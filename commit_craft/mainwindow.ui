@@ -469,6 +469,11 @@
     <string>Настройки</string>
    </property>
   </action>
+  <action name="actionCommit">
+   <property name="text">
+    <string>Commit</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>

@@ -81,12 +81,18 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    connect(ui->actionCommit, &QAction::triggered, this, &MainWindow::commitChanges);
     
     // Connect refresh button
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
     
-    // Connect commit button
-    connect(ui->commitButton, &QPushButton::clicked, this, &MainWindow::commitChanges);
+    // Connect commit button to the same action
+    connect(ui->commitButton, &QPushButton::clicked, ui->actionCommit, &QAction::trigger);
+    
+    // Connect action changes to update button state
+    connect(ui->actionCommit, &QAction::changed, this, [this]() {
+        ui->commitButton->setEnabled(ui->actionCommit->isEnabled());
+    });
     
     // Connect table selection changes
     connect(ui->filesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onFileTableSelectionChanged);
@@ -104,12 +110,18 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stagedFilesTable->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->stagedFilesTable, &QTableView::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
     
-    // Set initial state of commit button
+    // Set initial state of commit action and button
+    ui->actionCommit->setEnabled(false);
     ui->commitButton->setEnabled(false);
     
     // Set initial visibility of staged label and table
     ui->stagedLabel->setVisible(false);
     ui->stagedFilesTable->setVisible(false);
+    
+    // Connect action changes to update button state
+    connect(ui->actionCommit, &QAction::changed, this, [this]() {
+        ui->commitButton->setEnabled(ui->actionCommit->isEnabled());
+    });
     
     // Set window title to show current repository
     setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
@@ -484,9 +496,9 @@ void MainWindow::commitChanges()
 
 void MainWindow::updateCommitButtonState()
 {
-    // Enable commit button only if there are staged files
+    // Enable commit action only if there are staged files
     bool hasStagedFiles = stagedFilesModel->rowCount() > 0;
-    ui->commitButton->setEnabled(hasStagedFiles);
+    ui->actionCommit->setEnabled(hasStagedFiles);
     
     // Hide/show staged label and table based on whether there are staged files
     ui->stagedLabel->setVisible(hasStagedFiles);
