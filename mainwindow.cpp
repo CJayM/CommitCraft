@@ -1,19 +1,20 @@
 #include "mainwindow.h"
 #include <QCloseEvent>
+#include <QDebug>
 #include <QDir>
 #include <QFileDialog>
+#include <QList>
 #include <QMessageBox>
+#include <QPair>
+#include <QRegularExpression>
+#include <QScrollBar>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
-#include <QScrollBar>
-#include <QList>
-#include <QPair>
-#include <QRegularExpression>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
-#include "settingsdialog.h"
 #include "filemodel.h"
+#include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -769,24 +770,35 @@ void MainWindow::navigateToNextHunk()
     int stagedLine = hunk.first;
     int currentLine = hunk.second;
     
-    // Scroll to the hunk in both editors
+    // Scroll to the hunk in both editors using scroll bars for better control
     // For staged content editor
     QTextCursor stagedCursor(stagedContentEditor->document());
     stagedCursor.movePosition(QTextCursor::Start);
     for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
         stagedCursor.movePosition(QTextCursor::Down);
     }
+
     stagedContentEditor->setTextCursor(stagedCursor);
-    stagedContentEditor->ensureCursorVisible();
-    
+    // Calculate the position and scroll to it (center the hunk)
+    QRect cursorRect = stagedContentEditor->cursorRect(stagedCursor);
+    int scrollValue = cursorRect.y() - (stagedContentEditor->viewport()->height() / 2);
+    scrollValue = qBound(0, scrollValue, stagedContentEditor->verticalScrollBar()->maximum());
+    // stagedContentEditor->verticalScrollBar()->setValue(scrollValue);
+
     // For current content editor
     QTextCursor currentCursor(currentContentEditor->document());
     currentCursor.movePosition(QTextCursor::Start);
     for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
         currentCursor.movePosition(QTextCursor::Down);
     }
+    
+    // Calculate the position and scroll to it (center the hunk)
+    cursorRect = currentContentEditor->cursorRect(currentCursor);
     currentContentEditor->setTextCursor(currentCursor);
-    currentContentEditor->ensureCursorVisible();
+    scrollValue = cursorRect.y() - (currentContentEditor->viewport()->height() / 2);
+    scrollValue = qBound(0, scrollValue, currentContentEditor->verticalScrollBar()->maximum());
+    // currentContentEditor->verticalScrollBar()->setValue(scrollValue);
+    qDebug() << "Scroll to " << scrollValue << stagedLine << currentLine;
 }
 
 void MainWindow::navigateToPrevHunk()
@@ -804,15 +816,19 @@ void MainWindow::navigateToPrevHunk()
     int stagedLine = hunk.first;
     int currentLine = hunk.second;
     
-    // Scroll to the hunk in both editors
+    // Scroll to the hunk in both editors using scroll bars for better control
     // For staged content editor
     QTextCursor stagedCursor(stagedContentEditor->document());
     stagedCursor.movePosition(QTextCursor::Start);
     for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
         stagedCursor.movePosition(QTextCursor::Down);
     }
-    stagedContentEditor->setTextCursor(stagedCursor);
-    stagedContentEditor->ensureCursorVisible();
+    
+    // Calculate the position and scroll to it (center the hunk)
+    QRect cursorRect = stagedContentEditor->cursorRect(stagedCursor);
+    int scrollValue = cursorRect.y() - (stagedContentEditor->viewport()->height() / 2);
+    scrollValue = qBound(0, scrollValue, stagedContentEditor->verticalScrollBar()->maximum());
+    stagedContentEditor->verticalScrollBar()->setValue(scrollValue);
     
     // For current content editor
     QTextCursor currentCursor(currentContentEditor->document());
@@ -820,12 +836,17 @@ void MainWindow::navigateToPrevHunk()
     for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
         currentCursor.movePosition(QTextCursor::Down);
     }
-    currentContentEditor->setTextCursor(currentCursor);
-    currentContentEditor->ensureCursorVisible();
+    
+    // Calculate the position and scroll to it (center the hunk)
+    cursorRect = currentContentEditor->cursorRect(currentCursor);
+    scrollValue = cursorRect.y() - (currentContentEditor->viewport()->height() / 2);
+    scrollValue = qBound(0, scrollValue, currentContentEditor->verticalScrollBar()->maximum());
+    currentContentEditor->verticalScrollBar()->setValue(scrollValue);
 }
 
 void MainWindow::synchronizeScroll()
 {
+    return;
     // Prevent infinite recursion by temporarily blocking signals
     QScrollBar *stagedScrollBar = stagedContentEditor->verticalScrollBar();
     QScrollBar *currentScrollBar = currentContentEditor->verticalScrollBar();
