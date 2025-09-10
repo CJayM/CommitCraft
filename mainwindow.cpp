@@ -96,6 +96,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Set initial state of commit button
     ui->commitButton->setEnabled(false);
     
+    // Set initial visibility of staged label and table
+    ui->stagedLabel->setVisible(false);
+    ui->stagedFilesTable->setVisible(false);
+    
     // Set window title to show current repository
     setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
     
@@ -471,6 +475,10 @@ void MainWindow::updateCommitButtonState()
     // Enable commit button only if there are staged files
     bool hasStagedFiles = stagedFilesModel->rowCount() > 0;
     ui->commitButton->setEnabled(hasStagedFiles);
+    
+    // Hide/show staged label and table based on whether there are staged files
+    ui->stagedLabel->setVisible(hasStagedFiles);
+    ui->stagedFilesTable->setVisible(hasStagedFiles);
 }
 
 void MainWindow::onFileTableSelectionChanged()
