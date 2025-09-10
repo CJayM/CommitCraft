@@ -2,4 +2,5 @@
 
 /build/
 /commit_craft/build/
+/commit_craft_app/build/
 *.pro.user*

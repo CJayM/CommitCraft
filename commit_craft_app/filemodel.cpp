@@ -13,12 +13,7 @@ int FileModel::rowCount(const QModelIndex &parent) const
     return m_files.size();
 }
 
-int FileModel::columnCount(const QModelIndex &parent) const
-{
-    if (parent.isValid())
-        return 0;
-    return 2; // status, filename
-}
+
 
 QVariant FileModel::data(const QModelIndex &index, int role) const
 {

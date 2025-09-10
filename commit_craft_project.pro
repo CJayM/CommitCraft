@@ -1,10 +1,9 @@
 TEMPLATE = subdirs
 
 SUBDIRS += \
-    commit_craft
+    commit_craft_app \
+    commit_craft_lib \
+    commit_craft_tests
 
-# Optional: Add tests later
-# SUBDIRS += commit_craft_tests
-
-# If we add tests, specify dependencies
-# commit_craft_tests.depends = commit_craft
+commit_craft_app.depends = commit_craft_lib
+commit_craft_tests.depends = commit_craft_lib
