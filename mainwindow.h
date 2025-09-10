@@ -47,6 +47,7 @@ private:
     void restoreSplitterState();
     void executeGitStatus();
     void parseGitStatusOutput(const QString &output);
+    QColor getStatusBackgroundColor(const QString &status);
     bool isGitRepository(const QString &path);
     bool isStaged(const QString &status);
     bool isUnstaged(const QString &status);

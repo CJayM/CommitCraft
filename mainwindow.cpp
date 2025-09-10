@@ -214,6 +214,29 @@ void MainWindow::onGitStatusError(QProcess::ProcessError error)
     QMessageBox::warning(this, "Ошибка Git", errorMessage);
 }
 
+QColor MainWindow::getStatusBackgroundColor(const QString &status)
+{
+    // Define colors for each status type:
+    // 'M' - Modified (light blue)
+    if (status == "M") return QColor(173, 216, 230); // Light blue
+    // 'T' - Type changed (light purple)
+    if (status == "T") return QColor(230, 173, 230); // Light purple
+    // 'A' - Added (light green)
+    if (status == "A") return QColor(144, 238, 144); // Light green
+    // 'D' - Deleted (light pink)
+    if (status == "D") return QColor(255, 182, 193); // Light pink
+    // 'R' - Renamed (light yellow)
+    if (status == "R") return QColor(255, 255, 224); // Light yellow
+    // 'C' - Copied (light orange)
+    if (status == "C") return QColor(255, 218, 185); // Light orange
+    // 'U' - Unmerged (light gray)
+    if (status == "U") return QColor(211, 211, 211); // Light gray
+    // '?' - Untracked (default color)
+    if (status == "?") return QColor(255, 255, 255); // White
+    // Default color for any other status
+    return QColor(255, 255, 255); // White
+}
+
 void MainWindow::parseGitStatusOutput(const QString &output)
 {
     QStringList lines = output.split('\n', Qt::SkipEmptyParts);
@@ -248,6 +271,9 @@ void MainWindow::parseGitStatusOutput(const QString &output)
         QTableWidgetItem *statusItem = new QTableWidgetItem(fileInfo.first);
         QTableWidgetItem *fileItem = new QTableWidgetItem(fileInfo.second);
         
+        // Set background color based on status
+        statusItem->setBackground(getStatusBackgroundColor(fileInfo.first));
+        
         ui->filesTable->setItem(i, 0, statusItem);
         ui->filesTable->setItem(i, 1, fileItem);
     }
@@ -258,6 +284,9 @@ void MainWindow::parseGitStatusOutput(const QString &output)
         const auto &fileInfo = stagedFiles.at(i);
         QTableWidgetItem *statusItem = new QTableWidgetItem(fileInfo.first);
         QTableWidgetItem *fileItem = new QTableWidgetItem(fileInfo.second);
+        
+        // Set background color based on status
+        statusItem->setBackground(getStatusBackgroundColor(fileInfo.first));
         
         ui->stagedFilesTable->setItem(i, 0, statusItem);
         ui->stagedFilesTable->setItem(i, 1, fileItem);
