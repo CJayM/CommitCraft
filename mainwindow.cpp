@@ -3,14 +3,17 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QMessageBox>
-#include <QScrollBar>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QScrollBar>
+#include <QList>
+#include <QPair>
+#include <QRegularExpression>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
-#include "filemodel.h"
 #include "settingsdialog.h"
+#include "filemodel.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -23,6 +26,7 @@ MainWindow::MainWindow(QWidget *parent)
     , currentContentEditor(nullptr)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
+    , currentHunkIndex(-1)
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -64,8 +68,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(currentContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
     
     // Connect scroll synchronization
-    connect(stagedContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::synchronizeScroll);
-    connect(currentContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::synchronizeScroll);
+    connect(stagedContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, 
+            this, &MainWindow::synchronizeScroll);
+    connect(currentContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, 
+            this, &MainWindow::synchronizeScroll);
+    
+    // Connect hunk navigation buttons
+    connect(ui->nextHunkButton, &QPushButton::clicked, this, &MainWindow::navigateToNextHunk);
+    connect(ui->prevHunkButton, &QPushButton::clicked, this, &MainWindow::navigateToPrevHunk);
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
@@ -507,6 +517,12 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
+    // Reset hunk navigation
+    hunkPositions.clear();
+    currentHunkIndex = -1;
+    ui->nextHunkButton->setEnabled(false);
+    ui->prevHunkButton->setEnabled(false);
+    
     // Get file contents
     QString stagedContent = getFileContent(fileName, true);
     QString currentContent = getFileContent(fileName, false);
@@ -538,13 +554,52 @@ void MainWindow::applyDiffHighlighting(const QString &fileName)
     
     if (gitProcess.exitCode() == 0) {
         QString diffOutput = gitProcess.readAllStandardOutput();
+        // Extract hunk positions for navigation
+        extractHunkPositions(diffOutput);
         // Parse and apply diff highlighting to the text edits
         parseAndApplyDiffHighlighting(diffOutput);
     } else {
         // If git diff fails, clear any existing highlighting
         stagedContentEditor->setPlainText(stagedContentEditor->toPlainText());
         currentContentEditor->setPlainText(currentContentEditor->toPlainText());
+        // Clear hunk positions
+        hunkPositions.clear();
+        currentHunkIndex = -1;
+        // Update button states
+        ui->nextHunkButton->setEnabled(false);
+        ui->prevHunkButton->setEnabled(false);
     }
+}
+
+void MainWindow::extractHunkPositions(const QString &diffOutput)
+{
+    // Clear existing hunk positions
+    hunkPositions.clear();
+    currentHunkIndex = -1;
+    
+    // Parse diff output to extract hunk positions
+    QStringList lines = diffOutput.split('\n');
+    
+    // Process diff lines
+    for (int i = 0; i < lines.size(); i++) {
+        const QString &line = lines[i];
+        if (line.startsWith("@@")) {
+            // Hunk header - parse line numbers
+            // Format: @@ -start,count +start,count @@
+            QRegularExpression re("@@ -(\\d+),(\\d+) \\+(\\d+),(\\d+) @@");
+            QRegularExpressionMatch match = re.match(line);
+            if (match.hasMatch()) {
+                int stagedLine = match.captured(1).toInt();
+                int currentLine = match.captured(3).toInt();
+                hunkPositions.append(qMakePair(stagedLine, currentLine));
+            }
+        }
+    }
+    
+    // Update button states
+    bool hasHunks = !hunkPositions.isEmpty();
+    ui->nextHunkButton->setEnabled(hasHunks);
+    ui->prevHunkButton->setEnabled(hasHunks);
 }
 
 void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
@@ -697,6 +752,76 @@ void MainWindow::synchronizeZoom(int zoom)
     // Restore signals
     stagedContentEditor->blockSignals(stagedBlocked);
     currentContentEditor->blockSignals(currentBlocked);
+}
+
+void MainWindow::navigateToNextHunk()
+{
+    if (hunkPositions.isEmpty()) return;
+    
+    // Move to next hunk
+    currentHunkIndex++;
+    if (currentHunkIndex >= hunkPositions.size()) {
+        currentHunkIndex = 0; // Wrap around to first hunk
+    }
+    
+    // Get the hunk position
+    const auto &hunk = hunkPositions[currentHunkIndex];
+    int stagedLine = hunk.first;
+    int currentLine = hunk.second;
+    
+    // Scroll to the hunk in both editors
+    // For staged content editor
+    QTextCursor stagedCursor(stagedContentEditor->document());
+    stagedCursor.movePosition(QTextCursor::Start);
+    for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
+        stagedCursor.movePosition(QTextCursor::Down);
+    }
+    stagedContentEditor->setTextCursor(stagedCursor);
+    stagedContentEditor->ensureCursorVisible();
+    
+    // For current content editor
+    QTextCursor currentCursor(currentContentEditor->document());
+    currentCursor.movePosition(QTextCursor::Start);
+    for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
+        currentCursor.movePosition(QTextCursor::Down);
+    }
+    currentContentEditor->setTextCursor(currentCursor);
+    currentContentEditor->ensureCursorVisible();
+}
+
+void MainWindow::navigateToPrevHunk()
+{
+    if (hunkPositions.isEmpty()) return;
+    
+    // Move to previous hunk
+    currentHunkIndex--;
+    if (currentHunkIndex < 0) {
+        currentHunkIndex = hunkPositions.size() - 1; // Wrap around to last hunk
+    }
+    
+    // Get the hunk position
+    const auto &hunk = hunkPositions[currentHunkIndex];
+    int stagedLine = hunk.first;
+    int currentLine = hunk.second;
+    
+    // Scroll to the hunk in both editors
+    // For staged content editor
+    QTextCursor stagedCursor(stagedContentEditor->document());
+    stagedCursor.movePosition(QTextCursor::Start);
+    for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
+        stagedCursor.movePosition(QTextCursor::Down);
+    }
+    stagedContentEditor->setTextCursor(stagedCursor);
+    stagedContentEditor->ensureCursorVisible();
+    
+    // For current content editor
+    QTextCursor currentCursor(currentContentEditor->document());
+    currentCursor.movePosition(QTextCursor::Start);
+    for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
+        currentCursor.movePosition(QTextCursor::Down);
+    }
+    currentContentEditor->setTextCursor(currentCursor);
+    currentContentEditor->ensureCursorVisible();
 }
 
 void MainWindow::synchronizeScroll()

@@ -7,6 +7,9 @@
 #include <QPoint>
 #include <QTextCharFormat>
 #include <QScrollBar>
+#include <QList>
+#include <QPair>
+#include <QRegularExpression>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -43,6 +46,8 @@ private slots:
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
     void synchronizeZoom(int zoom);
+    void navigateToNextHunk();
+    void navigateToPrevHunk();
 
 private:
     void saveSplitterState();
@@ -58,6 +63,7 @@ private:
     void applyDiffHighlighting(const QString &fileName);
     void parseAndApplyDiffHighlighting(const QString &diffOutput);
     void synchronizeScroll();
+    void extractHunkPositions(const QString &diffOutput);
 
     Ui::MainWindow *ui;
     QSettings *settings;
@@ -68,5 +74,9 @@ private:
     CodeEditor *currentContentEditor;
     FileModel *unstagedFilesModel;
     FileModel *stagedFilesModel;
+    
+    // Hunk navigation data
+    QList<QPair<int, int>> hunkPositions; // Pair of (stagedLine, currentLine) for each hunk
+    int currentHunkIndex;
 };
 #endif // MAINWINDOW_H
