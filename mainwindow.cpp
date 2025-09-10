@@ -28,6 +28,7 @@ void MainWindow::saveSplitterState()
     settings->setValue("splitterSizes", ui->splitter->saveState());
     settings->setValue("leftSplitterSizes", ui->leftSplitter->saveState());
     settings->setValue("rightSplitterSizes", ui->rightSplitter->saveState());
+    settings->setValue("topSplitterSizes", ui->topSplitter->saveState());
 }
 
 void MainWindow::restoreSplitterState()
@@ -40,5 +41,8 @@ void MainWindow::restoreSplitterState()
     }
     if (settings->contains("rightSplitterSizes")) {
         ui->rightSplitter->restoreState(settings->value("rightSplitterSizes").toByteArray());
+    }
+    if (settings->contains("topSplitterSizes")) {
+        ui->topSplitter->restoreState(settings->value("topSplitterSizes").toByteArray());
     }
 }
