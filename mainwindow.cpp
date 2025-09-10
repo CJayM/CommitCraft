@@ -19,6 +19,16 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     restoreSplitterState();
     
+    // Load repository path from settings
+    QVariant savedRepoPath = settings->value("repositoryPath");
+    if (savedRepoPath.isValid() && !savedRepoPath.toString().isEmpty()) {
+        QString path = savedRepoPath.toString();
+        // Check if the saved directory is still a Git repository
+        if (isGitRepository(path)) {
+            repositoryPath = path;
+        }
+    }
+    
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
@@ -248,6 +258,8 @@ void MainWindow::openRepository()
         // Check if the selected directory is a Git repository
         if (isGitRepository(dir)) {
             repositoryPath = dir;
+            // Save the repository path to settings
+            settings->setValue("repositoryPath", repositoryPath);
             setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
             refreshGitStatus();
         } else {
