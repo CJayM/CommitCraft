@@ -32,7 +32,9 @@ private slots:
     void onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onGitStatusError(QProcess::ProcessError error);
     void showFileContextMenu(const QPoint &pos);
+    void showStagedFileContextMenu(const QPoint &pos);
     void addSelectedFile();
+    void unstageSelectedFile();
 
 private:
     void saveSplitterState();
@@ -40,6 +42,7 @@ private:
     void executeGitStatus();
     void parseGitStatusOutput(const QString &output);
     bool isGitRepository(const QString &path);
+    bool isStaged(const QString &status);
 
     Ui::MainWindow *ui;
     QSettings *settings;

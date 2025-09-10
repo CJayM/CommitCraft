@@ -31,14 +31,18 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onGitStatusFinished);
     connect(gitProcess, &QProcess::errorOccurred, this, &MainWindow::onGitStatusError);
     
-    // Initialize table
+    // Initialize tables
     ui->filesTable->setColumnCount(2);
     ui->filesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
     ui->filesTable->horizontalHeader()->setStretchLastSection(true);
-    
-    // Enable context menu
     ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->filesTable, &QTableWidget::customContextMenuRequested, this, &MainWindow::showFileContextMenu);
+    
+    ui->stagedFilesTable->setColumnCount(2);
+    ui->stagedFilesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
+    ui->stagedFilesTable->horizontalHeader()->setStretchLastSection(true);
+    ui->stagedFilesTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->stagedFilesTable, &QTableWidget::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
     
     // Set window title to show current repository
     setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
@@ -168,21 +172,54 @@ void MainWindow::parseGitStatusOutput(const QString &output)
 {
     QStringList lines = output.split('\n', Qt::SkipEmptyParts);
     
-    ui->filesTable->setRowCount(lines.size());
+    // Clear both tables
+    ui->filesTable->setRowCount(0);
+    ui->stagedFilesTable->setRowCount(0);
     
-    for (int i = 0; i < lines.size(); ++i) {
-        QString line = lines[i];
+    // Separate staged and unstaged files
+    QList<QPair<QString, QString>> unstagedFiles;
+    QList<QPair<QString, QString>> stagedFiles;
+    
+    for (const QString &line : lines) {
         if (line.length() < 4) continue;
         
         QString status = line.left(2);
         QString file = line.mid(3);
         
-        QTableWidgetItem *statusItem = new QTableWidgetItem(status);
-        QTableWidgetItem *fileItem = new QTableWidgetItem(file);
+        if (isStaged(status)) {
+            stagedFiles.append(qMakePair(status, file));
+        } else {
+            unstagedFiles.append(qMakePair(status, file));
+        }
+    }
+    
+    // Populate unstaged files table
+    ui->filesTable->setRowCount(unstagedFiles.size());
+    for (int i = 0; i < unstagedFiles.size(); ++i) {
+        const auto &fileInfo = unstagedFiles.at(i);
+        QTableWidgetItem *statusItem = new QTableWidgetItem(fileInfo.first);
+        QTableWidgetItem *fileItem = new QTableWidgetItem(fileInfo.second);
         
         ui->filesTable->setItem(i, 0, statusItem);
         ui->filesTable->setItem(i, 1, fileItem);
     }
+    
+    // Populate staged files table
+    ui->stagedFilesTable->setRowCount(stagedFiles.size());
+    for (int i = 0; i < stagedFiles.size(); ++i) {
+        const auto &fileInfo = stagedFiles.at(i);
+        QTableWidgetItem *statusItem = new QTableWidgetItem(fileInfo.first);
+        QTableWidgetItem *fileItem = new QTableWidgetItem(fileInfo.second);
+        
+        ui->stagedFilesTable->setItem(i, 0, statusItem);
+        ui->stagedFilesTable->setItem(i, 1, fileItem);
+    }
+}
+
+bool MainWindow::isStaged(const QString &status)
+{
+    // Check if the file is staged (first character is not space)
+    return status.at(0) != ' ' && status.at(0) != '?';
 }
 
 void MainWindow::openRepository()
@@ -282,4 +319,77 @@ void MainWindow::addSelectedFile()
     
     // Start the process
     addProcess->start();
+}
+
+void MainWindow::showStagedFileContextMenu(const QPoint &pos)
+{
+    // Get the item at the position
+    QTableWidgetItem *item = ui->stagedFilesTable->itemAt(pos);
+    if (!item) return;
+    
+    // Get the row of the item
+    int row = item->row();
+    
+    // Create the context menu
+    QMenu contextMenu(tr("Файл"), this);
+    
+    // Create the "Убрать из stage" action
+    QAction *unstageAction = new QAction(tr("Убрать из stage"), this);
+    connect(unstageAction, &QAction::triggered, this, &MainWindow::unstageSelectedFile);
+    contextMenu.addAction(unstageAction);
+    
+    // Show the context menu
+    contextMenu.exec(ui->stagedFilesTable->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::unstageSelectedFile()
+{
+    // Get the currently selected row
+    int row = ui->stagedFilesTable->currentRow();
+    if (row < 0) return;
+    
+    // Get the file name from the second column
+    QTableWidgetItem *fileItem = ui->stagedFilesTable->item(row, 1);
+    if (!fileItem) return;
+    
+    QString fileName = fileItem->text();
+    
+    // Make the file path absolute by prepending the repository path
+    QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Create a new process for git reset
+    QProcess *resetProcess = new QProcess(this);
+    
+    // Set up the process
+    resetProcess->setProgram(gitPath);
+    resetProcess->setArguments(QStringList() << "reset" << "HEAD" << absoluteFilePath);
+    resetProcess->setWorkingDirectory(repositoryPath);
+    
+    // Connect to signals to handle completion
+    connect(resetProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, resetProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+                if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    // Success - refresh the git status
+                    refreshGitStatus();
+                } else {
+                    // Error - show message
+                    QString error = resetProcess->readAllStandardError();
+                    QMessageBox::warning(this, tr("Ошибка Git"), 
+                                        QString(tr("Не удалось выполнить git reset:\n%1")).arg(error));
+                }
+                // Clean up the process
+                resetProcess->deleteLater();
+            });
+    
+    // Start the process
+    resetProcess->start();
 }
