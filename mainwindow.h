@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QSettings>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -17,7 +18,14 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
+    void saveSplitterState();
+    void restoreSplitterState();
+
     Ui::MainWindow *ui;
+    QSettings *settings;
 };
 #endif // MAINWINDOW_H

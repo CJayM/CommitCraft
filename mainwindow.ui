@@ -35,14 +35,17 @@
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
       </property>
+      <property name="lineWidth">
+       <number>0</number>
+      </property>
       <property name="midLineWidth">
-       <number>2</number>
+       <number>0</number>
       </property>
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
       <property name="handleWidth">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QFrame" name="leftFrame">
        <property name="minimumSize">
@@ -52,25 +55,107 @@
         </size>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Box</enum>
+        <enum>QFrame::Panel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Raised</enum>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
-         <widget class="QLabel" name="leftLabel">
+         <widget class="QSplitter" name="leftSplitter">
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
           </property>
-          <property name="text">
-           <string>Left Panel</string>
+          <property name="frameShadow">
+           <enum>QFrame::Raised</enum>
           </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
+          <property name="lineWidth">
+           <number>0</number>
           </property>
+          <property name="midLineWidth">
+           <number>0</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="handleWidth">
+           <number>6</number>
+          </property>
+          <widget class="QFrame" name="repoWidget">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>100</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::Panel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_4">
+            <item>
+             <widget class="QLabel" name="repoLabel">
+              <property name="text">
+               <string>Repository Panel</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QFrame" name="branchesWidget">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>100</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::Panel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_5">
+            <property name="spacing">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="branchesLabel">
+              <property name="text">
+               <string>Branches Panel</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
       </widget>
-      <widget class="QFrame" name="rightFrame">
+      <widget class="QFrame" name="rightWidget">
        <property name="minimumSize">
         <size>
          <width>100</width>
@@ -78,7 +163,10 @@
         </size>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Box</enum>
+        <enum>QFrame::Panel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Raised</enum>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
