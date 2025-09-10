@@ -1,20 +1,28 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
+#include "settingsdialog.h"
 #include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , settings(new QSettings("CommitCraft", "MainWindow"))
+    , settingsDialog(nullptr)
 {
     ui->setupUi(this);
     restoreSplitterState();
+    
+    // Connect the settings action to the slot
+    connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
     delete settings;
+    if (settingsDialog) {
+        delete settingsDialog;
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -45,4 +53,13 @@ void MainWindow::restoreSplitterState()
     if (settings->contains("topSplitterSizes")) {
         ui->topSplitter->restoreState(settings->value("topSplitterSizes").toByteArray());
     }
+}
+
+void MainWindow::openSettingsDialog()
+{
+    if (!settingsDialog) {
+        settingsDialog = new SettingsDialog(this);
+    }
+    
+    settingsDialog->exec();
 }

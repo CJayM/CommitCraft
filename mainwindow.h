@@ -10,6 +10,8 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+class SettingsDialog;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -21,11 +23,15 @@ public:
 protected:
     void closeEvent(QCloseEvent *event) override;
 
+private slots:
+    void openSettingsDialog();
+
 private:
     void saveSplitterState();
     void restoreSplitterState();
 
     Ui::MainWindow *ui;
     QSettings *settings;
+    SettingsDialog *settingsDialog;
 };
 #endif // MAINWINDOW_H
