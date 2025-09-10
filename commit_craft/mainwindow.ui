@@ -358,13 +358,13 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QSplitter" name="rightSplitter">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="handleWidth">
-           <number>6</number>
-          </property>
+
+
+
+       
+
+
+
           <widget class="QFrame" name="diffFrame">
            <property name="minimumSize">
             <size>
@@ -435,7 +435,7 @@
             </item>
            </layout>
           </widget>
-         </widget>
+
         </item>
        </layout>
       </widget>
