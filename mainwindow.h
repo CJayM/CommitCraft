@@ -40,6 +40,7 @@ private slots:
     void commitChanges();
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
+    void synchronizeZoom(int zoom);
 
 private:
     void saveSplitterState();

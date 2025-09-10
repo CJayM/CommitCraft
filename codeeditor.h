@@ -9,6 +9,7 @@ class QPaintEvent;
 class QResizeEvent;
 class QSize;
 class QWidget;
+class QWheelEvent;
 QT_END_NAMESPACE
 
 class LineNumberArea;
@@ -22,9 +23,18 @@ public:
 
     void lineNumberAreaPaintEvent(QPaintEvent *event);
     int lineNumberAreaWidth();
+    
+    void zoomIn(int range = 1);
+    void zoomOut(int range = 1);
+    void setZoom(int zoom);
+    int zoom() const;
+
+signals:
+    void zoomChanged(int zoom);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
@@ -33,6 +43,7 @@ private slots:
 
 private:
     QWidget *lineNumberArea;
+    int m_zoom;
 };
 
 #endif // CODEEDITOR_H

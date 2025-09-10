@@ -2,12 +2,14 @@
 #include "linenumberarea.h"
 
 #include <QAbstractItemView>
+#include <QApplication>
 #include <QPaintEvent>
-#include <QScrollBar>
 #include <QPainter>
+#include <QScrollBar>
 #include <QTextBlock>
+#include <QWheelEvent>
 
-CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent)
+CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent), m_zoom(100)
 {
     lineNumberArea = new LineNumberArea(this);
 
@@ -59,6 +61,20 @@ void CodeEditor::resizeEvent(QResizeEvent *e)
     lineNumberArea->setGeometry(QRect(cr.left(), cr.top(), lineNumberAreaWidth(), cr.height()));
 }
 
+void CodeEditor::wheelEvent(QWheelEvent *event)
+{
+    if (QApplication::keyboardModifiers() == Qt::ControlModifier) {
+        if (event->angleDelta().y() > 0) {
+            zoomIn(1);
+        } else {
+            zoomOut(1);
+        }
+        event->accept();
+        return;
+    }
+    QPlainTextEdit::wheelEvent(event);
+}
+
 void CodeEditor::highlightCurrentLine()
 {
     QList<QTextEdit::ExtraSelection> extraSelections;
@@ -107,4 +123,39 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
         bottom = top + qRound(blockBoundingRect(block).height());
         ++blockNumber;
     }
+}
+
+void CodeEditor::zoomIn(int range)
+{
+    setZoom(m_zoom + range * 10);
+}
+
+void CodeEditor::zoomOut(int range)
+{
+    setZoom(m_zoom - range * 10);
+}
+
+void CodeEditor::setZoom(int zoom)
+{
+    int oldZoom = m_zoom;
+    m_zoom = qBound(10, zoom, 150); // Limit zoom between 10% and 300%
+
+    // Only update if zoom actually changed
+    if (m_zoom != oldZoom) {
+        // Calculate the font size based on zoom level
+        QFont f = font();
+        f.setPointSizeF(14.0 * m_zoom / 100.0);
+        setFont(f);
+
+        // Update line number area
+        updateLineNumberAreaWidth(0);
+
+        // Emit zoom changed signal
+        emit zoomChanged(m_zoom);
+    }
+}
+
+int CodeEditor::zoom() const
+{
+    return m_zoom;
 }

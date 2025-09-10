@@ -51,6 +51,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->diffSplitter->addWidget(stagedContentEditor);
     ui->diffSplitter->addWidget(currentContentEditor);
     
+    // Connect zoom synchronization
+    connect(stagedContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
+    connect(currentContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
+    
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
@@ -709,4 +713,22 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
             return "";
         }
     }
+}
+
+void MainWindow::synchronizeZoom(int zoom)
+{
+    // Prevent infinite recursion by temporarily blocking signals
+    bool stagedBlocked = stagedContentEditor->blockSignals(true);
+    bool currentBlocked = currentContentEditor->blockSignals(true);
+    
+    // Set the same zoom level for both editors
+    if (sender() == stagedContentEditor) {
+        currentContentEditor->setZoom(zoom);
+    } else if (sender() == currentContentEditor) {
+        stagedContentEditor->setZoom(zoom);
+    }
+    
+    // Restore signals
+    stagedContentEditor->blockSignals(stagedBlocked);
+    currentContentEditor->blockSignals(currentBlocked);
 }

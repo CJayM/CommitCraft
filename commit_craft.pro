@@ -12,6 +12,7 @@ SOURCES += \
 
 HEADERS += \
     codeeditor.h \
+    linenumberarea.h \
     mainwindow.h \
     settingsdialog.h
 
