@@ -90,6 +90,9 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect refresh button
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
     
+    // Connect amend checkbox
+    connect(ui->amend_chk, &QCheckBox::stateChanged, this, &MainWindow::onAmendCheckBoxChanged);
+    
     // Connect commit button to the same action
     ui->commitButton->setDefaultAction(ui->actionCommit);
 
@@ -468,7 +471,14 @@ void MainWindow::commitChanges()
     
     // Set up the process
     commitProcess->setProgram(gitPath);
-    commitProcess->setArguments(QStringList() << "commit" << "-m" << commitMessage);
+    
+    // Check if amend is checked
+    if (ui->amend_chk->isChecked()) {
+        commitProcess->setArguments(QStringList() << "commit" << "--amend" << "-m" << commitMessage);
+    } else {
+        commitProcess->setArguments(QStringList() << "commit" << "-m" << commitMessage);
+    }
+    
     commitProcess->setWorkingDirectory(repositoryPath);
     
     // Connect to signals to handle completion
@@ -477,6 +487,8 @@ void MainWindow::commitChanges()
                 if (exitStatus == QProcess::NormalExit && exitCode == 0) {
                     // Success - clear the commit message and refresh the git status
                     ui->commitMessageTextEdit->clear();
+                    // Uncheck amend checkbox after successful commit
+                    ui->amend_chk->setChecked(false);
                     refreshGitStatus();
                     currentContentEditor->clear();
                     stagedContentEditor->clear();
@@ -828,6 +840,33 @@ void MainWindow::toggleLeftPanel(bool visible)
 void MainWindow::toggleTopPanel(bool visible)
 {
     ui->topFrame->setVisible(visible);
+}
+
+void MainWindow::onAmendCheckBoxChanged(int state)
+{
+    // Check if the checkbox is checked and commit message is empty
+    if (state == Qt::Checked && ui->commitMessageTextEdit->toPlainText().trimmed().isEmpty()) {
+        // Get the last commit message
+        QSettings gitSettings("CommitCraft", "Settings");
+        QString gitPath = gitSettings.value("gitPath", "").toString();
+        if (gitPath.isEmpty()) {
+            gitPath = "git";
+        }
+        
+        QProcess gitProcess;
+        gitProcess.setProgram(gitPath);
+        gitProcess.setArguments(QStringList() << "log" << "-1" << "--pretty=format:%s");
+        gitProcess.setWorkingDirectory(repositoryPath);
+        gitProcess.start();
+        gitProcess.waitForFinished();
+        
+        if (gitProcess.exitCode() == 0) {
+            QString lastCommitMessage = gitProcess.readAllStandardOutput();
+            if (!lastCommitMessage.isEmpty()) {
+                ui->commitMessageTextEdit->setPlainText(lastCommitMessage);
+            }
+        }
+    }
 }
 
 void MainWindow::navigateToPrevHunk()

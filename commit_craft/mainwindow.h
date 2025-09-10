@@ -50,6 +50,7 @@ private slots:
     void navigateToPrevHunk();
     void toggleLeftPanel(bool visible);
     void toggleTopPanel(bool visible);
+    void onAmendCheckBoxChanged(int state);
     void updateCommitButtonState();
 
 private:
