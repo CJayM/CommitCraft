@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QProcess>
 #include <QPoint>
+#include <QTextCharFormat>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -50,6 +51,7 @@ private:
     void updateCommitButtonState();
     void updateDiffPanel(const QString &fileName);
     QString getFileContent(const QString &fileName, bool staged);
+    void displayHighlightedDiff(const QString &diffOutput);
 
     Ui::MainWindow *ui;
     QSettings *settings;

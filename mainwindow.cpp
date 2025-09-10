@@ -516,17 +516,85 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
-    // Get file contents
-    QString stagedContent = getFileContent(fileName, true);
-    QString currentContent = getFileContent(fileName, false);
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
     
-    // Set content in text edits
-    ui->stagedContentTextEdit->setPlainText(stagedContent);
-    ui->currentContentTextEdit->setPlainText(currentContent);
+    // Run git diff command
+    QProcess gitProcess;
+    gitProcess.setProgram(gitPath);
+    gitProcess.setArguments(QStringList() << "diff" << fileName);
+    gitProcess.setWorkingDirectory(repositoryPath);
+    gitProcess.start();
+    gitProcess.waitForFinished();
     
-    // TODO: Implement proper diff highlighting
-    // For now, we're just showing the content side-by-side
-    // A full implementation would require a more sophisticated diff algorithm
+    if (gitProcess.exitCode() == 0) {
+        QString diffOutput = gitProcess.readAllStandardOutput();
+        // Parse and display diff with highlighting
+        displayHighlightedDiff(diffOutput);
+    } else {
+        // If git diff fails, fall back to showing file contents
+        QString stagedContent = getFileContent(fileName, true);
+        QString currentContent = getFileContent(fileName, false);
+        ui->stagedContentTextEdit->setPlainText(stagedContent);
+        ui->currentContentTextEdit->setPlainText(currentContent);
+    }
+}
+
+void MainWindow::displayHighlightedDiff(const QString &diffOutput)
+{
+    // Clear both text edits
+    ui->stagedContentTextEdit->clear();
+    ui->currentContentTextEdit->clear();
+    
+    // Parse diff output
+    QStringList lines = diffOutput.split('\n');
+    
+    // Text cursors for both text edits
+    QTextCursor stagedCursor(ui->stagedContentTextEdit->textCursor());
+    QTextCursor currentCursor(ui->currentContentTextEdit->textCursor());
+    
+    // Formats for highlighting
+    QTextCharFormat addedFormat;
+    addedFormat.setBackground(QColor(198, 255, 198)); // Light green
+    
+    QTextCharFormat deletedFormat;
+    deletedFormat.setBackground(QColor(255, 198, 198)); // Light red
+    
+    // Process diff lines
+    for (const QString &line : lines) {
+        if (line.startsWith("@@")) {
+            // Hunk header - skip for now
+            continue;
+        } else if (line.startsWith("+") && !line.startsWith("+++")) {
+            // Added line (in current version)
+            QString content = line.mid(1); // Remove the '+' prefix
+            currentCursor.insertText(content + "\n");
+            
+            // Highlight the added line
+            QTextBlockFormat blockFormat = currentCursor.blockFormat();
+            blockFormat.setBackground(QColor(198, 255, 198)); // Light green
+            currentCursor.setBlockFormat(blockFormat);
+        } else if (line.startsWith("-") && !line.startsWith("---")) {
+            // Deleted line (in staged version)
+            QString content = line.mid(1); // Remove the '-' prefix
+            stagedCursor.insertText(content + "\n");
+            
+            // Highlight the deleted line
+            QTextBlockFormat blockFormat = stagedCursor.blockFormat();
+            blockFormat.setBackground(QColor(255, 198, 198)); // Light red
+            stagedCursor.setBlockFormat(blockFormat);
+        } else if (!line.startsWith("diff") && !line.startsWith("index") && 
+                   !line.startsWith("---") && !line.startsWith("+++")) {
+            // Unchanged line
+            QString content = line.startsWith(" ") ? line.mid(1) : line;
+            stagedCursor.insertText(content + "\n");
+            currentCursor.insertText(content + "\n");
+        }
+    }
 }
 
 QString MainWindow::getFileContent(const QString &fileName, bool staged)
