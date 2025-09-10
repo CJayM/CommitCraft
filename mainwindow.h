@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QSettings>
 #include <QProcess>
+#include <QPoint>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -30,6 +31,8 @@ private slots:
     void refreshGitStatus();
     void onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onGitStatusError(QProcess::ProcessError error);
+    void showFileContextMenu(const QPoint &pos);
+    void addSelectedFile();
 
 private:
     void saveSplitterState();

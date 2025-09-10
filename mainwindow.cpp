@@ -36,6 +36,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->filesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
     ui->filesTable->horizontalHeader()->setStretchLastSection(true);
     
+    // Enable context menu
+    ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->filesTable, &QTableWidget::customContextMenuRequested, this, &MainWindow::showFileContextMenu);
+    
     // Set window title to show current repository
     setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
     
@@ -205,4 +209,77 @@ bool MainWindow::isGitRepository(const QString &path)
 {
     QDir dir(path);
     return dir.exists(".git");
+}
+
+void MainWindow::showFileContextMenu(const QPoint &pos)
+{
+    // Get the item at the position
+    QTableWidgetItem *item = ui->filesTable->itemAt(pos);
+    if (!item) return;
+    
+    // Get the row of the item
+    int row = item->row();
+    
+    // Create the context menu
+    QMenu contextMenu(tr("Файл"), this);
+    
+    // Create the "Добавить" action
+    QAction *addAction = new QAction(tr("Добавить"), this);
+    connect(addAction, &QAction::triggered, this, &MainWindow::addSelectedFile);
+    contextMenu.addAction(addAction);
+    
+    // Show the context menu
+    contextMenu.exec(ui->filesTable->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::addSelectedFile()
+{
+    // Get the currently selected row
+    int row = ui->filesTable->currentRow();
+    if (row < 0) return;
+    
+    // Get the file name from the second column
+    QTableWidgetItem *fileItem = ui->filesTable->item(row, 1);
+    if (!fileItem) return;
+    
+    QString fileName = fileItem->text();
+    
+    // Make the file path absolute by prepending the repository path
+    QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Create a new process for git add
+    QProcess *addProcess = new QProcess(this);
+    
+    // Set up the process
+    addProcess->setProgram(gitPath);
+    addProcess->setArguments(QStringList() << "add" << absoluteFilePath);
+    addProcess->setWorkingDirectory(repositoryPath);
+    
+    // Connect to signals to handle completion
+    connect(addProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, addProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+                if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    // Success - refresh the git status
+                    refreshGitStatus();
+                } else {
+                    // Error - show message
+                    QString error = addProcess->readAllStandardError();
+                    QMessageBox::warning(this, tr("Ошибка Git"), 
+                                        QString(tr("Не удалось выполнить git add:\n%1")).arg(error));
+                }
+                // Clean up the process
+                addProcess->deleteLater();
+            });
+    
+    // Start the process
+    addProcess->start();
 }
