@@ -2,6 +2,7 @@
 #define SETTINGSDIALOG_H
 
 #include <QDialog>
+#include <QSettings>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -17,8 +18,18 @@ public:
     explicit SettingsDialog(QWidget *parent = nullptr);
     ~SettingsDialog();
 
+    QString getGitPath() const;
+    void setGitPath(const QString &gitPath);
+
+private slots:
+    void onGitPathButtonClicked();
+
 private:
+    void loadSettings();
+    void saveSettings();
+
     Ui::SettingsDialog *ui;
+    QSettings *settings;
 };
 
 #endif // SETTINGSDIALOG_H
