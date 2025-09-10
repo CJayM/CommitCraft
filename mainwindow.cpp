@@ -8,6 +8,7 @@
 #include <QTextStream>
 #include "./ui_mainwindow.h"
 #include "settingsdialog.h"
+#include "codeeditor.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -16,6 +17,8 @@ MainWindow::MainWindow(QWidget *parent)
     , settingsDialog(nullptr)
     , gitProcess(new QProcess(this))
     , repositoryPath(QDir::currentPath())
+    , stagedContentEditor(nullptr)
+    , currentContentEditor(nullptr)
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -29,6 +32,24 @@ MainWindow::MainWindow(QWidget *parent)
             repositoryPath = path;
         }
     }
+    
+    // Replace QPlainTextEdit with CodeEditor for line numbers
+    // First, remove the existing widgets
+    delete ui->stagedContentTextEdit;
+    delete ui->currentContentTextEdit;
+    
+    // Create new CodeEditor widgets
+    stagedContentEditor = new CodeEditor(this);
+    stagedContentEditor->setReadOnly(true);
+    stagedContentEditor->setPlaceholderText(tr("Содержимое файла (staged)"));
+    
+    currentContentEditor = new CodeEditor(this);
+    currentContentEditor->setReadOnly(true);
+    currentContentEditor->setPlaceholderText(tr("Текущее содержимое файла"));
+    
+    // Add the CodeEditor widgets to the diffSplitter
+    ui->diffSplitter->addWidget(stagedContentEditor);
+    ui->diffSplitter->addWidget(currentContentEditor);
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
@@ -521,8 +542,8 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     QString currentContent = getFileContent(fileName, false);
     
     // Set content in text edits
-    ui->stagedContentTextEdit->setPlainText(stagedContent);
-    ui->currentContentTextEdit->setPlainText(currentContent);
+    stagedContentEditor->setPlainText(stagedContent);
+    currentContentEditor->setPlainText(currentContent);
     
     // Apply highlighting based on git diff
     applyDiffHighlighting(fileName);
@@ -549,6 +570,10 @@ void MainWindow::applyDiffHighlighting(const QString &fileName)
         QString diffOutput = gitProcess.readAllStandardOutput();
         // Parse and apply diff highlighting to the text edits
         parseAndApplyDiffHighlighting(diffOutput);
+    } else {
+        // If git diff fails, clear any existing highlighting
+        stagedContentEditor->setPlainText(stagedContentEditor->toPlainText());
+        currentContentEditor->setPlainText(currentContentEditor->toPlainText());
     }
 }
 
@@ -599,7 +624,7 @@ void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
     }
     
     // Apply highlighting to staged content
-    QTextCursor stagedCursor(ui->stagedContentTextEdit->document());
+    QTextCursor stagedCursor(stagedContentEditor->document());
     for (auto it = stagedLineTypes.begin(); it != stagedLineTypes.end(); ++it) {
         int lineNum = it.key();
         QString type = it.value();
@@ -623,7 +648,7 @@ void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
     }
     
     // Apply highlighting to current content
-    QTextCursor currentCursor(ui->currentContentTextEdit->document());
+    QTextCursor currentCursor(currentContentEditor->document());
     for (auto it = currentLineTypes.begin(); it != currentLineTypes.end(); ++it) {
         int lineNum = it.key();
         QString type = it.value();

@@ -14,6 +14,7 @@ class MainWindow;
 QT_END_NAMESPACE
 
 class SettingsDialog;
+class CodeEditor;
 
 class MainWindow : public QMainWindow
 {
@@ -59,5 +60,7 @@ private:
     SettingsDialog *settingsDialog;
     QProcess *gitProcess;
     QString repositoryPath;
+    CodeEditor *stagedContentEditor;
+    CodeEditor *currentContentEditor;
 };
 #endif // MAINWINDOW_H

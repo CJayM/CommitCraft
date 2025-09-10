@@ -5,11 +5,13 @@ TARGET = commit_craft
 TEMPLATE = app
 
 SOURCES += \
+    codeeditor.cpp \
     main.cpp \
     mainwindow.cpp \
     settingsdialog.cpp
 
 HEADERS += \
+    codeeditor.h \
     mainwindow.h \
     settingsdialog.h
 

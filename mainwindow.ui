@@ -389,7 +389,7 @@
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
-              <widget class="QTextEdit" name="stagedContentTextEdit">
+              <widget class="QPlainTextEdit" name="stagedContentTextEdit">
                <property name="readOnly">
                 <bool>true</bool>
                </property>
@@ -397,7 +397,7 @@
                 <string>Содержимое файла (staged)</string>
                </property>
               </widget>
-              <widget class="QTextEdit" name="currentContentTextEdit">
+              <widget class="QPlainTextEdit" name="currentContentTextEdit">
                <property name="readOnly">
                 <bool>true</bool>
                </property>
