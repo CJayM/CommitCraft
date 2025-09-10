@@ -466,8 +466,8 @@ void MainWindow::commitChanges()
                     // Success - clear the commit message and refresh the git status
                     ui->commitMessageTextEdit->clear();
                     refreshGitStatus();
-                    ui->currentContentTextEdit->clear();
-                    ui->stagedContentTextEdit->clear();
+                    currentContentEditor->clear();
+                    stagedContentEditor->clear();
                 } else {
                     // Error - show message
                     QString error = commitProcess->readAllStandardError();
