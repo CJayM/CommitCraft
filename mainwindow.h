@@ -35,6 +35,7 @@ private slots:
     void showStagedFileContextMenu(const QPoint &pos);
     void addSelectedFile();
     void unstageSelectedFile();
+    void commitChanges();
 
 private:
     void saveSplitterState();
@@ -44,6 +45,7 @@ private:
     bool isGitRepository(const QString &path);
     bool isStaged(const QString &status);
     bool isUnstaged(const QString &status);
+    void updateCommitButtonState();
 
     Ui::MainWindow *ui;
     QSettings *settings;

@@ -350,6 +350,20 @@
                   </property>
                  </widget>
                 </item>
+                <item>
+                 <widget class="QTextEdit" name="commitMessageTextEdit">
+                  <property name="placeholderText">
+                   <string>Введите сообщение коммита...</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="commitButton">
+                  <property name="text">
+                   <string>Commit</string>
+                  </property>
+                 </widget>
+                </item>
                </layout>
               </widget>
              </widget>

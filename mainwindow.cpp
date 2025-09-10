@@ -36,6 +36,9 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect refresh button
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
     
+    // Connect commit button
+    connect(ui->commitButton, &QPushButton::clicked, this, &MainWindow::commitChanges);
+    
     // Connect git process signals
     connect(gitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &MainWindow::onGitStatusFinished);
@@ -53,6 +56,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stagedFilesTable->horizontalHeader()->setStretchLastSection(true);
     ui->stagedFilesTable->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->stagedFilesTable, &QTableWidget::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
+    
+    // Set initial state of commit button
+    ui->commitButton->setEnabled(false);
     
     // Set window title to show current repository
     setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
@@ -233,6 +239,9 @@ void MainWindow::parseGitStatusOutput(const QString &output)
         ui->stagedFilesTable->setItem(i, 0, statusItem);
         ui->stagedFilesTable->setItem(i, 1, fileItem);
     }
+    
+    // Update commit button state
+    updateCommitButtonState();
 }
 
 bool MainWindow::isStaged(const QString &status)
@@ -419,4 +428,61 @@ void MainWindow::unstageSelectedFile()
     
     // Start the process
     resetProcess->start();
+}
+
+void MainWindow::commitChanges()
+{
+    // Get the commit message
+    QString commitMessage = ui->commitMessageTextEdit->toPlainText().trimmed();
+    
+    // Check if commit message is empty
+    if (commitMessage.isEmpty()) {
+        QMessageBox::warning(this, tr("Ошибка"), tr("Введите сообщение коммита."));
+        return;
+    }
+    
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Create a new process for git commit
+    QProcess *commitProcess = new QProcess(this);
+    
+    // Set up the process
+    commitProcess->setProgram(gitPath);
+    commitProcess->setArguments(QStringList() << "commit" << "-m" << commitMessage);
+    commitProcess->setWorkingDirectory(repositoryPath);
+    
+    // Connect to signals to handle completion
+    connect(commitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, commitProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+                if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    // Success - clear the commit message and refresh the git status
+                    ui->commitMessageTextEdit->clear();
+                    refreshGitStatus();
+                    QMessageBox::information(this, tr("Успех"), tr("Коммит успешно выполнен."));
+                } else {
+                    // Error - show message
+                    QString error = commitProcess->readAllStandardError();
+                    QMessageBox::warning(this, tr("Ошибка Git"), 
+                                        QString(tr("Не удалось выполнить git commit:\n%1")).arg(error));
+                }
+                // Clean up the process
+                commitProcess->deleteLater();
+            });
+    
+    // Start the process
+    commitProcess->start();
+}
+
+void MainWindow::updateCommitButtonState()
+{
+    // Enable commit button only if there are staged files
+    bool hasStagedFiles = ui->stagedFilesTable->rowCount() > 0;
+    ui->commitButton->setEnabled(hasStagedFiles);
 }
