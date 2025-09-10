@@ -7,8 +7,8 @@
 #include <QStandardPaths>
 #include <QTextStream>
 #include "./ui_mainwindow.h"
-#include "settingsdialog.h"
 #include "codeeditor.h"
+#include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -228,26 +228,19 @@ void MainWindow::parseGitStatusOutput(const QString &output)
     
     for (const QString &line : lines) {
         if (line.length() < 4) continue;
-        
-        QString status = line.left(2);
+
+        auto indexedStatus = line.left(1);
+        auto workStatus = line.mid(1, 1);
         QString file = line.mid(3);
-        
-        // Handle partially staged files (MM) - they should appear in both tables
-        if (status == "MM") {
-            // Add to both tables
-            unstagedFiles.append(qMakePair(QString(" M"), file)); // Show as modified in unstaged
-            stagedFiles.append(qMakePair(QString("M "), file));   // Show as staged in staged
-        } else {
-            // Handle other statuses normally
-            if (isStaged(status)) {
-                stagedFiles.append(qMakePair(status, file));
-            }
-            if (isUnstaged(status)) {
-                unstagedFiles.append(qMakePair(status, file));
-            }
+
+        if (indexedStatus != " " && indexedStatus != "?") {
+            stagedFiles.append(qMakePair(indexedStatus, file));
+        }
+        if (workStatus != " ") {
+            unstagedFiles.append(qMakePair(workStatus, file));
         }
     }
-    
+
     // Populate unstaged files table
     ui->filesTable->setRowCount(unstagedFiles.size());
     for (int i = 0; i < unstagedFiles.size(); ++i) {
@@ -272,18 +265,6 @@ void MainWindow::parseGitStatusOutput(const QString &output)
     
     // Update commit button state
     updateCommitButtonState();
-}
-
-bool MainWindow::isStaged(const QString &status)
-{
-    // Check if the file is staged (first character is not space)
-    return status.at(0) != ' ' && status.at(0) != '?';
-}
-
-bool MainWindow::isUnstaged(const QString &status)
-{
-    // Check if the file has unstaged changes (second character is not space)
-    return status.length() > 1 && status.at(1) != ' ' && status.at(1) != '?';
 }
 
 void MainWindow::openRepository()
