@@ -83,6 +83,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
     connect(ui->actionCommit, &QAction::triggered, this, &MainWindow::commitChanges);
     
+    // Connect panel toggle actions
+    connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
+    connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
+    
     // Connect refresh button
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
     
@@ -816,21 +820,32 @@ void MainWindow::navigateToNextHunk()
     qDebug() << "Scroll to " << scrollValue << stagedLine << currentLine;
 }
 
+void MainWindow::toggleLeftPanel(bool visible)
+{
+    ui->leftFrame->setVisible(visible);
+}
+
+void MainWindow::toggleTopPanel(bool visible)
+{
+    ui->topFrame->setVisible(visible);
+}
+
 void MainWindow::navigateToPrevHunk()
 {
-    if (hunkPositions.isEmpty()) return;
-    
+    if (hunkPositions.isEmpty())
+        return;
+
     // Move to previous hunk
     currentHunkIndex--;
     if (currentHunkIndex < 0) {
         currentHunkIndex = hunkPositions.size() - 1; // Wrap around to last hunk
     }
-    
+
     // Get the hunk position
     const auto &hunk = hunkPositions[currentHunkIndex];
     int stagedLine = hunk.first;
     int currentLine = hunk.second;
-    
+
     // Scroll to the hunk in both editors using scroll bars for better control
     // For staged content editor
     QTextCursor stagedCursor(stagedContentEditor->document());
@@ -838,20 +853,20 @@ void MainWindow::navigateToPrevHunk()
     for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
         stagedCursor.movePosition(QTextCursor::Down);
     }
-    
+
     // Calculate the position and scroll to it (center the hunk)
     QRect cursorRect = stagedContentEditor->cursorRect(stagedCursor);
     int scrollValue = cursorRect.y() - (stagedContentEditor->viewport()->height() / 2);
     scrollValue = qBound(0, scrollValue, stagedContentEditor->verticalScrollBar()->maximum());
     stagedContentEditor->verticalScrollBar()->setValue(scrollValue);
-    
+
     // For current content editor
     QTextCursor currentCursor(currentContentEditor->document());
     currentCursor.movePosition(QTextCursor::Start);
     for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
         currentCursor.movePosition(QTextCursor::Down);
     }
-    
+
     // Calculate the position and scroll to it (center the hunk)
     cursorRect = currentContentEditor->cursorRect(currentCursor);
     scrollValue = cursorRect.y() - (currentContentEditor->viewport()->height() / 2);

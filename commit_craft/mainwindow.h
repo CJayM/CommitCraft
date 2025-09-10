@@ -48,6 +48,8 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
+    void toggleLeftPanel(bool visible);
+    void toggleTopPanel(bool visible);
     void updateCommitButtonState();
 
 private:

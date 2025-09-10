@@ -468,6 +468,19 @@
    <addaction name="menuFile"/>
    <addaction name="menu"/>
   </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionToggleLeftPanel"/>
+   <addaction name="actionToggleTopPanel"/>
+  </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpenRepository">
    <property name="text">
@@ -485,6 +498,34 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Return</string>
+   </property>
+  </action>
+  <action name="actionToggleLeftPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Left Panel</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle Left Panel</string>
+   </property>
+  </action>
+  <action name="actionToggleTopPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Top Panel</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle Top Panel</string>
    </property>
   </action>
  </widget>
