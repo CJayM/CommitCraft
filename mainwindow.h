@@ -15,6 +15,7 @@ QT_END_NAMESPACE
 
 class SettingsDialog;
 class CodeEditor;
+class FileModel;
 
 class MainWindow : public QMainWindow
 {
@@ -47,7 +48,6 @@ private:
     void restoreSplitterState();
     void executeGitStatus();
     void parseGitStatusOutput(const QString &output);
-    QColor getStatusBackgroundColor(const QString &status);
     bool isGitRepository(const QString &path);
     bool isStaged(const QString &status);
     bool isUnstaged(const QString &status);
@@ -64,5 +64,7 @@ private:
     QString repositoryPath;
     CodeEditor *stagedContentEditor;
     CodeEditor *currentContentEditor;
+    FileModel *unstagedFilesModel;
+    FileModel *stagedFilesModel;
 };
 #endif // MAINWINDOW_H

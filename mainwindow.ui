@@ -272,26 +272,22 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QTableWidget" name="filesTable">
+                 <widget class="QTableView" name="filesTable">
                   <property name="selectionMode">
                    <enum>QAbstractItemView::SingleSelection</enum>
                   </property>
                   <property name="selectionBehavior">
                    <enum>QAbstractItemView::SelectRows</enum>
                   </property>
+                  <property name="showGrid">
+                   <bool>false</bool>
+                  </property>
                   <attribute name="horizontalHeaderStretchLastSection">
                    <bool>true</bool>
                   </attribute>
-                  <column>
-                   <property name="text">
-                    <string>Статус</string>
-                   </property>
-                  </column>
-                  <column>
-                   <property name="text">
-                    <string>Файл</string>
-                   </property>
-                  </column>
+                  <attribute name="verticalHeaderVisible">
+                   <bool>false</bool>
+                  </attribute>
                  </widget>
                 </item>
                 <item>
@@ -302,26 +298,22 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QTableWidget" name="stagedFilesTable">
+                 <widget class="QTableView" name="stagedFilesTable">
                   <property name="selectionMode">
                    <enum>QAbstractItemView::SingleSelection</enum>
                   </property>
                   <property name="selectionBehavior">
                    <enum>QAbstractItemView::SelectRows</enum>
                   </property>
+                  <property name="showGrid">
+                   <bool>false</bool>
+                  </property>
                   <attribute name="horizontalHeaderStretchLastSection">
                    <bool>true</bool>
                   </attribute>
-                  <column>
-                   <property name="text">
-                    <string>Статус</string>
-                   </property>
-                  </column>
-                  <column>
-                   <property name="text">
-                    <string>Файл</string>
-                   </property>
-                  </column>
+                  <attribute name="verticalHeaderVisible">
+                   <bool>false</bool>
+                  </attribute>
                  </widget>
                 </item>
                </layout>

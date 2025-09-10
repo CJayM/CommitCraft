@@ -9,6 +9,7 @@
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
 #include "settingsdialog.h"
+#include "filemodel.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,6 +20,8 @@ MainWindow::MainWindow(QWidget *parent)
     , repositoryPath(QDir::currentPath())
     , stagedContentEditor(nullptr)
     , currentContentEditor(nullptr)
+    , unstagedFilesModel(new FileModel(this))
+    , stagedFilesModel(new FileModel(this))
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -51,6 +54,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->diffSplitter->addWidget(stagedContentEditor);
     ui->diffSplitter->addWidget(currentContentEditor);
     
+    // Set up the table views with models
+    ui->filesTable->setModel(unstagedFilesModel);
+    ui->stagedFilesTable->setModel(stagedFilesModel);
+    
     // Connect zoom synchronization
     connect(stagedContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
     connect(currentContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
@@ -66,26 +73,20 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->commitButton, &QPushButton::clicked, this, &MainWindow::commitChanges);
     
     // Connect table selection changes
-    connect(ui->filesTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onFileTableSelectionChanged);
-    connect(ui->stagedFilesTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
+    connect(ui->filesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onFileTableSelectionChanged);
+    connect(ui->stagedFilesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
     
     // Connect git process signals
     connect(gitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &MainWindow::onGitStatusFinished);
     connect(gitProcess, &QProcess::errorOccurred, this, &MainWindow::onGitStatusError);
     
-    // Initialize tables
-    ui->filesTable->setColumnCount(2);
-    ui->filesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
-    ui->filesTable->horizontalHeader()->setStretchLastSection(true);
+    // Set up context menus
     ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->filesTable, &QTableWidget::customContextMenuRequested, this, &MainWindow::showFileContextMenu);
+    connect(ui->filesTable, &QTableView::customContextMenuRequested, this, &MainWindow::showFileContextMenu);
     
-    ui->stagedFilesTable->setColumnCount(2);
-    ui->stagedFilesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
-    ui->stagedFilesTable->horizontalHeader()->setStretchLastSection(true);
     ui->stagedFilesTable->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->stagedFilesTable, &QTableWidget::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
+    connect(ui->stagedFilesTable, &QTableView::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
     
     // Set initial state of commit button
     ui->commitButton->setEnabled(false);
@@ -152,9 +153,6 @@ void MainWindow::refreshGitStatus()
 
 void MainWindow::executeGitStatus()
 {
-    // Clear the table
-    ui->filesTable->setRowCount(0);
-    
     // Get git path from settings
     QSettings gitSettings("CommitCraft", "Settings");
     QString gitPath = gitSettings.value("gitPath", "").toString();
@@ -214,36 +212,9 @@ void MainWindow::onGitStatusError(QProcess::ProcessError error)
     QMessageBox::warning(this, "Ошибка Git", errorMessage);
 }
 
-QColor MainWindow::getStatusBackgroundColor(const QString &status)
-{
-    // Define colors for each status type:
-    // 'M' - Modified (light blue)
-    if (status == "M") return QColor(173, 216, 230); // Light blue
-    // 'T' - Type changed (light purple)
-    if (status == "T") return QColor(230, 173, 230); // Light purple
-    // 'A' - Added (light green)
-    if (status == "A") return QColor(144, 238, 144); // Light green
-    // 'D' - Deleted (light pink)
-    if (status == "D") return QColor(255, 182, 193); // Light pink
-    // 'R' - Renamed (light yellow)
-    if (status == "R") return QColor(255, 255, 224); // Light yellow
-    // 'C' - Copied (light orange)
-    if (status == "C") return QColor(255, 218, 185); // Light orange
-    // 'U' - Unmerged (light gray)
-    if (status == "U") return QColor(211, 211, 211); // Light gray
-    // '?' - Untracked (default color)
-    if (status == "?") return QColor(255, 255, 255); // White
-    // Default color for any other status
-    return QColor(255, 255, 255); // White
-}
-
 void MainWindow::parseGitStatusOutput(const QString &output)
 {
     QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-    
-    // Clear both tables
-    ui->filesTable->setRowCount(0);
-    ui->stagedFilesTable->setRowCount(0);
     
     // Separate staged and unstaged files
     QList<QPair<QString, QString>> unstagedFiles;
@@ -264,33 +235,9 @@ void MainWindow::parseGitStatusOutput(const QString &output)
         }
     }
 
-    // Populate unstaged files table
-    ui->filesTable->setRowCount(unstagedFiles.size());
-    for (int i = 0; i < unstagedFiles.size(); ++i) {
-        const auto &fileInfo = unstagedFiles.at(i);
-        QTableWidgetItem *statusItem = new QTableWidgetItem(fileInfo.first);
-        QTableWidgetItem *fileItem = new QTableWidgetItem(fileInfo.second);
-        
-        // Set background color based on status
-        statusItem->setBackground(getStatusBackgroundColor(fileInfo.first));
-        
-        ui->filesTable->setItem(i, 0, statusItem);
-        ui->filesTable->setItem(i, 1, fileItem);
-    }
-    
-    // Populate staged files table
-    ui->stagedFilesTable->setRowCount(stagedFiles.size());
-    for (int i = 0; i < stagedFiles.size(); ++i) {
-        const auto &fileInfo = stagedFiles.at(i);
-        QTableWidgetItem *statusItem = new QTableWidgetItem(fileInfo.first);
-        QTableWidgetItem *fileItem = new QTableWidgetItem(fileInfo.second);
-        
-        // Set background color based on status
-        statusItem->setBackground(getStatusBackgroundColor(fileInfo.first));
-        
-        ui->stagedFilesTable->setItem(i, 0, statusItem);
-        ui->stagedFilesTable->setItem(i, 1, fileItem);
-    }
+    // Update models with new data
+    unstagedFilesModel->setFiles(unstagedFiles);
+    stagedFilesModel->setFiles(stagedFiles);
     
     // Update commit button state
     updateCommitButtonState();
@@ -326,12 +273,9 @@ bool MainWindow::isGitRepository(const QString &path)
 
 void MainWindow::showFileContextMenu(const QPoint &pos)
 {
-    // Get the item at the position
-    QTableWidgetItem *item = ui->filesTable->itemAt(pos);
-    if (!item) return;
-    
-    // Get the row of the item
-    int row = item->row();
+    // Get the index at the position
+    QModelIndex index = ui->filesTable->indexAt(pos);
+    if (!index.isValid()) return;
     
     // Create the context menu
     QMenu contextMenu(tr("Файл"), this);
@@ -348,14 +292,14 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
 void MainWindow::addSelectedFile()
 {
     // Get the currently selected row
-    int row = ui->filesTable->currentRow();
-    if (row < 0) return;
+    QModelIndexList selectedIndexes = ui->filesTable->selectionModel()->selectedRows();
+    if (selectedIndexes.isEmpty()) return;
     
-    // Get the file name from the second column
-    QTableWidgetItem *fileItem = ui->filesTable->item(row, 1);
-    if (!fileItem) return;
+    int row = selectedIndexes.first().row();
     
-    QString fileName = fileItem->text();
+    // Get the file name from the model
+    QString fileName = unstagedFilesModel->getFileName(row);
+    if (fileName.isEmpty()) return;
     
     // Make the file path absolute by prepending the repository path
     QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
@@ -399,12 +343,9 @@ void MainWindow::addSelectedFile()
 
 void MainWindow::showStagedFileContextMenu(const QPoint &pos)
 {
-    // Get the item at the position
-    QTableWidgetItem *item = ui->stagedFilesTable->itemAt(pos);
-    if (!item) return;
-    
-    // Get the row of the item
-    int row = item->row();
+    // Get the index at the position
+    QModelIndex index = ui->stagedFilesTable->indexAt(pos);
+    if (!index.isValid()) return;
     
     // Create the context menu
     QMenu contextMenu(tr("Файл"), this);
@@ -421,14 +362,14 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
 void MainWindow::unstageSelectedFile()
 {
     // Get the currently selected row
-    int row = ui->stagedFilesTable->currentRow();
-    if (row < 0) return;
+    QModelIndexList selectedIndexes = ui->stagedFilesTable->selectionModel()->selectedRows();
+    if (selectedIndexes.isEmpty()) return;
     
-    // Get the file name from the second column
-    QTableWidgetItem *fileItem = ui->stagedFilesTable->item(row, 1);
-    if (!fileItem) return;
+    int row = selectedIndexes.first().row();
     
-    QString fileName = fileItem->text();
+    // Get the file name from the model
+    QString fileName = stagedFilesModel->getFileName(row);
+    if (fileName.isEmpty()) return;
     
     // Make the file path absolute by prepending the repository path
     QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
@@ -523,28 +464,30 @@ void MainWindow::commitChanges()
 void MainWindow::updateCommitButtonState()
 {
     // Enable commit button only if there are staged files
-    bool hasStagedFiles = ui->stagedFilesTable->rowCount() > 0;
+    bool hasStagedFiles = stagedFilesModel->rowCount() > 0;
     ui->commitButton->setEnabled(hasStagedFiles);
 }
 
 void MainWindow::onFileTableSelectionChanged()
 {
-    int row = ui->filesTable->currentRow();
-    if (row >= 0) {
-        QTableWidgetItem *fileItem = ui->filesTable->item(row, 1);
-        if (fileItem) {
-            updateDiffPanel(fileItem->text());
+    QModelIndexList selectedIndexes = ui->filesTable->selectionModel()->selectedRows();
+    if (!selectedIndexes.isEmpty()) {
+        int row = selectedIndexes.first().row();
+        QString fileName = unstagedFilesModel->getFileName(row);
+        if (!fileName.isEmpty()) {
+            updateDiffPanel(fileName);
         }
     }
 }
 
 void MainWindow::onStagedFileTableSelectionChanged()
 {
-    int row = ui->stagedFilesTable->currentRow();
-    if (row >= 0) {
-        QTableWidgetItem *fileItem = ui->stagedFilesTable->item(row, 1);
-        if (fileItem) {
-            updateDiffPanel(fileItem->text());
+    QModelIndexList selectedIndexes = ui->stagedFilesTable->selectionModel()->selectedRows();
+    if (!selectedIndexes.isEmpty()) {
+        int row = selectedIndexes.first().row();
+        QString fileName = stagedFilesModel->getFileName(row);
+        if (!fileName.isEmpty()) {
+            updateDiffPanel(fileName);
         }
     }
 }
