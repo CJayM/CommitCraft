@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>icons/refresh.svg</file>
+        <file>icons/prev_hunk.svg</file>
+        <file>icons/next_hunk.svg</file>
+    </qresource>
+</RCC>

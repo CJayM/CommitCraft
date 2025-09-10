@@ -273,7 +273,7 @@
                  <string>Обновить</string>
                 </property>
                 <property name="toolButtonStyle">
-                 <enum>Qt::ToolButtonTextOnly</enum>
+                 <enum>Qt::ToolButtonIconOnly</enum>
                 </property>
                </widget>
               </item>
@@ -504,12 +504,26 @@
                <property name="text">
                 <string>Prev</string>
                </property>
+               <property name="icon">
+                <iconset resource="icons.qrc">
+                 <normaloff>:/icons/icons/prev_hunk.svg</normaloff>:/icons/icons/prev_hunk.svg</iconset>
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonIconOnly</enum>
+               </property>
               </widget>
              </item>
              <item>
               <widget class="QToolButton" name="nextHunkButton">
                <property name="text">
                 <string>Next</string>
+               </property>
+               <property name="icon">
+                <iconset resource="icons.qrc">
+                 <normaloff>:/icons/icons/next_hunk.svg</normaloff>:/icons/icons/next_hunk.svg</iconset>
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonIconOnly</enum>
                </property>
               </widget>
              </item>
@@ -577,6 +591,12 @@
    <property name="windowTitle">
     <string>toolBar</string>
    </property>
+   <property name="iconSize">
+    <size>
+     <width>16</width>
+     <height>16</height>
+    </size>
+   </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
    </attribute>
@@ -609,6 +629,10 @@
    </property>
   </action>
   <action name="actionRefresh">
+   <property name="icon">
+    <iconset>
+     <normaloff>icons/refresh.svg</normaloff>icons/refresh.svg</iconset>
+   </property>
    <property name="text">
     <string>Refresh</string>
    </property>
@@ -620,6 +644,10 @@
    </property>
   </action>
   <action name="actionPrevHunk">
+   <property name="icon">
+    <iconset>
+     <normaloff>icons/prev_hunk.svg</normaloff>icons/prev_hunk.svg</iconset>
+   </property>
    <property name="text">
     <string>Previous Hunk</string>
    </property>
@@ -627,10 +655,14 @@
     <string>Go to Previous Hunk</string>
    </property>
    <property name="shortcut">
-    <string>Shift+F6</string>
+    <string>Alt+Up</string>
    </property>
   </action>
   <action name="actionNextHunk">
+   <property name="icon">
+    <iconset>
+     <normaloff>icons/next_hunk.svg</normaloff>icons/next_hunk.svg</iconset>
+   </property>
    <property name="text">
     <string>Next Hunk</string>
    </property>
@@ -638,7 +670,7 @@
     <string>Go to Next Hunk</string>
    </property>
    <property name="shortcut">
-    <string>F6</string>
+    <string>Alt+Down</string>
    </property>
   </action>
   <action name="actionToggleLeftPanel">
@@ -670,6 +702,8 @@
    </property>
   </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="icons.qrc"/>
+ </resources>
  <connections/>
 </ui>
