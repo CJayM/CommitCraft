@@ -186,10 +186,19 @@ void MainWindow::parseGitStatusOutput(const QString &output)
         QString status = line.left(2);
         QString file = line.mid(3);
         
-        if (isStaged(status)) {
-            stagedFiles.append(qMakePair(status, file));
+        // Handle partially staged files (MM) - they should appear in both tables
+        if (status == "MM") {
+            // Add to both tables
+            unstagedFiles.append(qMakePair(QString(" M"), file)); // Show as modified in unstaged
+            stagedFiles.append(qMakePair(QString("M "), file));   // Show as staged in staged
         } else {
-            unstagedFiles.append(qMakePair(status, file));
+            // Handle other statuses normally
+            if (isStaged(status)) {
+                stagedFiles.append(qMakePair(status, file));
+            }
+            if (isUnstaged(status)) {
+                unstagedFiles.append(qMakePair(status, file));
+            }
         }
     }
     
@@ -220,6 +229,12 @@ bool MainWindow::isStaged(const QString &status)
 {
     // Check if the file is staged (first character is not space)
     return status.at(0) != ' ' && status.at(0) != '?';
+}
+
+bool MainWindow::isUnstaged(const QString &status)
+{
+    // Check if the file has unstaged changes (second character is not space)
+    return status.length() > 1 && status.at(1) != ' ' && status.at(1) != '?';
 }
 
 void MainWindow::openRepository()

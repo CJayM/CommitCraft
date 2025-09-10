@@ -43,6 +43,7 @@ private:
     void parseGitStatusOutput(const QString &output);
     bool isGitRepository(const QString &path);
     bool isStaged(const QString &status);
+    bool isUnstaged(const QString &status);
 
     Ui::MainWindow *ui;
     QSettings *settings;
