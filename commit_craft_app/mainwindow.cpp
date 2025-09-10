@@ -13,10 +13,10 @@
 #include <QTextStream>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
-#include "filemodel.h"
+#include <commithistorymodel.h>
+#include <commititemdelegate.h>
+#include <filemodel.h>
 #include "settingsdialog.h"
-#include <CommitHistoryModel.h>
-#include <CommitItemDelegate.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)

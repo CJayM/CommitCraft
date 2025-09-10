@@ -1,9 +1,9 @@
 #ifndef COMMITITEMDELEGATE_H
 #define COMMITITEMDELEGATE_H
 
-#include <QStyledItemDelegate>
 #include <QList>
 #include <QMetaType>
+#include <QStyledItemDelegate>
 
 // Register QList<QString> for use with QVariant
 Q_DECLARE_METATYPE(QList<QString>)

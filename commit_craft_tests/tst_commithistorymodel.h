@@ -3,7 +3,7 @@
 
 #include <QtTest>
 
-#include "../commit_craft/commithistorymodel.h"
+#include "../commit_craft_lib/commithistorymodel.h"
 
 class TestCommitHistoryModel : public QObject
 {
@@ -15,6 +15,5 @@ private slots:
     void testCommitHistoryModelCreation();
     void testCommitHistoryModelWithCommits();
 };
-
 
 #endif // TESTCOMMITHISTORYMODEL_H

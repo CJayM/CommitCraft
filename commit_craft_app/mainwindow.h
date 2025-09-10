@@ -19,9 +19,11 @@ QT_END_NAMESPACE
 
 class SettingsDialog;
 class CodeEditor;
-class FileModel;
 class CommitHistoryModel;
 class CommitItemDelegate;
+
+// Forward declare FileModel from the library
+class FileModel;
 
 class MainWindow : public QMainWindow
 {

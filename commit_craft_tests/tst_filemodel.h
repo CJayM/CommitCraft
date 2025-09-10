@@ -1,8 +1,6 @@
 #ifndef TESTFILEMODEL_H
 #define TESTFILEMODEL_H
 
-#include "../commit_craft/filemodel.h"
-
 #include <QtTest>
 
 class TestFileModel : public QObject
