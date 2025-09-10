@@ -7,6 +7,7 @@ TEMPLATE = app
 SOURCES += \
     codeeditor.cpp \
     commithistorymodel.cpp \
+    commititemdelegate.cpp \
     filemodel.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -16,6 +17,7 @@ SOURCES += \
 HEADERS += \
     codeeditor.h \
     commithistorymodel.h \
+    commititemdelegate.h \
     filemodel.h \
     linenumberarea.h \
     mainwindow.h \

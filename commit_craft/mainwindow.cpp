@@ -16,6 +16,7 @@
 #include "filemodel.h"
 #include "settingsdialog.h"
 #include <CommitHistoryModel.h>
+#include <CommitItemDelegate.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -29,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
     , commitHistoryModel(new CommitHistoryModel(this))
+    , commitItemDelegate(new CommitItemDelegate(this))
     , currentHunkIndex(-1)
 {
     ui->setupUi(this);
@@ -65,7 +67,8 @@ MainWindow::MainWindow(QWidget *parent)
     // Set up the table views with models
     ui->filesTable->setModel(unstagedFilesModel);
     ui->stagedFilesTable->setModel(stagedFilesModel);
-    ui->commitHistoryTable->setModel(commitHistoryModel);
+    ui->commitHistoryList->setModel(commitHistoryModel);
+    ui->commitHistoryList->setItemDelegate(commitItemDelegate);
     
     // Connect zoom synchronization
     connect(stagedContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);

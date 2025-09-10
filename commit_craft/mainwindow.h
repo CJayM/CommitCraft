@@ -21,6 +21,7 @@ class SettingsDialog;
 class CodeEditor;
 class FileModel;
 class CommitHistoryModel;
+class CommitItemDelegate;
 
 class MainWindow : public QMainWindow
 {
@@ -80,6 +81,7 @@ private:
     FileModel *unstagedFilesModel;
     FileModel *stagedFilesModel;
     CommitHistoryModel *commitHistoryModel;
+    CommitItemDelegate *commitItemDelegate;
     
     // Hunk navigation data
     QList<QPair<int, int>> hunkPositions; // Pair of (stagedLine, currentLine) for each hunk

@@ -2,7 +2,7 @@
 #include <QColor>
 
 CommitHistoryModel::CommitHistoryModel(QObject *parent)
-    : QAbstractTableModel(parent)
+    : QAbstractListModel(parent)
 {
 }
 
@@ -11,13 +11,6 @@ int CommitHistoryModel::rowCount(const QModelIndex &parent) const
     if (parent.isValid())
         return 0;
     return m_commits.size();
-}
-
-int CommitHistoryModel::columnCount(const QModelIndex &parent) const
-{
-    if (parent.isValid())
-        return 0;
-    return 4; // hash, author, date, message
 }
 
 QVariant CommitHistoryModel::data(const QModelIndex &index, int role) const
@@ -29,36 +22,29 @@ QVariant CommitHistoryModel::data(const QModelIndex &index, int role) const
 
     switch (role) {
     case Qt::DisplayRole:
-        if (index.column() >= 0 && index.column() < commit.size()) {
-            return commit.at(index.column());
+        if (commit.size() >= 4) {
+            // Return a formatted string for display
+            return QString("%1 - %2 (%3)\n%4")
+                    .arg(commit.at(0).left(8)) // hash
+                    .arg(commit.at(3))         // message
+                    .arg(commit.at(1))         // author
+                    .arg(commit.at(2));        // date
         }
         break;
-    case Qt::TextAlignmentRole:
-        if (index.column() == 0) { // hash column
-            return Qt::AlignCenter;
-        } else if (index.column() == 2) { // date column
-            return Qt::AlignCenter;
+    case Qt::UserRole:
+        // Return the raw commit data for the delegate
+        return QVariant::fromValue(commit);
+    case Qt::ToolTipRole:
+        if (commit.size() >= 4) {
+            return QString("Hash: %1\nAuthor: %2\nDate: %3\nMessage: %4")
+                    .arg(commit.at(0))
+                    .arg(commit.at(1))
+                    .arg(commit.at(2))
+                    .arg(commit.at(3));
         }
         break;
     }
 
-    return QVariant();
-}
-
-QVariant CommitHistoryModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-    if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
-        switch (section) {
-        case 0:
-            return QString("Hash");
-        case 1:
-            return QString("Author");
-        case 2:
-            return QString("Date");
-        case 3:
-            return QString("Message");
-        }
-    }
     return QVariant();
 }
 
