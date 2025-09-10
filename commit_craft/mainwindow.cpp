@@ -15,6 +15,7 @@
 #include "codeeditor.h"
 #include "filemodel.h"
 #include "settingsdialog.h"
+#include <CommitHistoryModel.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -27,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
     , currentContentEditor(nullptr)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
+    , commitHistoryModel(new CommitHistoryModel(this))
     , currentHunkIndex(-1)
 {
     ui->setupUi(this);
@@ -63,6 +65,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Set up the table views with models
     ui->filesTable->setModel(unstagedFilesModel);
     ui->stagedFilesTable->setModel(stagedFilesModel);
+    ui->commitHistoryTable->setModel(commitHistoryModel);
     
     // Connect zoom synchronization
     connect(stagedContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
@@ -134,8 +137,47 @@ MainWindow::MainWindow(QWidget *parent)
     // Set window title to show current repository
     setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
     
-    // Load initial git status
+    // Load initial git status and commit history
     refreshGitStatus();
+}
+
+void MainWindow::loadCommitHistory()
+{
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Run git log command to get commit history
+    QProcess gitProcess;
+    // Format: hash, author, date, message
+    gitProcess.setProgram(gitPath);
+    gitProcess.setArguments(QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s" << "--date=short");
+    gitProcess.setWorkingDirectory(repositoryPath);
+    gitProcess.start();
+    gitProcess.waitForFinished();
+    
+    QList<QList<QString>> commits;
+    
+    if (gitProcess.exitCode() == 0) {
+        QString output = gitProcess.readAllStandardOutput();
+        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        
+        for (const QString &line : lines) {
+            QStringList parts = line.split('|');
+            if (parts.size() >= 4) {
+                // Format the hash to show only first 8 characters
+                if (!parts[0].isEmpty()) {
+                    parts[0] = parts[0].left(8);
+                }
+                commits.append(parts);
+            }
+        }
+    }
+    
+    commitHistoryModel->setCommits(commits);
 }
 
 MainWindow::~MainWindow()
@@ -185,6 +227,7 @@ void MainWindow::openSettingsDialog()
 void MainWindow::refreshGitStatus()
 {
     executeGitStatus();
+    loadCommitHistory();
 }
 
 void MainWindow::executeGitStatus()

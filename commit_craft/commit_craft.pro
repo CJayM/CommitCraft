@@ -6,14 +6,16 @@ TEMPLATE = app
 
 SOURCES += \
     codeeditor.cpp \
+    commithistorymodel.cpp \
     filemodel.cpp \
     main.cpp \
     mainwindow.cpp \
-    settingsdialog.cpp
+    settingsdialog.cpp \
     # synchronizezoom.cpp
 
 HEADERS += \
     codeeditor.h \
+    commithistorymodel.h \
     filemodel.h \
     linenumberarea.h \
     mainwindow.h \

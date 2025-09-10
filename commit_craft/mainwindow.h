@@ -20,6 +20,7 @@ QT_END_NAMESPACE
 class SettingsDialog;
 class CodeEditor;
 class FileModel;
+class CommitHistoryModel;
 
 class MainWindow : public QMainWindow
 {
@@ -67,6 +68,7 @@ private:
     void parseAndApplyDiffHighlighting(const QString &diffOutput);
     void synchronizeScroll();
     void extractHunkPositions(const QString &diffOutput);
+    void loadCommitHistory();
 
     Ui::MainWindow *ui;
     QSettings *settings;
@@ -77,6 +79,7 @@ private:
     CodeEditor *currentContentEditor;
     FileModel *unstagedFilesModel;
     FileModel *stagedFilesModel;
+    CommitHistoryModel *commitHistoryModel;
     
     // Hunk navigation data
     QList<QPair<int, int>> hunkPositions; // Pair of (stagedLine, currentLine) for each hunk
