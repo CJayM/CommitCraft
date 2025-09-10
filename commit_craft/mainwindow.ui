@@ -500,14 +500,14 @@
               </spacer>
              </item>
              <item>
-              <widget class="QPushButton" name="prevHunkButton">
+              <widget class="QToolButton" name="prevHunkButton">
                <property name="text">
                 <string>Prev</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="nextHunkButton">
+              <widget class="QToolButton" name="nextHunkButton">
                <property name="text">
                 <string>Next</string>
                </property>
@@ -591,6 +591,9 @@
    <property name="text">
     <string>Открыть репозиторий</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
   </action>
   <action name="actionSettings">
    <property name="text">
@@ -614,6 +617,28 @@
    </property>
    <property name="shortcut">
     <string>F5</string>
+   </property>
+  </action>
+  <action name="actionPrevHunk">
+   <property name="text">
+    <string>Previous Hunk</string>
+   </property>
+   <property name="toolTip">
+    <string>Go to Previous Hunk</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+F6</string>
+   </property>
+  </action>
+  <action name="actionNextHunk">
+   <property name="text">
+    <string>Next Hunk</string>
+   </property>
+   <property name="toolTip">
+    <string>Go to Next Hunk</string>
+   </property>
+   <property name="shortcut">
+    <string>F6</string>
    </property>
   </action>
   <action name="actionToggleLeftPanel">

@@ -81,8 +81,12 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::synchronizeScroll);
     
     // Connect hunk navigation buttons
-    connect(ui->nextHunkButton, &QPushButton::clicked, this, &MainWindow::navigateToNextHunk);
-    connect(ui->prevHunkButton, &QPushButton::clicked, this, &MainWindow::navigateToPrevHunk);
+    connect(ui->actionPrevHunk, &QAction::triggered, this, &MainWindow::navigateToPrevHunk);
+    connect(ui->actionNextHunk, &QAction::triggered, this, &MainWindow::navigateToNextHunk);
+    
+    // Set default actions for hunk navigation buttons
+    ui->prevHunkButton->setDefaultAction(ui->actionPrevHunk);
+    ui->nextHunkButton->setDefaultAction(ui->actionNextHunk);
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
@@ -599,8 +603,8 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     // Reset hunk navigation
     hunkPositions.clear();
     currentHunkIndex = -1;
-    ui->nextHunkButton->setEnabled(false);
-    ui->prevHunkButton->setEnabled(false);
+    ui->actionPrevHunk->setEnabled(false);
+    ui->actionNextHunk->setEnabled(false);
     
     // Get file contents
     QString stagedContent = getFileContent(fileName, true);
@@ -644,9 +648,9 @@ void MainWindow::applyDiffHighlighting(const QString &fileName)
         // Clear hunk positions
         hunkPositions.clear();
         currentHunkIndex = -1;
-        // Update button states
-        ui->nextHunkButton->setEnabled(false);
-        ui->prevHunkButton->setEnabled(false);
+        // Update action states
+        ui->actionPrevHunk->setEnabled(false);
+        ui->actionNextHunk->setEnabled(false);
     }
 }
 
@@ -677,8 +681,8 @@ void MainWindow::extractHunkPositions(const QString &diffOutput)
     
     // Update button states
     bool hasHunks = !hunkPositions.isEmpty();
-    ui->nextHunkButton->setEnabled(hasHunks);
-    ui->prevHunkButton->setEnabled(hasHunks);
+    ui->actionPrevHunk->setEnabled(hasHunks);
+    ui->actionNextHunk->setEnabled(hasHunks);
 }
 
 void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
