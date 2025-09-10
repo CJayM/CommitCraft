@@ -24,11 +24,10 @@ QVariant CommitHistoryModel::data(const QModelIndex &index, int role) const
     case Qt::DisplayRole:
         if (commit.size() >= 4) {
             // Return a formatted string for display
-            return QString("%1 - %2 (%3)\n%4")
-                    .arg(commit.at(0).left(8)) // hash
-                    .arg(commit.at(3))         // message
-                    .arg(commit.at(1))         // author
-                    .arg(commit.at(2));        // date
+            return QString("%1 - %2 (%3)")
+                .arg(commit.at(2))  // date
+                .arg(commit.at(3))  // message
+                .arg(commit.at(1)); // author
         }
         break;
     case Qt::UserRole:

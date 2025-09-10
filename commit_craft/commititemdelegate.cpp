@@ -49,37 +49,37 @@ void CommitItemDelegate::paintCommitItem(QPainter *painter, const QStyleOptionVi
     rect.setLeft(rect.left() + 5);
     rect.setRight(rect.right() - 5);
 
-    // Extract commit data (hash, author, date, message)
-    QString hash = commitData.size() > 0 ? commitData[0] : "";
+    // Extract commit data (author, date, message)
     QString author = commitData.size() > 1 ? commitData[1] : "";
     QString date = commitData.size() > 2 ? commitData[2] : "";
     QString message = commitData.size() > 3 ? commitData[3] : "";
 
-    // Truncate hash to 8 characters for better readability
-    if (hash.length() > 8) {
-        hash = hash.left(8);
-    }
-
     // Format the display text
-    QString firstLine = QString("%1 - %2 (%3)").arg(hash, message, author);
-    QString secondLine = date;
 
     // Draw the commit info
     QFont font = painter->font();
     QFont boldFont = font;
     boldFont.setBold(true);
 
-    // Draw first line (hash - message (author))
-    painter->setFont(boldFont);
+    // Draw first line (date - message (author))
+    // painter->setFont(boldFont);
     QFontMetrics fm1(boldFont);
-    QString elidedFirstLine = fm1.elidedText(firstLine, Qt::ElideRight, rect.width());
-    painter->drawText(rect.left(), rect.top() + fm1.ascent() + 5, elidedFirstLine);
-
-    // Draw second line (date)
     painter->setFont(font);
     QFontMetrics fm2(font);
-    QString elidedSecondLine = fm2.elidedText(secondLine, Qt::ElideRight, rect.width());
-    painter->drawText(rect.left(), rect.top() + fm1.height() + fm2.ascent() + 5, elidedSecondLine);
+
+    // QString elidedFirstLine = fm2.elidedText(firstLine, Qt::ElideRight, rect.width());
+    painter->setPen(Qt::gray);
+    painter->setFont(boldFont);
+    painter->drawText(rect.left(), rect.bottom() - fm2.ascent() + fm2.ascent() - 5, author);
+    painter->setFont(font);
+    painter->drawText(rect.left(), rect.top() + fm2.ascent(), date);
+    painter->setPen(Qt::black);
+    painter->drawText(rect.left() + 80, rect.top() + fm2.ascent(), message);
+
+    // Draw second line (date)
+
+    // QString elidedSecondLine = fm2.elidedText(secondLine, Qt::ElideRight, rect.width());
+    // painter->drawText(rect.left(), rect.top() + fm1.height() + fm2.ascent() + 5, elidedSecondLine);
 
     painter->restore();
 }
