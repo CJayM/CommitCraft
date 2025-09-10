@@ -219,9 +219,12 @@
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="refreshButton">
+               <widget class="QToolButton" name="refreshButton">
                 <property name="text">
                  <string>Обновить</string>
+                </property>
+                <property name="toolButtonStyle">
+                 <enum>Qt::ToolButtonTextOnly</enum>
                 </property>
                </widget>
               </item>
@@ -316,11 +319,11 @@
              <layout class="QHBoxLayout" name="horizontalLayout_3">
               <item>
                <widget class="QCheckBox" name="amend_chk">
-                <property name="text">
-                 <string>Amend last commit</string>
-                </property>
                 <property name="toolTip">
                  <string> Amend the last commit instead of creating a new one</string>
+                </property>
+                <property name="text">
+                 <string>Amend last commit</string>
                 </property>
                </widget>
               </item>
@@ -482,6 +485,7 @@
     <property name="title">
      <string>Действия</string>
     </property>
+    <addaction name="actionRefresh"/>
     <addaction name="actionCommit"/>
    </widget>
    <addaction name="menuFile"/>
@@ -496,7 +500,7 @@
    </attribute>
    <attribute name="toolBarBreak">
     <bool>false</bool>
-   </attribute>
+   </attribute>   
    <addaction name="actionToggleLeftPanel"/>
    <addaction name="actionToggleTopPanel"/>
   </widget>
@@ -517,6 +521,17 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Return</string>
+   </property>
+  </action>
+  <action name="actionRefresh">
+   <property name="text">
+    <string>Refresh</string>
+   </property>
+   <property name="toolTip">
+    <string>Refresh Git Status</string>
+   </property>
+   <property name="shortcut">
+    <string>F5</string>
    </property>
   </action>
   <action name="actionToggleLeftPanel">

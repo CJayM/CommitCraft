@@ -82,16 +82,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
     connect(ui->actionCommit, &QAction::triggered, this, &MainWindow::commitChanges);
+    connect(ui->actionRefresh, &QAction::triggered, this, &MainWindow::refreshGitStatus);
     
     // Connect panel toggle actions
     connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
     
-    // Connect refresh button
-    connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
-    
     // Connect amend checkbox
     connect(ui->amend_chk, &QCheckBox::stateChanged, this, &MainWindow::onAmendCheckBoxChanged);
+    
+    // Set default action for refresh button
+    ui->refreshButton->setDefaultAction(ui->actionRefresh);
     
     // Connect commit button to the same action
     ui->commitButton->setDefaultAction(ui->actionCommit);
