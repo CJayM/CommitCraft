@@ -26,6 +26,7 @@ protected:
 
 private slots:
     void openSettingsDialog();
+    void openRepository();
     void refreshGitStatus();
     void onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onGitStatusError(QProcess::ProcessError error);
@@ -35,10 +36,12 @@ private:
     void restoreSplitterState();
     void executeGitStatus();
     void parseGitStatusOutput(const QString &output);
+    bool isGitRepository(const QString &path);
 
     Ui::MainWindow *ui;
     QSettings *settings;
     SettingsDialog *settingsDialog;
     QProcess *gitProcess;
+    QString repositoryPath;
 };
 #endif // MAINWINDOW_H

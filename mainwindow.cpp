@@ -5,6 +5,8 @@
 #include <QSettings>
 #include <QMessageBox>
 #include <QDir>
+#include <QFileDialog>
+#include <QStandardPaths>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -12,11 +14,13 @@ MainWindow::MainWindow(QWidget *parent)
     , settings(new QSettings("CommitCraft", "MainWindow"))
     , settingsDialog(nullptr)
     , gitProcess(new QProcess(this))
+    , repositoryPath(QDir::currentPath())
 {
     ui->setupUi(this);
     restoreSplitterState();
     
-    // Connect the settings action to the slot
+    // Connect the menu actions to their slots
+    connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
     
     // Connect refresh button
@@ -31,6 +35,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->filesTable->setColumnCount(2);
     ui->filesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
     ui->filesTable->horizontalHeader()->setStretchLastSection(true);
+    
+    // Set window title to show current repository
+    setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
     
     // Load initial git status
     refreshGitStatus();
@@ -107,8 +114,8 @@ void MainWindow::executeGitStatus()
     gitProcess->setProgram(gitPath);
     gitProcess->setArguments(QStringList() << "status" << "--porcelain");
     
-    // Set working directory to current directory (you might want to make this configurable)
-    gitProcess->setWorkingDirectory(QDir::currentPath());
+    // Set working directory to selected repository path
+    gitProcess->setWorkingDirectory(repositoryPath);
     
     // Start the process
     gitProcess->start();
@@ -172,4 +179,30 @@ void MainWindow::parseGitStatusOutput(const QString &output)
         ui->filesTable->setItem(i, 0, statusItem);
         ui->filesTable->setItem(i, 1, fileItem);
     }
+}
+
+void MainWindow::openRepository()
+{
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Выберите Git репозиторий"),
+                                                    repositoryPath,
+                                                    QFileDialog::ShowDirsOnly
+                                                    | QFileDialog::DontResolveSymlinks);
+    
+    if (!dir.isEmpty()) {
+        // Check if the selected directory is a Git repository
+        if (isGitRepository(dir)) {
+            repositoryPath = dir;
+            setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
+            refreshGitStatus();
+        } else {
+            QMessageBox::warning(this, tr("Ошибка"), 
+                                tr("Выбранная директория не является Git репозиторием."));
+        }
+    }
+}
+
+bool MainWindow::isGitRepository(const QString &path)
+{
+    QDir dir(path);
+    return dir.exists(".git");
 }

@@ -366,10 +366,16 @@
     <property name="title">
      <string>Файл</string>
     </property>
+    <addaction name="actionOpenRepository"/>
     <addaction name="actionSettings"/>
    </widget>
    <addaction name="menuFile"/>
   </widget>
+  <action name="actionOpenRepository">
+   <property name="text">
+    <string>Открыть репозиторий</string>
+   </property>
+  </action>
   <action name="actionSettings">
    <property name="text">
     <string>Настройки</string>
