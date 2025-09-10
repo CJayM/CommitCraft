@@ -51,7 +51,8 @@ private:
     void updateCommitButtonState();
     void updateDiffPanel(const QString &fileName);
     QString getFileContent(const QString &fileName, bool staged);
-    void displayHighlightedDiff(const QString &diffOutput);
+    void applyDiffHighlighting(const QString &fileName);
+    void parseAndApplyDiffHighlighting(const QString &diffOutput);
 
     Ui::MainWindow *ui;
     QSettings *settings;

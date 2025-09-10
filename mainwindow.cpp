@@ -516,6 +516,20 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
+    // Get file contents
+    QString stagedContent = getFileContent(fileName, true);
+    QString currentContent = getFileContent(fileName, false);
+    
+    // Set content in text edits
+    ui->stagedContentTextEdit->setPlainText(stagedContent);
+    ui->currentContentTextEdit->setPlainText(currentContent);
+    
+    // Apply highlighting based on git diff
+    applyDiffHighlighting(fileName);
+}
+
+void MainWindow::applyDiffHighlighting(const QString &fileName)
+{
     // Get git path from settings
     QSettings gitSettings("CommitCraft", "Settings");
     QString gitPath = gitSettings.value("gitPath", "").toString();
@@ -533,67 +547,103 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     
     if (gitProcess.exitCode() == 0) {
         QString diffOutput = gitProcess.readAllStandardOutput();
-        // Parse and display diff with highlighting
-        displayHighlightedDiff(diffOutput);
-    } else {
-        // If git diff fails, fall back to showing file contents
-        QString stagedContent = getFileContent(fileName, true);
-        QString currentContent = getFileContent(fileName, false);
-        ui->stagedContentTextEdit->setPlainText(stagedContent);
-        ui->currentContentTextEdit->setPlainText(currentContent);
+        // Parse and apply diff highlighting to the text edits
+        parseAndApplyDiffHighlighting(diffOutput);
     }
 }
 
-void MainWindow::displayHighlightedDiff(const QString &diffOutput)
+void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
 {
-    // Clear both text edits
-    ui->stagedContentTextEdit->clear();
-    ui->currentContentTextEdit->clear();
-    
-    // Parse diff output
+    // Parse diff output to identify line differences
     QStringList lines = diffOutput.split('\n');
     
-    // Text cursors for both text edits
-    QTextCursor stagedCursor(ui->stagedContentTextEdit->textCursor());
-    QTextCursor currentCursor(ui->currentContentTextEdit->textCursor());
+    // Maps to store line numbers and their types (added/deleted/modified)
+    QMap<int, QString> stagedLineTypes;  // For staged content
+    QMap<int, QString> currentLineTypes; // For current content
     
-    // Formats for highlighting
-    QTextCharFormat addedFormat;
-    addedFormat.setBackground(QColor(198, 255, 198)); // Light green
-    
-    QTextCharFormat deletedFormat;
-    deletedFormat.setBackground(QColor(255, 198, 198)); // Light red
+    int stagedLineNum = 1;
+    int currentLineNum = 1;
     
     // Process diff lines
     for (const QString &line : lines) {
         if (line.startsWith("@@")) {
-            // Hunk header - skip for now
-            continue;
+            // Hunk header - parse line numbers
+            // Format: @@ -start,count +start,count @@
+            QRegularExpression re("@@ -(\\d+),(\\d+) \\+(\\d+),(\\d+) @@");
+            QRegularExpressionMatch match = re.match(line);
+            if (match.hasMatch()) {
+                stagedLineNum = match.captured(1).toInt();
+                currentLineNum = match.captured(3).toInt();
+            }
         } else if (line.startsWith("+") && !line.startsWith("+++")) {
             // Added line (in current version)
-            QString content = line.mid(1); // Remove the '+' prefix
-            currentCursor.insertText(content + "\n");
-            
-            // Highlight the added line
-            QTextBlockFormat blockFormat = currentCursor.blockFormat();
-            blockFormat.setBackground(QColor(198, 255, 198)); // Light green
-            currentCursor.setBlockFormat(blockFormat);
+            currentLineTypes[currentLineNum] = "added";
+            currentLineNum++;
         } else if (line.startsWith("-") && !line.startsWith("---")) {
             // Deleted line (in staged version)
-            QString content = line.mid(1); // Remove the '-' prefix
-            stagedCursor.insertText(content + "\n");
-            
-            // Highlight the deleted line
-            QTextBlockFormat blockFormat = stagedCursor.blockFormat();
-            blockFormat.setBackground(QColor(255, 198, 198)); // Light red
-            stagedCursor.setBlockFormat(blockFormat);
+            stagedLineTypes[stagedLineNum] = "deleted";
+            stagedLineNum++;
         } else if (!line.startsWith("diff") && !line.startsWith("index") && 
                    !line.startsWith("---") && !line.startsWith("+++")) {
             // Unchanged line
-            QString content = line.startsWith(" ") ? line.mid(1) : line;
-            stagedCursor.insertText(content + "\n");
-            currentCursor.insertText(content + "\n");
+            if (!line.startsWith(" ")) {
+                // This is an unchanged line
+                stagedLineNum++;
+                currentLineNum++;
+            } else {
+                // This is an unchanged line (starts with space)
+                stagedLineNum++;
+                currentLineNum++;
+            }
         }
+    }
+    
+    // Apply highlighting to staged content
+    QTextCursor stagedCursor(ui->stagedContentTextEdit->document());
+    for (auto it = stagedLineTypes.begin(); it != stagedLineTypes.end(); ++it) {
+        int lineNum = it.key();
+        QString type = it.value();
+        
+        // Move cursor to the line
+        stagedCursor.movePosition(QTextCursor::Start);
+        for (int i = 1; i < lineNum && !stagedCursor.atEnd(); i++) {
+            stagedCursor.movePosition(QTextCursor::Down);
+        }
+        
+        // Select the entire line
+        stagedCursor.movePosition(QTextCursor::StartOfLine);
+        stagedCursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+        
+        // Apply formatting
+        QTextCharFormat format;
+        if (type == "deleted") {
+            format.setBackground(QColor(255, 198, 198)); // Light red
+        }
+        stagedCursor.setCharFormat(format);
+    }
+    
+    // Apply highlighting to current content
+    QTextCursor currentCursor(ui->currentContentTextEdit->document());
+    for (auto it = currentLineTypes.begin(); it != currentLineTypes.end(); ++it) {
+        int lineNum = it.key();
+        QString type = it.value();
+        
+        // Move cursor to the line
+        currentCursor.movePosition(QTextCursor::Start);
+        for (int i = 1; i < lineNum && !currentCursor.atEnd(); i++) {
+            currentCursor.movePosition(QTextCursor::Down);
+        }
+        
+        // Select the entire line
+        currentCursor.movePosition(QTextCursor::StartOfLine);
+        currentCursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+        
+        // Apply formatting
+        QTextCharFormat format;
+        if (type == "added") {
+            format.setBackground(QColor(198, 255, 198)); // Light green
+        }
+        currentCursor.setCharFormat(format);
     }
 }
 
