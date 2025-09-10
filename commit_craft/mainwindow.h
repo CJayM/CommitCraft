@@ -48,6 +48,7 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
+    void updateCommitButtonState();
 
 private:
     void saveSplitterState();
@@ -56,8 +57,7 @@ private:
     void parseGitStatusOutput(const QString &output);
     bool isGitRepository(const QString &path);
     bool isStaged(const QString &status);
-    bool isUnstaged(const QString &status);
-    void updateCommitButtonState();
+    bool isUnstaged(const QString &status);    
     void updateDiffPanel(const QString &fileName);
     QString getFileContent(const QString &fileName, bool staged);
     void applyDiffHighlighting(const QString &fileName);

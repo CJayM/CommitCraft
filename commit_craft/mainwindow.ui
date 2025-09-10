@@ -350,9 +350,12 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QPushButton" name="commitButton">
+                 <widget class="QToolButton" name="commitButton">
                   <property name="text">
                    <string>Commit</string>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextOnly</enum>
                   </property>
                  </widget>
                 </item>
@@ -456,7 +459,14 @@
     <addaction name="actionOpenRepository"/>
     <addaction name="actionSettings"/>
    </widget>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>Действия</string>
+    </property>
+    <addaction name="actionCommit"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menu"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpenRepository">
@@ -472,6 +482,9 @@
   <action name="actionCommit">
    <property name="text">
     <string>Commit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Return</string>
    </property>
   </action>
  </widget>

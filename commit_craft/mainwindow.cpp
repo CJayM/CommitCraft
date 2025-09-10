@@ -87,17 +87,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
     
     // Connect commit button to the same action
-    connect(ui->commitButton, &QPushButton::clicked, ui->actionCommit, &QAction::trigger);
-    
-    // Connect action changes to update button state
-    connect(ui->actionCommit, &QAction::changed, this, [this]() {
-        ui->commitButton->setEnabled(ui->actionCommit->isEnabled());
-    });
-    
+    ui->commitButton->setDefaultAction(ui->actionCommit);
+
     // Connect table selection changes
     connect(ui->filesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onFileTableSelectionChanged);
     connect(ui->stagedFilesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
-    
+
+    connect(ui->commitMessageTextEdit,
+            &QTextEdit::textChanged,
+            this,
+            &MainWindow::updateCommitButtonState);
+
     // Connect git process signals
     connect(gitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &MainWindow::onGitStatusFinished);
@@ -498,8 +498,14 @@ void MainWindow::updateCommitButtonState()
 {
     // Enable commit action only if there are staged files
     bool hasStagedFiles = stagedFilesModel->rowCount() > 0;
-    ui->actionCommit->setEnabled(hasStagedFiles);
-    
+
+    if (hasStagedFiles) {
+        auto msg = ui->commitMessageTextEdit->toPlainText().trimmed();
+        ui->actionCommit->setEnabled(!msg.isEmpty());
+    } else {
+        ui->actionCommit->setEnabled(false);
+    }
+
     // Hide/show staged label and table based on whether there are staged files
     ui->stagedLabel->setVisible(hasStagedFiles);
     ui->stagedFilesTable->setVisible(hasStagedFiles);
