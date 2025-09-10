@@ -1,12 +1,13 @@
 #include "mainwindow.h"
-#include "./ui_mainwindow.h"
-#include "settingsdialog.h"
 #include <QCloseEvent>
-#include <QSettings>
-#include <QMessageBox>
 #include <QDir>
 #include <QFileDialog>
+#include <QMessageBox>
+#include <QSettings>
 #include <QStandardPaths>
+#include <QTextStream>
+#include "./ui_mainwindow.h"
+#include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -38,6 +39,10 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect commit button
     connect(ui->commitButton, &QPushButton::clicked, this, &MainWindow::commitChanges);
+    
+    // Connect table selection changes
+    connect(ui->filesTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onFileTableSelectionChanged);
+    connect(ui->stagedFilesTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
     
     // Connect git process signals
     connect(gitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
@@ -485,4 +490,80 @@ void MainWindow::updateCommitButtonState()
     // Enable commit button only if there are staged files
     bool hasStagedFiles = ui->stagedFilesTable->rowCount() > 0;
     ui->commitButton->setEnabled(hasStagedFiles);
+}
+
+void MainWindow::onFileTableSelectionChanged()
+{
+    int row = ui->filesTable->currentRow();
+    if (row >= 0) {
+        QTableWidgetItem *fileItem = ui->filesTable->item(row, 1);
+        if (fileItem) {
+            updateDiffPanel(fileItem->text());
+        }
+    }
+}
+
+void MainWindow::onStagedFileTableSelectionChanged()
+{
+    int row = ui->stagedFilesTable->currentRow();
+    if (row >= 0) {
+        QTableWidgetItem *fileItem = ui->stagedFilesTable->item(row, 1);
+        if (fileItem) {
+            updateDiffPanel(fileItem->text());
+        }
+    }
+}
+
+void MainWindow::updateDiffPanel(const QString &fileName)
+{
+    // Get file contents
+    QString stagedContent = getFileContent(fileName, true);
+    QString currentContent = getFileContent(fileName, false);
+    
+    // Set content in text edits
+    ui->stagedContentTextEdit->setPlainText(stagedContent);
+    ui->currentContentTextEdit->setPlainText(currentContent);
+    
+    // TODO: Implement proper diff highlighting
+    // For now, we're just showing the content side-by-side
+    // A full implementation would require a more sophisticated diff algorithm
+}
+
+QString MainWindow::getFileContent(const QString &fileName, bool staged)
+{
+    QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
+    if (staged) {
+        // For staged content, we need to get it from git
+        QSettings gitSettings("CommitCraft", "Settings");
+        QString gitPath = gitSettings.value("gitPath", "").toString();
+        if (gitPath.isEmpty()) {
+            gitPath = "git";
+        }
+        
+        QProcess gitProcess;
+        gitProcess.setProgram(gitPath);
+        gitProcess.setArguments(QStringList() << "show" << QString("HEAD:%1").arg(fileName));
+        gitProcess.setWorkingDirectory(repositoryPath);
+        gitProcess.start();
+        gitProcess.waitForFinished();
+        
+        if (gitProcess.exitCode() == 0) {
+            return gitProcess.readAllStandardOutput();
+        } else {
+            // If file doesn't exist in HEAD, return empty string
+            return "";
+        }
+    } else {
+        // For current content, read from file system
+        QFile file(absoluteFilePath);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            QString content = in.readAll();
+            file.close();
+            return content;
+        } else {
+            return "";
+        }
+    }
 }

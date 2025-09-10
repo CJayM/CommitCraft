@@ -36,6 +36,8 @@ private slots:
     void addSelectedFile();
     void unstageSelectedFile();
     void commitChanges();
+    void onFileTableSelectionChanged();
+    void onStagedFileTableSelectionChanged();
 
 private:
     void saveSplitterState();
@@ -46,6 +48,8 @@ private:
     bool isStaged(const QString &status);
     bool isUnstaged(const QString &status);
     void updateCommitButtonState();
+    void updateDiffPanel(const QString &fileName);
+    QString getFileContent(const QString &fileName, bool staged);
 
     Ui::MainWindow *ui;
     QSettings *settings;

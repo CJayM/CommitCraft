@@ -251,7 +251,7 @@
                      <string>Files Panel</string>
                     </property>
                     <property name="alignment">
-                     <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+                     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
                     </property>
                    </widget>
                   </item>
@@ -385,13 +385,26 @@
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_7">
             <item>
-             <widget class="QLabel" name="diffLabel">
-              <property name="text">
-               <string>Diff Panel</string>
+             <widget class="QSplitter" name="diffSplitter">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
               </property>
-              <property name="alignment">
-               <set>Qt::AlignCenter</set>
-              </property>
+              <widget class="QTextEdit" name="stagedContentTextEdit">
+               <property name="readOnly">
+                <bool>true</bool>
+               </property>
+               <property name="placeholderText">
+                <string>Содержимое файла (staged)</string>
+               </property>
+              </widget>
+              <widget class="QTextEdit" name="currentContentTextEdit">
+               <property name="readOnly">
+                <bool>true</bool>
+               </property>
+               <property name="placeholderText">
+                <string>Текущее содержимое файла</string>
+               </property>
+              </widget>
              </widget>
             </item>
            </layout>
@@ -422,6 +435,7 @@
    </widget>
    <addaction name="menuFile"/>
   </widget>
+  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpenRepository">
    <property name="text">
     <string>Открыть репозиторий</string>
@@ -432,7 +446,6 @@
     <string>Настройки</string>
    </property>
   </action>
-  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
  <connections/>
