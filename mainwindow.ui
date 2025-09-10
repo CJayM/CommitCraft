@@ -244,13 +244,47 @@
                </property>
                <layout class="QVBoxLayout" name="verticalLayout_8">
                 <item>
-                 <widget class="QLabel" name="filesLabel">
-                  <property name="text">
-                   <string>Files Panel</string>
+                 <layout class="QHBoxLayout" name="horizontalLayout">
+                  <item>
+                   <widget class="QLabel" name="filesLabel">
+                    <property name="text">
+                     <string>Files Panel</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QPushButton" name="refreshButton">
+                    <property name="text">
+                     <string>Обновить</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QTableWidget" name="filesTable">
+                  <property name="selectionMode">
+                   <enum>QAbstractItemView::SingleSelection</enum>
                   </property>
-                  <property name="alignment">
-                   <set>Qt::AlignCenter</set>
+                  <property name="selectionBehavior">
+                   <enum>QAbstractItemView::SelectRows</enum>
                   </property>
+                  <attribute name="horizontalHeaderStretchLastSection">
+                   <bool>true</bool>
+                  </attribute>
+                  <column>
+                   <property name="text">
+                    <string>Статус</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string>Файл</string>
+                   </property>
+                  </column>
                  </widget>
                 </item>
                </layout>

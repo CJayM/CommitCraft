@@ -2,18 +2,38 @@
 #include "./ui_mainwindow.h"
 #include "settingsdialog.h"
 #include <QCloseEvent>
+#include <QSettings>
+#include <QMessageBox>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , settings(new QSettings("CommitCraft", "MainWindow"))
     , settingsDialog(nullptr)
+    , gitProcess(new QProcess(this))
 {
     ui->setupUi(this);
     restoreSplitterState();
     
     // Connect the settings action to the slot
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    
+    // Connect refresh button
+    connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
+    
+    // Connect git process signals
+    connect(gitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &MainWindow::onGitStatusFinished);
+    connect(gitProcess, &QProcess::errorOccurred, this, &MainWindow::onGitStatusError);
+    
+    // Initialize table
+    ui->filesTable->setColumnCount(2);
+    ui->filesTable->setHorizontalHeaderLabels(QStringList() << "Статус" << "Файл");
+    ui->filesTable->horizontalHeader()->setStretchLastSection(true);
+    
+    // Load initial git status
+    refreshGitStatus();
 }
 
 MainWindow::~MainWindow()
@@ -62,4 +82,94 @@ void MainWindow::openSettingsDialog()
     }
     
     settingsDialog->exec();
+}
+
+void MainWindow::refreshGitStatus()
+{
+    executeGitStatus();
+}
+
+void MainWindow::executeGitStatus()
+{
+    // Clear the table
+    ui->filesTable->setRowCount(0);
+    
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Set up the process
+    gitProcess->setProgram(gitPath);
+    gitProcess->setArguments(QStringList() << "status" << "--porcelain");
+    
+    // Set working directory to current directory (you might want to make this configurable)
+    gitProcess->setWorkingDirectory(QDir::currentPath());
+    
+    // Start the process
+    gitProcess->start();
+}
+
+void MainWindow::onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString output = gitProcess->readAllStandardOutput();
+        parseGitStatusOutput(output);
+    } else {
+        QString error = gitProcess->readAllStandardError();
+        QMessageBox::warning(this, "Ошибка Git", 
+                            QString("Не удалось выполнить git status:\n%1").arg(error));
+    }
+}
+
+void MainWindow::onGitStatusError(QProcess::ProcessError error)
+{
+    QString errorMessage;
+    switch (error) {
+    case QProcess::FailedToStart:
+        errorMessage = "Не удалось запустить Git. Проверьте путь к Git в настройках.";
+        break;
+    case QProcess::Crashed:
+        errorMessage = "Git процесс аварийно завершился.";
+        break;
+    case QProcess::Timedout:
+        errorMessage = "Таймаут выполнения Git команды.";
+        break;
+    case QProcess::WriteError:
+        errorMessage = "Ошибка записи в Git процесс.";
+        break;
+    case QProcess::ReadError:
+        errorMessage = "Ошибка чтения из Git процесса.";
+        break;
+    default:
+        errorMessage = "Неизвестная ошибка Git процесса.";
+        break;
+    }
+    
+    QMessageBox::warning(this, "Ошибка Git", errorMessage);
+}
+
+void MainWindow::parseGitStatusOutput(const QString &output)
+{
+    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    
+    ui->filesTable->setRowCount(lines.size());
+    
+    for (int i = 0; i < lines.size(); ++i) {
+        QString line = lines[i];
+        if (line.length() < 4) continue;
+        
+        QString status = line.left(2);
+        QString file = line.mid(3);
+        
+        QTableWidgetItem *statusItem = new QTableWidgetItem(status);
+        QTableWidgetItem *fileItem = new QTableWidgetItem(file);
+        
+        ui->filesTable->setItem(i, 0, statusItem);
+        ui->filesTable->setItem(i, 1, fileItem);
+    }
 }

@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QSettings>
+#include <QProcess>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -25,13 +26,19 @@ protected:
 
 private slots:
     void openSettingsDialog();
+    void refreshGitStatus();
+    void onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onGitStatusError(QProcess::ProcessError error);
 
 private:
     void saveSplitterState();
     void restoreSplitterState();
+    void executeGitStatus();
+    void parseGitStatusOutput(const QString &output);
 
     Ui::MainWindow *ui;
     QSettings *settings;
     SettingsDialog *settingsDialog;
+    QProcess *gitProcess;
 };
 #endif // MAINWINDOW_H
