@@ -3,13 +3,14 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
-#include "settingsdialog.h"
 #include "filemodel.h"
+#include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -61,6 +62,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect zoom synchronization
     connect(stagedContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
     connect(currentContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
+    
+    // Connect scroll synchronization
+    connect(stagedContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::synchronizeScroll);
+    connect(currentContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::synchronizeScroll);
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
@@ -684,4 +689,50 @@ void MainWindow::synchronizeZoom(int zoom)
     // Restore signals
     stagedContentEditor->blockSignals(stagedBlocked);
     currentContentEditor->blockSignals(currentBlocked);
+}
+
+void MainWindow::synchronizeScroll()
+{
+    // Prevent infinite recursion by temporarily blocking signals
+    QScrollBar *stagedScrollBar = stagedContentEditor->verticalScrollBar();
+    QScrollBar *currentScrollBar = currentContentEditor->verticalScrollBar();
+
+    bool stagedBlocked = stagedScrollBar->blockSignals(true);
+    bool currentBlocked = currentScrollBar->blockSignals(true);
+
+    // Get the scroll bar ranges
+    int stagedRange = stagedScrollBar->maximum() - stagedScrollBar->minimum();
+    int currentRange = currentScrollBar->maximum() - currentScrollBar->minimum();
+
+    // Only synchronize if both editors have content
+    if (stagedRange > 0 && currentRange > 0) {
+        // Calculate the scroll position as a percentage
+        if (sender() == stagedScrollBar) {
+            // Calculate percentage of staged scroll position
+            double percentage = static_cast<double>(stagedScrollBar->value()
+                                                    - stagedScrollBar->minimum())
+                                / stagedRange;
+            // Apply the same percentage to current scroll position
+            int newValue = currentScrollBar->minimum()
+                           + static_cast<int>(percentage * currentRange);
+            currentScrollBar->blockSignals(currentBlocked);
+            currentScrollBar->setValue(newValue);
+        } else if (sender() == currentScrollBar) {
+            // Calculate percentage of current scroll position
+            double percentage = static_cast<double>(currentScrollBar->value()
+                                                    - currentScrollBar->minimum())
+                                / currentRange;
+            // Apply the same percentage to staged scroll position
+            int newValue = stagedScrollBar->minimum() + static_cast<int>(percentage * stagedRange);
+            stagedScrollBar->blockSignals(stagedBlocked);
+            stagedScrollBar->setValue(newValue);
+        }
+    }
+
+    // Restore signals
+    stagedScrollBar->blockSignals(stagedBlocked);
+    currentScrollBar->blockSignals(currentBlocked);
+
+    // stagedContentEditor->redraw();
+    // currentContentEditor->redraw();
 }

@@ -6,6 +6,7 @@
 #include <QProcess>
 #include <QPoint>
 #include <QTextCharFormat>
+#include <QScrollBar>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -56,6 +57,7 @@ private:
     QString getFileContent(const QString &fileName, bool staged);
     void applyDiffHighlighting(const QString &fileName);
     void parseAndApplyDiffHighlighting(const QString &diffOutput);
+    void synchronizeScroll();
 
     Ui::MainWindow *ui;
     QSettings *settings;
