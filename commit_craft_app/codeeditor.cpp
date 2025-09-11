@@ -1,5 +1,6 @@
 #include "codeeditor.h"
 #include "linenumberarea.h"
+#include "syntaxhighlighter.h"
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -9,9 +10,10 @@
 #include <QTextBlock>
 #include <QWheelEvent>
 
-CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent), m_zoom(100)
+CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent), m_zoom(100), m_syntaxHighlighting(true)
 {
     lineNumberArea = new LineNumberArea(this);
+    highlighter = new Highlighter(document());
 
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
@@ -158,4 +160,27 @@ void CodeEditor::setZoom(int zoom)
 int CodeEditor::zoom() const
 {
     return m_zoom;
+}
+
+void CodeEditor::setSyntaxHighlighting(bool enabled)
+{
+    if (m_syntaxHighlighting == enabled)
+        return;
+
+    m_syntaxHighlighting = enabled;
+
+    if (enabled) {
+        highlighter->rehighlight();
+    } else {
+        // Clear formatting
+        QTextCharFormat defaultFormat;
+        QTextCursor cursor(document());
+        cursor.select(QTextCursor::Document);
+        cursor.setCharFormat(defaultFormat);
+    }
+}
+
+bool CodeEditor::syntaxHighlighting() const
+{
+    return m_syntaxHighlighting;
 }

@@ -10,9 +10,11 @@ class QResizeEvent;
 class QSize;
 class QWidget;
 class QWheelEvent;
+class QTextDocument;
 QT_END_NAMESPACE
 
 class LineNumberArea;
+class Highlighter;
 
 class CodeEditor : public QPlainTextEdit
 {
@@ -28,6 +30,9 @@ public:
     void zoomOut(int range = 1);
     void setZoom(int zoom);
     int zoom() const;
+    
+    void setSyntaxHighlighting(bool enabled);
+    bool syntaxHighlighting() const;
 
 signals:
     void zoomChanged(int zoom);
@@ -43,7 +48,9 @@ private slots:
 
 private:
     QWidget *lineNumberArea;
+    Highlighter *highlighter;
     int m_zoom;
+    bool m_syntaxHighlighting;
 };
 
 #endif // CODEEDITOR_H

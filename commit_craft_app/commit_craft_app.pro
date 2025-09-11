@@ -1,4 +1,5 @@
 QT += widgets
+QT += gui
 CONFIG += c++17
 
 TARGET = commit_craft
@@ -8,13 +9,15 @@ SOURCES += \
     codeeditor.cpp \
     main.cpp \
     mainwindow.cpp \
-    settingsdialog.cpp \    
+    settingsdialog.cpp \
+    syntaxhighlighter.cpp
 
 HEADERS += \
     codeeditor.h \
     linenumberarea.h \
     mainwindow.h \
-    settingsdialog.h
+    settingsdialog.h \
+    syntaxhighlighter.h
 
 FORMS += \
     mainwindow.ui \
