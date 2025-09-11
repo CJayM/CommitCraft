@@ -4,7 +4,7 @@ QT += gui \
 TEMPLATE = lib
 CONFIG += staticlib
 
-CONFIG += c++14
+CONFIG += c++17
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -22,10 +22,12 @@ HEADERS += \
     commithistorymodel.h \
     commititemdelegate.h \
     filemodel.h \
-    git.h
+    git.h \
+    gitparser.h
 
 SOURCES += \
     commithistorymodel.cpp \
     commititemdelegate.cpp \
     filemodel.cpp \
-    git.cpp
+    git.cpp \
+    gitparser.cpp

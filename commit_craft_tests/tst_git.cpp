@@ -23,3 +23,8 @@ void TestGit::testGitSettersAndGetters()
     git.setGitPath("/usr/bin/git");
     QCOMPARE(git.gitPath(), QString("/usr/bin/git"));
 }
+
+int this_method_make_TestGit_visible_in_QT_tests_panel()
+{
+    return QTest::qExec(new TestGit());
+}

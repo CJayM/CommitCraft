@@ -6,6 +6,7 @@
 #include <QList>
 #include <QPair>
 #include <QString>
+#include "gitparser.h"
 
 class Git : public QObject
 {
@@ -61,6 +62,9 @@ private:
     QProcess *m_addFileProcess;
     QProcess *m_unstageFileProcess;
     QProcess *m_commitProcess;
+    
+    // Git parser
+    GitParser m_gitParser;
     
     // Helper methods
     QString getGitExecutable() const;

@@ -2,6 +2,7 @@
 #include "tst_commithistorymodel.h"
 #include "tst_filemodel.h"
 #include "tst_git.h"
+#include "tst_gitparser.h"
 
 int main(int argc, char *argv[])
 {
@@ -17,6 +18,7 @@ int main(int argc, char *argv[])
     RUN_TEST(new TestCommitHistoryModel());
     RUN_TEST(new TestFileModel());
     RUN_TEST(new TestGit());
+    RUN_TEST(new TestGitParser());
 
     return status;
 }

@@ -17,6 +17,7 @@
 #include <commititemdelegate.h>
 #include <filemodel.h>
 #include <git.h>
+#include <gitparser.h>
 #include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -213,6 +214,11 @@ void MainWindow::onGitDiffReady(const QString &output)
 {
     // Extract hunk positions for navigation
     extractHunkPositions(output);
+    
+    // Demonstrate advanced usage of GitParser
+    // Uncomment the following line to see hunk details in the debug output
+    // displayHunkDetails(output);
+    
     // Parse and apply diff highlighting to the text edits
     parseAndApplyDiffHighlighting(output);
 }
@@ -448,6 +454,9 @@ void MainWindow::updateDiffPanel(const QString &fileName)
 void MainWindow::applyDiffHighlighting(const QString &fileName)
 {
     git->getDiff(fileName);
+    
+    // For demonstration purposes, you could also parse and display hunk details here
+    // This would typically be done in the onGitDiffReady slot after receiving the diff output
 }
 
 void MainWindow::extractHunkPositions(const QString &diffOutput)
@@ -456,29 +465,53 @@ void MainWindow::extractHunkPositions(const QString &diffOutput)
     hunkPositions.clear();
     currentHunkIndex = -1;
     
-    // Parse diff output to extract hunk positions
-    QStringList lines = diffOutput.split('\n');
+    // Use GitParser to parse the diff output
+    GitParser parser;
+    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
     
-    // Process diff lines
-    for (int i = 0; i < lines.size(); i++) {
-        const QString &line = lines[i];
-        if (line.startsWith("@@")) {
-            // Hunk header - parse line numbers
-            // Format: @@ -start,count +start,count @@
-            QRegularExpression re("@@ -(\\d+),(\\d+) \\+(\\d+),(\\d+) @@");
-            QRegularExpressionMatch match = re.match(line);
-            if (match.hasMatch()) {
-                int stagedLine = match.captured(1).toInt();
-                int currentLine = match.captured(3).toInt();
-                hunkPositions.append(qMakePair(stagedLine, currentLine));
-            }
-        }
+    // Process each hunk to extract positions
+    for (const Hunk &hunk : hunks) {
+        // For simplicity, we're just storing the start positions
+        // In a real application, you might want to store more information
+        hunkPositions.append(qMakePair(hunk.leftStart, hunk.rightStart));
     }
     
     // Update button states
     bool hasHunks = !hunkPositions.isEmpty();
     ui->actionPrevHunk->setEnabled(hasHunks);
     ui->actionNextHunk->setEnabled(hasHunks);
+}
+
+void MainWindow::displayHunkDetails(const QString &diffOutput)
+{
+    GitParser parser;
+    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
+    
+    qDebug() << "Found" << hunks.size() << "hunks:";
+    
+    for (int i = 0; i < hunks.size(); ++i) {
+        const Hunk &hunk = hunks[i];
+        qDebug() << "Hunk" << i << ": @@ -" << hunk.leftStart << "," << hunk.leftSize 
+                 << " +" << hunk.rightStart << "," << hunk.rightSize << " @@";
+        
+        qDebug() << "  Lines:";
+        for (int j = 0; j < hunk.lines.size(); ++j) {
+            const HunkLine &line = hunk.lines[j];
+            QString typeStr;
+            switch (line.type) {
+            case HunkLine::Unchanged:
+                typeStr = " ";
+                break;
+            case HunkLine::Removed:
+                typeStr = "-";
+                break;
+            case HunkLine::Added:
+                typeStr = "+";
+                break;
+            }
+            qDebug() << "    " << typeStr << line.content;
+        }
+    }
 }
 
 void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)

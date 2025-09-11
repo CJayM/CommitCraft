@@ -14,12 +14,14 @@ SOURCES += \
     main.cpp \
     tst_commithistorymodel.cpp \
     tst_filemodel.cpp \
-    tst_git.cpp
+    tst_git.cpp \
+    tst_gitparser.cpp
 
 HEADERS += \
     tst_commithistorymodel.h \
     tst_filemodel.h \
-    tst_git.h
+    tst_git.h \
+    tst_gitparser.h
 
 
 
@@ -27,6 +29,7 @@ HEADERS += \
 qnx: target.path = /tmp/${TARGET}/bin
 else: unix:!android: target.path = /opt/${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
 
 
 

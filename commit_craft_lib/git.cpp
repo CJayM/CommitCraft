@@ -14,50 +14,39 @@ Git::Git(QObject *parent)
     , m_addFileProcess(new QProcess(this))
     , m_unstageFileProcess(new QProcess(this))
     , m_commitProcess(new QProcess(this))
+    , m_gitParser(this)
 {
     // Connect process signals
-    connect(m_statusProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onStatusFinished);
+    connect(m_statusProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onStatusFinished);
     connect(m_statusProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
-
-    connect(m_diffProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onDiffFinished);
+    
+    connect(m_diffProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onDiffFinished);
     connect(m_diffProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
-
-    connect(m_commitHistoryProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onCommitHistoryFinished);
+    
+    connect(m_commitHistoryProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCommitHistoryFinished);
     connect(m_commitHistoryProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
-
-    connect(m_fileContentProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onFileContentFinished);
+    
+    connect(m_fileContentProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onFileContentFinished);
     connect(m_fileContentProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
-
-    connect(m_addFileProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onAddFileFinished);
+    
+    connect(m_addFileProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onAddFileFinished);
     connect(m_addFileProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
-
-    connect(m_unstageFileProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onUnstageFileFinished);
+    
+    connect(m_unstageFileProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onUnstageFileFinished);
     connect(m_unstageFileProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
-
-    connect(m_commitProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            &Git::onCommitFinished);
+    
+    connect(m_commitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCommitFinished);
     connect(m_commitProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
+
+// ... (rest of the implementation remains the same)
 
 void Git::setRepositoryPath(const QString &path)
 {
@@ -183,6 +172,11 @@ void Git::onDiffFinished(int exitCode, QProcess::ExitStatus exitStatus)
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
         QString output = m_diffProcess->readAllStandardOutput();
         emit diffReady(output);
+        
+        // Example of how to use GitParser with the diff output
+        // QList<Hunk> hunks = m_gitParser.parseDiffOutput(output);
+        // You can now work with the parsed hunks
+        
     } else {
         QString msg = m_diffProcess->readAllStandardError();
         emit error(QString("Failed to execute git diff: %1").arg(msg));

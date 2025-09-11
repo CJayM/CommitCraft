@@ -22,6 +22,7 @@ class CodeEditor;
 class CommitHistoryModel;
 class CommitItemDelegate;
 class Git;
+class GitParser;
 
 // Forward declare FileModel from the library
 class FileModel;
@@ -73,6 +74,7 @@ private:
     void parseAndApplyDiffHighlighting(const QString &diffOutput);
     void synchronizeScroll();
     void extractHunkPositions(const QString &diffOutput);
+    void displayHunkDetails(const QString &diffOutput);
     void applyDiffHighlighting(const QString &fileName);
 
     Ui::MainWindow *ui;
