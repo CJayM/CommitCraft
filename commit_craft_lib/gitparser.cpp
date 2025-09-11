@@ -3,7 +3,7 @@
 
 GitParser::GitParser(QObject *parent)
     : QObject(parent)
-    , m_hunkHeaderRegex(QStringLiteral("^@@ -(\\d+)(,(\\d+))? \\+(\\d+)(,(\\d+))? @@.*$"))
+    , m_hunkHeaderRegex(QStringLiteral("^@@ -(\\d+)(,(\\d+))? \\+(\\d+)(,(\\d+))? @@(.*)$"))
 {
 }
 
@@ -34,7 +34,10 @@ QList<Hunk> GitParser::parseDiffOutput(const QString &diffOutput) const
                 int rightSize = match.captured(6).toInt();
                 if (rightSize == 0) rightSize = 1; // Handle special case
                 
-                currentHunk = Hunk(leftStart, rightStart, leftSize, rightSize);
+                // Extract caption (text after second @@)
+                QString caption = match.captured(7).trimmed();
+                
+                currentHunk = Hunk(leftStart, rightStart, leftSize, rightSize, caption);
                 currentHunk.lines.clear();
                 inHunk = true;
             }
