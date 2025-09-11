@@ -15,6 +15,7 @@ private slots:
     void testGitParserCreation();
     void testParseSimpleDiff();
     void testParseComplexDiff();
+    void testParseFromFile();
     void testParseEmptyDiff();
 };
 
