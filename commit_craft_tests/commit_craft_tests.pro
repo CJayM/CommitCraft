@@ -13,11 +13,13 @@ MOC_DIR = _temp_build/moc
 SOURCES += \
     main.cpp \
     tst_commithistorymodel.cpp \
-    tst_filemodel.cpp
+    tst_filemodel.cpp \
+    tst_git.cpp
 
 HEADERS += \
     tst_commithistorymodel.h \
-    tst_filemodel.h
+    tst_filemodel.h \
+    tst_git.h
 
 
 

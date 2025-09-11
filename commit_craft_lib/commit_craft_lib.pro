@@ -14,16 +14,18 @@ TARGET = commit_craft_lib
 
 # Default rules for deployment.
 unix {
-    target.path = $$[QT_INSTALL_PLUGINS]/generic
+    target.path = $[QT_INSTALL_PLUGINS]/generic
 }
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
     commithistorymodel.h \
     commititemdelegate.h \
-    filemodel.h
+    filemodel.h \
+    git.h
 
 SOURCES += \
     commithistorymodel.cpp \
     commititemdelegate.cpp \
-    filemodel.cpp
+    filemodel.cpp \
+    git.cpp

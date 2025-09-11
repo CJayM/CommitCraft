@@ -16,7 +16,6 @@
 #include <commithistorymodel.h>
 #include <commititemdelegate.h>
 #include <filemodel.h>
-#include <git.h>
 #include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -24,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , settings(new QSettings("CommitCraft", "MainWindow"))
     , settingsDialog(nullptr)
+    , gitProcess(new QProcess(this))
     , repositoryPath(QDir::currentPath())
     , stagedContentEditor(nullptr)
     , currentContentEditor(nullptr)
@@ -31,7 +31,6 @@ MainWindow::MainWindow(QWidget *parent)
     , stagedFilesModel(new FileModel(this))
     , commitHistoryModel(new CommitHistoryModel(this))
     , commitItemDelegate(new CommitItemDelegate(this))
-    , git(new Git(this))
     , currentHunkIndex(-1)
 {
     ui->setupUi(this);
@@ -46,9 +45,6 @@ MainWindow::MainWindow(QWidget *parent)
             repositoryPath = path;
         }
     }
-    
-    // Set repository path for Git operations
-    git->setRepositoryPath(repositoryPath);
     
     // Replace QPlainTextEdit with CodeEditor for line numbers
     // First, remove the existing widgets
@@ -110,7 +106,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect commit button to the same action
     ui->commitButton->setDefaultAction(ui->actionCommit);
-    
+
     // Connect table selection changes
     connect(ui->filesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onFileTableSelectionChanged);
     connect(ui->stagedFilesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
@@ -121,11 +117,9 @@ MainWindow::MainWindow(QWidget *parent)
             &MainWindow::updateCommitButtonState);
 
     // Connect git process signals
-    connect(git, &Git::statusReady, this, &MainWindow::onGitStatusFinished);
-    connect(git, &Git::diffReady, this, &MainWindow::onGitDiffReady);
-    connect(git, &Git::commitHistoryReady, this, &MainWindow::onGitCommitHistoryReady);
-    connect(git, &Git::commitReady, this, &MainWindow::onGitCommitFinished);
-    connect(git, &Git::error, this, &MainWindow::onGitError);
+    connect(gitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &MainWindow::onGitStatusFinished);
+    connect(gitProcess, &QProcess::errorOccurred, this, &MainWindow::onGitStatusError);
     
     // Set up context menus
     ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -152,6 +146,45 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Load initial git status and commit history
     refreshGitStatus();
+}
+
+void MainWindow::loadCommitHistory()
+{
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Run git log command to get commit history
+    QProcess gitProcess;
+    // Format: hash, author, date, message
+    gitProcess.setProgram(gitPath);
+    gitProcess.setArguments(QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s" << "--date=short");
+    gitProcess.setWorkingDirectory(repositoryPath);
+    gitProcess.start();
+    gitProcess.waitForFinished();
+    
+    QList<QList<QString>> commits;
+    
+    if (gitProcess.exitCode() == 0) {
+        QString output = gitProcess.readAllStandardOutput();
+        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        
+        for (const QString &line : lines) {
+            QStringList parts = line.split('|');
+            if (parts.size() >= 4) {
+                // Format the hash to show only first 8 characters
+                if (!parts[0].isEmpty()) {
+                    parts[0] = parts[0].left(8);
+                }
+                commits.append(parts);
+            }
+        }
+    }
+    
+    commitHistoryModel->setCommits(commits);
 }
 
 MainWindow::~MainWindow()
@@ -200,46 +233,69 @@ void MainWindow::openSettingsDialog()
 
 void MainWindow::refreshGitStatus()
 {
-    git->getStatus();
+    executeGitStatus();
+    loadCommitHistory();
 }
 
-void MainWindow::onGitStatusFinished(const QString &output)
+void MainWindow::executeGitStatus()
 {
-    parseGitStatusOutput(output);
-    git->getCommitHistory();
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Set up the process
+    gitProcess->setProgram(gitPath);
+    gitProcess->setArguments(QStringList() << "status" << "--porcelain" << "--untracked-files=all");
+
+    // Set working directory to selected repository path
+    gitProcess->setWorkingDirectory(repositoryPath);
+    
+    // Start the process
+    gitProcess->start();
 }
 
-void MainWindow::onGitDiffReady(const QString &output)
+void MainWindow::onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    // Extract hunk positions for navigation
-    extractHunkPositions(output);
-    // Parse and apply diff highlighting to the text edits
-    parseAndApplyDiffHighlighting(output);
-}
-
-void MainWindow::onGitCommitHistoryReady(const QList<QList<QString>> &commits)
-{
-    commitHistoryModel->setCommits(commits);
-}
-
-void MainWindow::onGitCommitFinished(bool success, const QString &message)
-{
-    if (success) {
-        // Success - clear the commit message and refresh the git status
-        ui->commitMessageTextEdit->clear();
-        // Uncheck amend checkbox after successful commit
-        ui->amend_chk->setChecked(false);
-        refreshGitStatus();
-        QMessageBox::information(this, tr("Успех"), tr("Коммит успешно выполнен."));
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString output = gitProcess->readAllStandardOutput();
+        parseGitStatusOutput(output);
     } else {
-        // Error - show message
-        QMessageBox::warning(this, tr("Ошибка Git"), message);
+        QString error = gitProcess->readAllStandardError();
+        QMessageBox::warning(this, "Ошибка Git", 
+                            QString("Не удалось выполнить git status:\n%1").arg(error));
     }
 }
 
-void MainWindow::onGitError(const QString &error)
+void MainWindow::onGitStatusError(QProcess::ProcessError error)
 {
-    QMessageBox::warning(this, "Ошибка Git", error);
+    QString errorMessage;
+    switch (error) {
+    case QProcess::FailedToStart:
+        errorMessage = "Не удалось запустить Git. Проверьте путь к Git в настройках.";
+        break;
+    case QProcess::Crashed:
+        errorMessage = "Git процесс аварийно завершился.";
+        break;
+    case QProcess::Timedout:
+        errorMessage = "Таймаут выполнения Git команды.";
+        break;
+    case QProcess::WriteError:
+        errorMessage = "Ошибка записи в Git процесс.";
+        break;
+    case QProcess::ReadError:
+        errorMessage = "Ошибка чтения из Git процесса.";
+        break;
+    default:
+        errorMessage = "Неизвестная ошибка Git процесса.";
+        break;
+    }
+    
+    QMessageBox::warning(this, "Ошибка Git", errorMessage);
 }
 
 void MainWindow::parseGitStatusOutput(const QString &output)
@@ -331,7 +387,44 @@ void MainWindow::addSelectedFile()
     QString fileName = unstagedFilesModel->getFileName(row);
     if (fileName.isEmpty()) return;
     
-    git->addFile(fileName);
+    // Make the file path absolute by prepending the repository path
+    QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Create a new process for git add
+    QProcess *addProcess = new QProcess(this);
+    
+    // Set up the process
+    addProcess->setProgram(gitPath);
+    addProcess->setArguments(QStringList() << "add" << absoluteFilePath);
+    addProcess->setWorkingDirectory(repositoryPath);
+    
+    // Connect to signals to handle completion
+    connect(addProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, addProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+                if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    // Success - refresh the git status
+                    refreshGitStatus();
+                } else {
+                    // Error - show message
+                    QString error = addProcess->readAllStandardError();
+                    QMessageBox::warning(this, tr("Ошибка Git"), 
+                                        QString(tr("Не удалось выполнить git add:\n%1")).arg(error));
+                }
+                // Clean up the process
+                addProcess->deleteLater();
+            });
+    
+    // Start the process
+    addProcess->start();
 }
 
 void MainWindow::showStagedFileContextMenu(const QPoint &pos)
@@ -364,7 +457,44 @@ void MainWindow::unstageSelectedFile()
     QString fileName = stagedFilesModel->getFileName(row);
     if (fileName.isEmpty()) return;
     
-    git->unstageFile(fileName);
+    // Make the file path absolute by prepending the repository path
+    QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Create a new process for git reset
+    QProcess *resetProcess = new QProcess(this);
+    
+    // Set up the process
+    resetProcess->setProgram(gitPath);
+    resetProcess->setArguments(QStringList() << "reset" << "HEAD" << absoluteFilePath);
+    resetProcess->setWorkingDirectory(repositoryPath);
+    
+    // Connect to signals to handle completion
+    connect(resetProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, resetProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+                if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    // Success - refresh the git status
+                    refreshGitStatus();
+                } else {
+                    // Error - show message
+                    QString error = resetProcess->readAllStandardError();
+                    QMessageBox::warning(this, tr("Ошибка Git"), 
+                                        QString(tr("Не удалось выполнить git reset:\n%1")).arg(error));
+                }
+                // Clean up the process
+                resetProcess->deleteLater();
+            });
+    
+    // Start the process
+    resetProcess->start();
 }
 
 void MainWindow::commitChanges()
@@ -378,10 +508,53 @@ void MainWindow::commitChanges()
         return;
     }
     
-    // Check if amend is checked
-    bool amend = ui->amend_chk->isChecked();
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
     
-    git->commit(commitMessage, amend);
+    // If git path is empty, try to find git in PATH
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Create a new process for git commit
+    QProcess *commitProcess = new QProcess(this);
+    
+    // Set up the process
+    commitProcess->setProgram(gitPath);
+    
+    // Check if amend is checked
+    if (ui->amend_chk->isChecked()) {
+        commitProcess->setArguments(QStringList() << "commit" << "--amend" << "-m" << commitMessage);
+    } else {
+        commitProcess->setArguments(QStringList() << "commit" << "-m" << commitMessage);
+    }
+    
+    commitProcess->setWorkingDirectory(repositoryPath);
+    
+    // Connect to signals to handle completion
+    connect(commitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, commitProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+                if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    // Success - clear the commit message and refresh the git status
+                    ui->commitMessageTextEdit->clear();
+                    // Uncheck amend checkbox after successful commit
+                    ui->amend_chk->setChecked(false);
+                    refreshGitStatus();
+                    currentContentEditor->clear();
+                    stagedContentEditor->clear();
+                } else {
+                    // Error - show message
+                    QString error = commitProcess->readAllStandardError();
+                    QMessageBox::warning(this, tr("Ошибка Git"), 
+                                        QString(tr("Не удалось выполнить git commit:\n%1")).arg(error));
+                }
+                // Clean up the process
+                commitProcess->deleteLater();
+            });
+    
+    // Start the process
+    commitProcess->start();
 }
 
 void MainWindow::updateCommitButtonState()
@@ -447,7 +620,38 @@ void MainWindow::updateDiffPanel(const QString &fileName)
 
 void MainWindow::applyDiffHighlighting(const QString &fileName)
 {
-    git->getDiff(fileName);
+    // Get git path from settings
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    // Run git diff command
+    QProcess gitProcess;
+    gitProcess.setProgram(gitPath);
+    gitProcess.setArguments(QStringList() << "diff" << fileName);
+    gitProcess.setWorkingDirectory(repositoryPath);
+    gitProcess.start();
+    gitProcess.waitForFinished();
+    
+    if (gitProcess.exitCode() == 0) {
+        QString diffOutput = gitProcess.readAllStandardOutput();
+        // Extract hunk positions for navigation
+        extractHunkPositions(diffOutput);
+        // Parse and apply diff highlighting to the text edits
+        parseAndApplyDiffHighlighting(diffOutput);
+    } else {
+        // If git diff fails, clear any existing highlighting
+        stagedContentEditor->setPlainText(stagedContentEditor->toPlainText());
+        currentContentEditor->setPlainText(currentContentEditor->toPlainText());
+        // Clear hunk positions
+        hunkPositions.clear();
+        currentHunkIndex = -1;
+        // Update action states
+        ui->actionPrevHunk->setEnabled(false);
+        ui->actionNextHunk->setEnabled(false);
+    }
 }
 
 void MainWindow::extractHunkPositions(const QString &diffOutput)
@@ -578,10 +782,10 @@ void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
 
 QString MainWindow::getFileContent(const QString &fileName, bool staged)
 {
+    QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
     if (staged) {
         // For staged content, we need to get it from git
-        // We'll use a blocking call here for simplicity, but in a real application
-        // you might want to make this asynchronous
         QSettings gitSettings("CommitCraft", "Settings");
         QString gitPath = gitSettings.value("gitPath", "").toString();
         if (gitPath.isEmpty()) {
@@ -603,7 +807,6 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
         }
     } else {
         // For current content, read from file system
-        QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
         QFile file(absoluteFilePath);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);

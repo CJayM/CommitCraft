@@ -21,6 +21,7 @@ class SettingsDialog;
 class CodeEditor;
 class CommitHistoryModel;
 class CommitItemDelegate;
+class Git;
 
 // Forward declare FileModel from the library
 class FileModel;
@@ -40,8 +41,11 @@ private slots:
     void openSettingsDialog();
     void openRepository();
     void refreshGitStatus();
-    void onGitStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void onGitStatusError(QProcess::ProcessError error);
+    void onGitStatusFinished(const QString &output);
+    void onGitDiffReady(const QString &output);
+    void onGitCommitHistoryReady(const QList<QList<QString>> &commits);
+    void onGitCommitFinished(bool success, const QString &message);
+    void onGitError(const QString &error);
     void showFileContextMenu(const QPoint &pos);
     void showStagedFileContextMenu(const QPoint &pos);
     void addSelectedFile();
@@ -60,23 +64,20 @@ private slots:
 private:
     void saveSplitterState();
     void restoreSplitterState();
-    void executeGitStatus();
     void parseGitStatusOutput(const QString &output);
     bool isGitRepository(const QString &path);
     bool isStaged(const QString &status);
     bool isUnstaged(const QString &status);    
     void updateDiffPanel(const QString &fileName);
     QString getFileContent(const QString &fileName, bool staged);
-    void applyDiffHighlighting(const QString &fileName);
     void parseAndApplyDiffHighlighting(const QString &diffOutput);
     void synchronizeScroll();
     void extractHunkPositions(const QString &diffOutput);
-    void loadCommitHistory();
+    void applyDiffHighlighting(const QString &fileName);
 
     Ui::MainWindow *ui;
     QSettings *settings;
     SettingsDialog *settingsDialog;
-    QProcess *gitProcess;
     QString repositoryPath;
     CodeEditor *stagedContentEditor;
     CodeEditor *currentContentEditor;
@@ -84,6 +85,7 @@ private:
     FileModel *stagedFilesModel;
     CommitHistoryModel *commitHistoryModel;
     CommitItemDelegate *commitItemDelegate;
+    Git *git;
     
     // Hunk navigation data
     QList<QPair<int, int>> hunkPositions; // Pair of (stagedLine, currentLine) for each hunk

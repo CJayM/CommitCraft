@@ -58,11 +58,11 @@ MainWindow::MainWindow(QWidget *parent)
     // Create new CodeEditor widgets
     stagedContentEditor = new CodeEditor(this);
     stagedContentEditor->setReadOnly(true);
-    stagedContentEditor->setPlaceholderText(tr("Содержимое файла (staged)"));
+    stagedContentEditor->setPlaceholderText(tr("РЎРѕРґРµСЂР¶РёРјРѕРµ С„Р°Р№Р»Р° (staged)"));
     
     currentContentEditor = new CodeEditor(this);
     currentContentEditor->setReadOnly(true);
-    currentContentEditor->setPlaceholderText(tr("Текущее содержимое файла"));
+    currentContentEditor->setPlaceholderText(tr("РўРµРєСѓС‰РµРµ СЃРѕРґРµСЂР¶РёРјРѕРµ С„Р°Р№Р»Р°"));
     
     // Add the CodeEditor widgets to the diffSplitter
     ui->diffSplitter->addWidget(stagedContentEditor);
@@ -107,6 +107,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Set default action for refresh button
     ui->refreshButton->setDefaultAction(ui->actionRefresh);
+    
+    // Connect refresh button
+    // connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::refreshGitStatus);
     
     // Connect commit button to the same action
     ui->commitButton->setDefaultAction(ui->actionCommit);
@@ -230,16 +233,16 @@ void MainWindow::onGitCommitFinished(bool success, const QString &message)
         // Uncheck amend checkbox after successful commit
         ui->amend_chk->setChecked(false);
         refreshGitStatus();
-        QMessageBox::information(this, tr("Успех"), tr("Коммит успешно выполнен."));
+        QMessageBox::information(this, tr("РЈСЃРїРµС…"), tr("РљРѕРјРјРёС‚ СѓСЃРїРµС€РЅРѕ РІС‹РїРѕР»РЅРµРЅ."));
     } else {
         // Error - show message
-        QMessageBox::warning(this, tr("Ошибка Git"), message);
+        QMessageBox::warning(this, tr("РћС€РёР±РєР° Git"), message);
     }
 }
 
 void MainWindow::onGitError(const QString &error)
 {
-    QMessageBox::warning(this, "Ошибка Git", error);
+    QMessageBox::warning(this, "РћС€РёР±РєР° Git", error);
 }
 
 void MainWindow::parseGitStatusOutput(const QString &output)
@@ -275,7 +278,7 @@ void MainWindow::parseGitStatusOutput(const QString &output)
 
 void MainWindow::openRepository()
 {
-    QString dir = QFileDialog::getExistingDirectory(this, tr("Выберите Git репозиторий"),
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Р’С‹Р±РµСЂРёС‚Рµ Git СЂРµРїРѕР·РёС‚РѕСЂРёР№"),
                                                     repositoryPath,
                                                     QFileDialog::ShowDirsOnly
                                                     | QFileDialog::DontResolveSymlinks);
@@ -289,8 +292,8 @@ void MainWindow::openRepository()
             setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
             refreshGitStatus();
         } else {
-            QMessageBox::warning(this, tr("Ошибка"), 
-                                tr("Выбранная директория не является Git репозиторием."));
+            QMessageBox::warning(this, tr("РћС€РёР±РєР°"), 
+                                tr("Р’С‹Р±СЂР°РЅРЅР°СЏ РґРёСЂРµРєС‚РѕСЂРёСЏ РЅРµ СЏРІР»СЏРµС‚СЃСЏ Git СЂРµРїРѕР·РёС‚РѕСЂРёРµРј."));
         }
     }
 }
@@ -308,10 +311,10 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
     if (!index.isValid()) return;
     
     // Create the context menu
-    QMenu contextMenu(tr("Файл"), this);
+    QMenu contextMenu(tr("Р¤Р°Р№Р»"), this);
     
-    // Create the "Добавить" action
-    QAction *addAction = new QAction(tr("Добавить"), this);
+    // Create the "Р”РѕР±Р°РІРёС‚СЊ" action
+    QAction *addAction = new QAction(tr("Р”РѕР±Р°РІРёС‚СЊ"), this);
     connect(addAction, &QAction::triggered, this, &MainWindow::addSelectedFile);
     contextMenu.addAction(addAction);
     
@@ -341,10 +344,10 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
     if (!index.isValid()) return;
     
     // Create the context menu
-    QMenu contextMenu(tr("Файл"), this);
+    QMenu contextMenu(tr("Р¤Р°Р№Р»"), this);
     
-    // Create the "Убрать из stage" action
-    QAction *unstageAction = new QAction(tr("Убрать из stage"), this);
+    // Create the "РЈР±СЂР°С‚СЊ РёР· stage" action
+    QAction *unstageAction = new QAction(tr("РЈР±СЂР°С‚СЊ РёР· stage"), this);
     connect(unstageAction, &QAction::triggered, this, &MainWindow::unstageSelectedFile);
     contextMenu.addAction(unstageAction);
     
@@ -374,7 +377,7 @@ void MainWindow::commitChanges()
     
     // Check if commit message is empty
     if (commitMessage.isEmpty()) {
-        QMessageBox::warning(this, tr("Ошибка"), tr("Введите сообщение коммита."));
+        QMessageBox::warning(this, tr("РћС€РёР±РєР°"), tr("Р’РІРµРґРёС‚Рµ СЃРѕРѕР±С‰РµРЅРёРµ РєРѕРјРјРёС‚Р°."));
         return;
     }
     
