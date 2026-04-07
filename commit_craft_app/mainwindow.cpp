@@ -13,6 +13,7 @@
 #include <QTextStream>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
+#include "diffeditor.h"
 #include <commithistorymodel.h>
 #include <commititemdelegate.h>
 #include <filemodel.h>
@@ -50,42 +51,21 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Set repository path for Git operations
     git->setRepositoryPath(repositoryPath);
-    
-    // Replace QPlainTextEdit with CodeEditor for line numbers
-    // First, remove the existing widgets
-    delete ui->stagedContentTextEdit;
-    delete ui->currentContentTextEdit;
-    
-    // Create new CodeEditor widgets
-    stagedContentEditor = new CodeEditor(this);
-    stagedContentEditor->setReadOnly(true);
-    stagedContentEditor->setPlaceholderText(tr("Содержимое файла (staged)"));
-    
-    currentContentEditor = new CodeEditor(this);
-    currentContentEditor->setReadOnly(true);
-    currentContentEditor->setPlaceholderText(tr("Текущее содержимое файла"));
-    
-    // Add the CodeEditor widgets to the diffSplitter
-    ui->diffSplitter->addWidget(stagedContentEditor);
-    ui->diffSplitter->addWidget(currentContentEditor);
-    
+
+    // DiffEditor создан через promoted widget в mainwindow.ui
+    // Получаем ссылатель на него
+    diffEditor = ui->diffEditor;
+
     // Set up the table views with models
     ui->filesTable->setModel(unstagedFilesModel);
     ui->stagedFilesTable->setModel(stagedFilesModel);
     ui->commitHistoryList->setModel(commitHistoryModel);
     ui->commitHistoryList->setItemDelegate(commitItemDelegate);
-    
-    // Connect zoom synchronization
-    connect(stagedContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
-    connect(currentContentEditor, &CodeEditor::zoomChanged, this, &MainWindow::synchronizeZoom);
-    
-    // Connect scroll synchronization
-    connect(stagedContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, 
-            this, &MainWindow::synchronizeScroll);
-    connect(currentContentEditor->verticalScrollBar(), &QScrollBar::valueChanged, 
-            this, &MainWindow::synchronizeScroll);
-    
-    // Connect hunk navigation buttons
+
+    // Connect git process signals to DiffEditor
+    connect(git, &Git::diffReady, diffEditor, &DiffEditor::applyDiffData);
+
+    // Connect hunk navigation buttons to DiffEditor
     connect(ui->actionPrevHunk, &QAction::triggered, this, &MainWindow::navigateToPrevHunk);
     connect(ui->actionNextHunk, &QAction::triggered, this, &MainWindow::navigateToNextHunk);
     
@@ -433,205 +413,40 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
-    // Reset hunk navigation
-    hunkPositions.clear();
-    currentHunkIndex = -1;
-    ui->actionPrevHunk->setEnabled(false);
-    ui->actionNextHunk->setEnabled(false);
-    
     // Get file contents
     QString stagedContent = getFileContent(fileName, true);
     QString currentContent = getFileContent(fileName, false);
-    
-    // Set content in text edits
-    stagedContentEditor->setPlainText(stagedContent);
-    currentContentEditor->setPlainText(currentContent);
-    
-    // Apply highlighting based on git diff
-    applyDiffHighlighting(fileName);
+
+    // Set content in DiffEditor (diff data will come asynchronously via applyDiffData)
+    diffEditor->setContents(stagedContent, currentContent, fileName);
 }
 
-void MainWindow::applyDiffHighlighting(const QString &fileName)
+void MainWindow::synchronizeZoom(int zoom)
 {
-    git->getDiff(fileName);
-    
-    // For demonstration purposes, you could also parse and display hunk details here
-    // This would typically be done in the onGitDiffReady slot after receiving the diff output
-}
-
-void MainWindow::extractHunkPositions(const QString &diffOutput)
-{
-    // Clear existing hunk positions
-    hunkPositions.clear();
-    currentHunkIndex = -1;
-    
-    // Use GitParser to parse the diff output
-    GitParser parser;
-    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
-    
-    // Process each hunk to extract positions
-    for (const Hunk &hunk : hunks) {
-        // For simplicity, we're just storing the start positions
-        // In a real application, you might want to store more information
-        hunkPositions.append(qMakePair(hunk.leftStart, hunk.rightStart));
-    }
-    
-    // Update button states
-    bool hasHunks = !hunkPositions.isEmpty();
-    ui->actionPrevHunk->setEnabled(hasHunks);
-    ui->actionNextHunk->setEnabled(hasHunks);
-}
-
-void MainWindow::displayHunkDetails(const QString &diffOutput)
-{
-    GitParser parser;
-    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
-    
-    qDebug() << "Found" << hunks.size() << "hunks:";
-    
-    for (int i = 0; i < hunks.size(); ++i) {
-        const Hunk &hunk = hunks[i];
-        qDebug() << "Hunk" << i << ": @@ -" << hunk.leftStart << "," << hunk.leftSize 
-                 << " +" << hunk.rightStart << "," << hunk.rightSize << " @@";
-        
-        qDebug() << "  Lines:";
-        for (int j = 0; j < hunk.lines.size(); ++j) {
-            const HunkLine &line = hunk.lines[j];
-            QString typeStr;
-            switch (line.type) {
-            case HunkLine::Unchanged:
-                typeStr = " ";
-                break;
-            case HunkLine::Removed:
-                typeStr = "-";
-                break;
-            case HunkLine::Added:
-                typeStr = "+";
-                break;
-            }
-            qDebug() << "    " << typeStr << line.content;
-        }
-    }
-}
-
-void MainWindow::parseAndApplyDiffHighlighting(const QString &diffOutput)
-{
-    // Parse diff output to identify line differences
-    QStringList lines = diffOutput.split('\n');
-    
-    // Maps to store line numbers and their types (added/deleted/modified)
-    QMap<int, QString> stagedLineTypes;  // For staged content
-    QMap<int, QString> currentLineTypes; // For current content
-    
-    int stagedLineNum = 1;
-    int currentLineNum = 1;
-    
-    // Process diff lines
-    for (const QString &line : lines) {
-        if (line.startsWith("@@")) {
-            // Hunk header - parse line numbers
-            // Format: @@ -start,count +start,count @@
-            QRegularExpression re("@@ -(\\d+),(\\d+) \\+(\\d+),(\\d+) @@");
-            QRegularExpressionMatch match = re.match(line);
-            if (match.hasMatch()) {
-                stagedLineNum = match.captured(1).toInt();
-                currentLineNum = match.captured(3).toInt();
-            }
-        } else if (line.startsWith("+") && !line.startsWith("+++")) {
-            // Added line (in current version)
-            currentLineTypes[currentLineNum] = "added";
-            currentLineNum++;
-        } else if (line.startsWith("-") && !line.startsWith("---")) {
-            // Deleted line (in staged version)
-            stagedLineTypes[stagedLineNum] = "deleted";
-            stagedLineNum++;
-        } else if (!line.startsWith("diff") && !line.startsWith("index") && 
-                   !line.startsWith("---") && !line.startsWith("+++")) {
-            // Unchanged line
-            if (!line.startsWith(" ")) {
-                // This is an unchanged line
-                stagedLineNum++;
-                currentLineNum++;
-            } else {
-                // This is an unchanged line (starts with space)
-                stagedLineNum++;
-                currentLineNum++;
-            }
-        }
-    }
-    
-    // Apply highlighting to staged content
-    QTextCursor stagedCursor(stagedContentEditor->document());
-    for (auto it = stagedLineTypes.begin(); it != stagedLineTypes.end(); ++it) {
-        int lineNum = it.key();
-        QString type = it.value();
-        
-        // Move cursor to the line
-        stagedCursor.movePosition(QTextCursor::Start);
-        for (int i = 1; i < lineNum && !stagedCursor.atEnd(); i++) {
-            stagedCursor.movePosition(QTextCursor::Down);
-        }
-        
-        // Select the entire line
-        stagedCursor.movePosition(QTextCursor::StartOfLine);
-        stagedCursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
-        
-        // Apply formatting
-        QTextCharFormat format;
-        if (type == "deleted") {
-            format.setBackground(QColor(255, 198, 198)); // Light red
-        }
-        stagedCursor.setCharFormat(format);
-    }
-    
-    // Apply highlighting to current content
-    QTextCursor currentCursor(currentContentEditor->document());
-    for (auto it = currentLineTypes.begin(); it != currentLineTypes.end(); ++it) {
-        int lineNum = it.key();
-        QString type = it.value();
-        
-        // Move cursor to the line
-        currentCursor.movePosition(QTextCursor::Start);
-        for (int i = 1; i < lineNum && !currentCursor.atEnd(); i++) {
-            currentCursor.movePosition(QTextCursor::Down);
-        }
-        
-        // Select the entire line
-        currentCursor.movePosition(QTextCursor::StartOfLine);
-        currentCursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
-        
-        // Apply formatting
-        QTextCharFormat format;
-        if (type == "added") {
-            format.setBackground(QColor(198, 255, 198)); // Light green
-        }
-        currentCursor.setCharFormat(format);
-    }
+    // Больше не используется — синхронизация зума внутри DiffEditor
+    Q_UNUSED(zoom);
 }
 
 QString MainWindow::getFileContent(const QString &fileName, bool staged)
 {
     if (staged) {
         // For staged content, we need to get it from git
-        // We'll use a blocking call here for simplicity, but in a real application
-        // you might want to make this asynchronous
         QSettings gitSettings("CommitCraft", "Settings");
         QString gitPath = gitSettings.value("gitPath", "").toString();
         if (gitPath.isEmpty()) {
             gitPath = "git";
         }
-        
+
         QProcess gitProcess;
         gitProcess.setProgram(gitPath);
         gitProcess.setArguments(QStringList() << "show" << QString("HEAD:%1").arg(fileName));
         gitProcess.setWorkingDirectory(repositoryPath);
         gitProcess.start();
         gitProcess.waitForFinished();
-        
+
         if (gitProcess.exitCode() == 0) {
             return gitProcess.readAllStandardOutput();
         } else {
-            // If file doesn't exist in HEAD, return empty string
             return "";
         }
     } else {
@@ -649,68 +464,9 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
     }
 }
 
-void MainWindow::synchronizeZoom(int zoom)
-{
-    // Prevent infinite recursion by temporarily blocking signals
-    bool stagedBlocked = stagedContentEditor->blockSignals(true);
-    bool currentBlocked = currentContentEditor->blockSignals(true);
-    
-    // Set the same zoom level for both editors
-    if (sender() == stagedContentEditor) {
-        currentContentEditor->setZoom(zoom);
-    } else if (sender() == currentContentEditor) {
-        stagedContentEditor->setZoom(zoom);
-    }
-    
-    // Restore signals
-    stagedContentEditor->blockSignals(stagedBlocked);
-    currentContentEditor->blockSignals(currentBlocked);
-}
-
 void MainWindow::navigateToNextHunk()
 {
-    if (hunkPositions.isEmpty()) return;
-    
-    // Move to next hunk
-    currentHunkIndex++;
-    if (currentHunkIndex >= hunkPositions.size()) {
-        currentHunkIndex = 0; // Wrap around to first hunk
-    }
-    
-    // Get the hunk position
-    const auto &hunk = hunkPositions[currentHunkIndex];
-    int stagedLine = hunk.first;
-    int currentLine = hunk.second;
-    
-    // Scroll to the hunk in both editors using scroll bars for better control
-    // For staged content editor
-    QTextCursor stagedCursor(stagedContentEditor->document());
-    stagedCursor.movePosition(QTextCursor::Start);
-    for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
-        stagedCursor.movePosition(QTextCursor::Down);
-    }
-
-    stagedContentEditor->setTextCursor(stagedCursor);
-    // Calculate the position and scroll to it (center the hunk)
-    QRect cursorRect = stagedContentEditor->cursorRect(stagedCursor);
-    int scrollValue = cursorRect.y() - (stagedContentEditor->viewport()->height() / 2);
-    scrollValue = qBound(0, scrollValue, stagedContentEditor->verticalScrollBar()->maximum());
-    // stagedContentEditor->verticalScrollBar()->setValue(scrollValue);
-
-    // For current content editor
-    QTextCursor currentCursor(currentContentEditor->document());
-    currentCursor.movePosition(QTextCursor::Start);
-    for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
-        currentCursor.movePosition(QTextCursor::Down);
-    }
-    
-    // Calculate the position and scroll to it (center the hunk)
-    cursorRect = currentContentEditor->cursorRect(currentCursor);
-    currentContentEditor->setTextCursor(currentCursor);
-    scrollValue = cursorRect.y() - (currentContentEditor->viewport()->height() / 2);
-    scrollValue = qBound(0, scrollValue, currentContentEditor->verticalScrollBar()->maximum());
-    // currentContentEditor->verticalScrollBar()->setValue(scrollValue);
-    qDebug() << "Scroll to " << scrollValue << stagedLine << currentLine;
+    diffEditor->navigateToNextHunk();
 }
 
 void MainWindow::toggleLeftPanel(bool visible)
@@ -733,14 +489,14 @@ void MainWindow::onAmendCheckBoxChanged(int state)
         if (gitPath.isEmpty()) {
             gitPath = "git";
         }
-        
+
         QProcess gitProcess;
         gitProcess.setProgram(gitPath);
         gitProcess.setArguments(QStringList() << "log" << "-1" << "--pretty=format:%s");
         gitProcess.setWorkingDirectory(repositoryPath);
         gitProcess.start();
         gitProcess.waitForFinished();
-        
+
         if (gitProcess.exitCode() == 0) {
             QString lastCommitMessage = gitProcess.readAllStandardOutput();
             if (!lastCommitMessage.isEmpty()) {
@@ -752,91 +508,5 @@ void MainWindow::onAmendCheckBoxChanged(int state)
 
 void MainWindow::navigateToPrevHunk()
 {
-    if (hunkPositions.isEmpty())
-        return;
-
-    // Move to previous hunk
-    currentHunkIndex--;
-    if (currentHunkIndex < 0) {
-        currentHunkIndex = hunkPositions.size() - 1; // Wrap around to last hunk
-    }
-
-    // Get the hunk position
-    const auto &hunk = hunkPositions[currentHunkIndex];
-    int stagedLine = hunk.first;
-    int currentLine = hunk.second;
-
-    // Scroll to the hunk in both editors using scroll bars for better control
-    // For staged content editor
-    QTextCursor stagedCursor(stagedContentEditor->document());
-    stagedCursor.movePosition(QTextCursor::Start);
-    for (int i = 1; i < stagedLine && !stagedCursor.atEnd(); i++) {
-        stagedCursor.movePosition(QTextCursor::Down);
-    }
-
-    // Calculate the position and scroll to it (center the hunk)
-    QRect cursorRect = stagedContentEditor->cursorRect(stagedCursor);
-    int scrollValue = cursorRect.y() - (stagedContentEditor->viewport()->height() / 2);
-    scrollValue = qBound(0, scrollValue, stagedContentEditor->verticalScrollBar()->maximum());
-    stagedContentEditor->verticalScrollBar()->setValue(scrollValue);
-
-    // For current content editor
-    QTextCursor currentCursor(currentContentEditor->document());
-    currentCursor.movePosition(QTextCursor::Start);
-    for (int i = 1; i < currentLine && !currentCursor.atEnd(); i++) {
-        currentCursor.movePosition(QTextCursor::Down);
-    }
-
-    // Calculate the position and scroll to it (center the hunk)
-    cursorRect = currentContentEditor->cursorRect(currentCursor);
-    scrollValue = cursorRect.y() - (currentContentEditor->viewport()->height() / 2);
-    scrollValue = qBound(0, scrollValue, currentContentEditor->verticalScrollBar()->maximum());
-    currentContentEditor->verticalScrollBar()->setValue(scrollValue);
-}
-
-void MainWindow::synchronizeScroll()
-{
-    return;
-    // Prevent infinite recursion by temporarily blocking signals
-    QScrollBar *stagedScrollBar = stagedContentEditor->verticalScrollBar();
-    QScrollBar *currentScrollBar = currentContentEditor->verticalScrollBar();
-
-    bool stagedBlocked = stagedScrollBar->blockSignals(true);
-    bool currentBlocked = currentScrollBar->blockSignals(true);
-
-    // Get the scroll bar ranges
-    int stagedRange = stagedScrollBar->maximum() - stagedScrollBar->minimum();
-    int currentRange = currentScrollBar->maximum() - currentScrollBar->minimum();
-
-    // Only synchronize if both editors have content
-    if (stagedRange > 0 && currentRange > 0) {
-        // Calculate the scroll position as a percentage
-        if (sender() == stagedScrollBar) {
-            // Calculate percentage of staged scroll position
-            double percentage = static_cast<double>(stagedScrollBar->value()
-                                                    - stagedScrollBar->minimum())
-                                / stagedRange;
-            // Apply the same percentage to current scroll position
-            int newValue = currentScrollBar->minimum()
-                           + static_cast<int>(percentage * currentRange);
-            currentScrollBar->blockSignals(currentBlocked);
-            currentScrollBar->setValue(newValue);
-        } else if (sender() == currentScrollBar) {
-            // Calculate percentage of current scroll position
-            double percentage = static_cast<double>(currentScrollBar->value()
-                                                    - currentScrollBar->minimum())
-                                / currentRange;
-            // Apply the same percentage to staged scroll position
-            int newValue = stagedScrollBar->minimum() + static_cast<int>(percentage * stagedRange);
-            stagedScrollBar->blockSignals(stagedBlocked);
-            stagedScrollBar->setValue(newValue);
-        }
-    }
-
-    // Restore signals
-    stagedScrollBar->blockSignals(stagedBlocked);
-    currentScrollBar->blockSignals(currentBlocked);
-
-    // stagedContentEditor->redraw();
-    // currentContentEditor->redraw();
+    diffEditor->navigateToPrevHunk();
 }

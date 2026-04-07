@@ -530,26 +530,13 @@
             </layout>
            </item>
            <item>
-            <widget class="QSplitter" name="diffSplitter">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+            <widget class="DiffEditor" name="diffEditor">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
              </property>
-             <widget class="QPlainTextEdit" name="stagedContentTextEdit">
-              <property name="readOnly">
-               <bool>true</bool>
-              </property>
-              <property name="placeholderText">
-               <string>Содержимое файла (staged)</string>
-              </property>
-             </widget>
-             <widget class="QPlainTextEdit" name="currentContentTextEdit">
-              <property name="readOnly">
-               <bool>true</bool>
-              </property>
-              <property name="placeholderText">
-               <string>Текущее содержимое файла</string>
-              </property>
-             </widget>
             </widget>
            </item>
           </layout>
@@ -702,6 +689,14 @@
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DiffEditor</class>
+   <extends>QWidget</extends>
+   <header>diffeditor.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>

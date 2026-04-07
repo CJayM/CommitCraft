@@ -7,6 +7,7 @@ TEMPLATE = app
 
 SOURCES += \
     codeeditor.cpp \
+    diffeditor.cpp \
     diffhighlighter.cpp \
     diffpanel.cpp \
     intralinediff.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
 
 HEADERS += \
     codeeditor.h \
+    diffeditor.h \
     diffhighlighter.h \
     diffpanel.h \
     intralinediff.h \

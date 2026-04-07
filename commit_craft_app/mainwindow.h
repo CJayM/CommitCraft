@@ -23,6 +23,7 @@ class CommitHistoryModel;
 class CommitItemDelegate;
 class Git;
 class GitParser;
+class DiffEditor;
 
 // Forward declare FileModel from the library
 class FileModel;
@@ -54,43 +55,30 @@ private slots:
     void commitChanges();
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
-    void synchronizeZoom(int zoom);
-    void navigateToNextHunk();
-    void navigateToPrevHunk();
     void toggleLeftPanel(bool visible);
     void toggleTopPanel(bool visible);
     void onAmendCheckBoxChanged(int state);
     void updateCommitButtonState();
+    void synchronizeZoom(int zoom);
+    void navigateToNextHunk();
+    void navigateToPrevHunk();
 
 private:
     void saveSplitterState();
     void restoreSplitterState();
-    void parseGitStatusOutput(const QString &output);
     bool isGitRepository(const QString &path);
-    bool isStaged(const QString &status);
-    bool isUnstaged(const QString &status);    
-    void updateDiffPanel(const QString &fileName);
     QString getFileContent(const QString &fileName, bool staged);
-    void parseAndApplyDiffHighlighting(const QString &diffOutput);
-    void synchronizeScroll();
-    void extractHunkPositions(const QString &diffOutput);
-    void displayHunkDetails(const QString &diffOutput);
-    void applyDiffHighlighting(const QString &fileName);
+    void updateDiffPanel(const QString &fileName);
 
     Ui::MainWindow *ui;
     QSettings *settings;
     SettingsDialog *settingsDialog;
     QString repositoryPath;
-    CodeEditor *stagedContentEditor;
-    CodeEditor *currentContentEditor;
+    DiffEditor *diffEditor;
     FileModel *unstagedFilesModel;
     FileModel *stagedFilesModel;
     CommitHistoryModel *commitHistoryModel;
     CommitItemDelegate *commitItemDelegate;
     Git *git;
-    
-    // Hunk navigation data
-    QList<QPair<int, int>> hunkPositions; // Pair of (stagedLine, currentLine) for each hunk
-    int currentHunkIndex;
 };
 #endif // MAINWINDOW_H
