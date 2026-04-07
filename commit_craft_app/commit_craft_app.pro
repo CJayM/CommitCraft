@@ -7,7 +7,9 @@ TEMPLATE = app
 
 SOURCES += \
     codeeditor.cpp \
+    diffhighlighter.cpp \
     diffpanel.cpp \
+    intralinediff.cpp \
     main.cpp \
     mainwindow.cpp \
     settingsdialog.cpp \
@@ -15,7 +17,9 @@ SOURCES += \
 
 HEADERS += \
     codeeditor.h \
+    diffhighlighter.h \
     diffpanel.h \
+    intralinediff.h \
     linenumberarea.h \
     mainwindow.h \
     settingsdialog.h \
