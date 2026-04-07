@@ -12,8 +12,21 @@
 #include <QScrollBar>
 #include <QLabel>
 #include <QFileInfo>
+#include <QTextDocument>
 
 class Highlighter;
+
+/// Структура для синхронизированной строки diff
+struct SyncedLine {
+    QString leftText;   // Текст для левой панели (пустая если строка добавлена)
+    QString rightText;  // Текст для правой панели (пустая если строка удалена)
+    bool isRemoved;     // Строка удалена (отображается слева)
+    bool isAdded;       // Строка добавлена (отображается справа)
+    bool isModified;    // Строка модифицирована
+    bool isContext;     // Контекстная строка (без изменений)
+    int leftLineNum;    // Номер строки в левом файле (-1 если не применяется)
+    int rightLineNum;   // Номер строки в правом файле (-1 если не применяется)
+};
 
 /// Виджет side-by-side diff с синхронным скроллом, зумом и подсветкой синтаксиса.
 class DiffEditor : public QWidget
@@ -34,7 +47,7 @@ public:
     /// Очистить содержимое
     void clear();
 
-    /// Применить diff-данные (вызывается из MainWindow при получении сигнала от Git)
+    /// Применить diff-данные и перестроить side-by-side view
     void applyDiffData(const QList<Hunk> &hunks);
 
 signals:
@@ -52,23 +65,38 @@ private slots:
     void synchronizeZoom(int zoom);
 
 private:
+    /// Построить синхронизированные строки из hunks и полного содержимого
+    QVector<SyncedLine> buildSyncedLines(const QList<Hunk> &hunks,
+                                         const QStringList &leftLines,
+                                         const QStringList &rightLines);
+
+    /// Заполнить панели синхронизированным содержимым
+    void populatePanels(const QVector<SyncedLine> &syncedLines);
+
+    /// Прокрутить к позиции ханка
+    void scrollToHunk(int hunkIndex);
+
     /// Применить подсветку синтаксиса по типу файла
     void applySyntaxHighlighting(const QString &fileName);
 
     DiffPanel *m_leftPanel;
     DiffPanel *m_rightPanel;
 
-    // Синтаксис подсветка (переиспользуем существующий Highlighter из CodeEditor)
-    // Каждая DiffPanel уже содержит свой Highlighter через CodeEditor
-    // Здесь храним ссылки для rehighlight
-
     // Навигация по ханкам
     QList<QPair<int, int>> m_hunkPositions; // (leftLine, rightLine)
     int m_currentHunkIndex;
 
+    // Флаг для предотвращения рекурсии при синхронизации скролла
+    bool m_syncingScroll;
+
     // Layout
     QVBoxLayout *m_layout;
     QSplitter *m_splitter;
+
+    // Полное содержимое файлов (для side-by-side diff)
+    QString m_leftFullContent;
+    QString m_rightFullContent;
+    QString m_fileName;
 };
 
 #endif // DIFFEDITOR_H

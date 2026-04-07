@@ -402,8 +402,11 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     QString stagedContent = getFileContent(fileName, true);
     QString currentContent = getFileContent(fileName, false);
 
-    // Set content in DiffEditor (diff data will come asynchronously via applyDiffData)
+    // Set content in DiffEditor
     diffEditor->setContents(stagedContent, currentContent, fileName);
+
+    // Request diff data from Git (asynchronously)
+    git->getDiff(fileName);
 }
 
 void MainWindow::synchronizeZoom(int zoom)

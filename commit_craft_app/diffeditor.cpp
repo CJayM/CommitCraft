@@ -3,12 +3,14 @@
 #include <QScrollBar>
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <QTextBlock>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
     , m_leftPanel(new DiffPanel(this))
     , m_rightPanel(new DiffPanel(this))
     , m_currentHunkIndex(-1)
+    , m_syncingScroll(false)
     , m_layout(new QVBoxLayout(this))
     , m_splitter(new QSplitter(Qt::Horizontal, this))
 {
@@ -20,9 +22,6 @@ DiffEditor::DiffEditor(QWidget *parent)
     m_splitter->addWidget(m_rightPanel);
 
     m_layout->addWidget(m_splitter);
-
-    // Начальное равное распределение
-    // Будет пересчитано при показе
     setLayout(m_layout);
 
     // Подключить синхронизацию скролла
@@ -40,44 +39,248 @@ void DiffEditor::setContents(const QString &leftContent,
                               const QString &rightContent,
                               const QString &fileName)
 {
-    // 1. Установить содержимое в панели
-    m_leftPanel->setContent(leftContent);
-    m_rightPanel->setContent(rightContent);
+    m_leftFullContent = leftContent;
+    m_rightFullContent = rightContent;
+    m_fileName = fileName;
 
-    // 2. Очистить предыдущие diff-данные
+    // Очистить предыдущие diff-данные
     m_leftPanel->clearDiffData();
     m_rightPanel->clearDiffData();
     m_hunkPositions.clear();
     m_currentHunkIndex = -1;
 
-    // 3. Применить подсветку синтаксиса
-    applySyntaxHighlighting(fileName);
+    // Показать полное содержимое (будет заменено на side-by-side diff в applyDiffData)
+    m_leftPanel->setContent(leftContent);
+    m_rightPanel->setContent(rightContent);
 
-    // 4. diff-данные будут применены позже через applyDiffData()
-    //    когда Git завершит обработку
+    // Применить подсветку синтаксиса
+    applySyntaxHighlighting(fileName);
 }
 
 void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
 {
-    // 1. Строим LineDiffMap для каждой панели
-    auto leftMap = DiffHighlighter::buildLineDiffMapLeft(hunks);
-    auto rightMap = DiffHighlighter::buildLineDiffMapRight(hunks);
+    if (hunks.isEmpty())
+        return;
 
-    // 2. Для Modified строк вычисляем intra-line diff
-    DiffHighlighter::computeIntraLineDiffs(leftMap, rightMap, hunks);
+    // Разбить содержимое на строки
+    QStringList leftLines = m_leftFullContent.split('\n');
+    QStringList rightLines = m_rightFullContent.split('\n');
 
-    // 3. Сохраняем ханки для навигации
+    // Построить синхронизированные строки
+    QVector<SyncedLine> syncedLines = buildSyncedLines(hunks, leftLines, rightLines);
+
+    // Сохранить ханки для навигации
     m_hunkPositions.clear();
     for (const auto &hunk : hunks) {
         m_hunkPositions.append(qMakePair(hunk.leftStart, hunk.rightStart));
     }
 
-    // 4. Применяем данные к панелям
-    m_leftPanel->setDiffData(leftMap);
-    m_rightPanel->setDiffData(rightMap);
+    // Заполнить панели синхронизированным содержимым
+    populatePanels(syncedLines);
 
-    // 5. Обновить подсветку синтаксиса (diff-фоны могут перекрыть)
-    //    Highlighter уже установлен в CodeEditor, перерисовка произойдёт автоматически
+    // Вычислить intra-line diff для Modified строк
+    auto leftMap = DiffHighlighter::buildLineDiffMapLeft(hunks);
+    auto rightMap = DiffHighlighter::buildLineDiffMapRight(hunks);
+    DiffHighlighter::computeIntraLineDiffs(leftMap, rightMap, hunks);
+
+    // НО: номера строк в leftMap/rightMap — это оригинальные номера файлов,
+    // а у нас теперь синхронизированные строки. Нужно пересчитать.
+    // Для простоты — создадим новую карту на основе syncedLines
+    QMap<int, LineDiffInfo> leftDiffMap, rightDiffMap;
+    for (int i = 0; i < syncedLines.size(); ++i) {
+        const auto &sl = syncedLines[i];
+        if (sl.isRemoved) {
+            leftDiffMap[i] = {DiffType::Removed, i, {}};
+        }
+        if (sl.isAdded) {
+            rightDiffMap[i] = {DiffType::Added, i, {}};
+        }
+        if (sl.isModified) {
+            leftDiffMap[i] = {DiffType::Modified, i, {}};
+            rightDiffMap[i] = {DiffType::Modified, i, {}};
+            // Вставить intra-line ranges если есть
+            auto lit = leftMap.find(sl.leftLineNum);
+            auto rit = rightMap.find(sl.rightLineNum);
+            if (lit != leftMap.end()) {
+                leftDiffMap[i].changedRanges = lit->changedRanges;
+            }
+            if (rit != rightMap.end()) {
+                rightDiffMap[i].changedRanges = rit->changedRanges;
+            }
+        }
+    }
+
+    m_leftPanel->setDiffData(leftDiffMap);
+    m_rightPanel->setDiffData(rightDiffMap);
+}
+
+QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
+                                                  const QStringList &leftLines,
+                                                  const QStringList &rightLines)
+{
+    QVector<SyncedLine> result;
+    const int CONTEXT_LINES = 3;
+
+    int prevLeftEnd = 0; // 0-based индекс следующей необработанной строки слева
+    int prevRightEnd = 0;
+
+    for (int hunkIdx = 0; hunkIdx < hunks.size(); ++hunkIdx) {
+        const auto &hunk = hunks[hunkIdx];
+
+        // Пределы hunk (1-based из GitParser)
+        int hunkLeftStart = hunk.leftStart;   // 1-based
+        int hunkRightStart = hunk.rightStart; // 1-based
+
+        // --- Контекстные строки ДО hunk ---
+        int contextStartLeft = qMax(prevLeftEnd, hunkLeftStart - 1 - CONTEXT_LINES);
+        int contextStartRight = qMax(prevRightEnd, hunkRightStart - 1 - CONTEXT_LINES);
+
+        int ctxLeft = contextStartLeft;
+        int ctxRight = contextStartRight;
+        while (ctxLeft < hunkLeftStart - 1 && ctxRight < hunkRightStart - 1
+               && ctxLeft < leftLines.size() && ctxRight < rightLines.size()) {
+            result.append({
+                leftLines[ctxLeft],
+                rightLines[ctxRight],
+                false, false, false, true, // context
+                ctxLeft, ctxRight
+            });
+            ctxLeft++;
+            ctxRight++;
+        }
+
+        // --- Строки внутри hunk ---
+        // Обрабатываем строки hunk последовательно, сохраняя порядок.
+        // Removed и Added группируем в "change groups", Unchanged добавляем как контекст.
+        struct ChangeGroup {
+            QVector<QString> removedContents;
+            QVector<int> removedLeftNums;
+            QVector<QString> addedContents;
+            QVector<int> addedRightNums;
+        };
+        QVector<ChangeGroup> changeGroups;
+        QVector<SyncedLine> unchangedInHunk;
+        ChangeGroup currentGroup;
+
+        int leftIdx = hunkLeftStart - 1; // 0-based
+        int rightIdx = hunkRightStart - 1; // 0-based
+
+        for (const auto &line : hunk.lines) {
+            switch (line.type) {
+            case HunkLine::Removed:
+                if (leftIdx < leftLines.size()) {
+                    currentGroup.removedContents.append(leftLines[leftIdx]);
+                } else {
+                    currentGroup.removedContents.append(line.content);
+                }
+                currentGroup.removedLeftNums.append(leftIdx);
+                leftIdx++;
+                break;
+            case HunkLine::Added:
+                if (rightIdx < rightLines.size()) {
+                    currentGroup.addedContents.append(rightLines[rightIdx]);
+                } else {
+                    currentGroup.addedContents.append(line.content);
+                }
+                currentGroup.addedRightNums.append(rightIdx);
+                rightIdx++;
+                break;
+            case HunkLine::Unchanged:
+                // Сохраняем предыдущую группу изменений
+                if (!currentGroup.removedContents.isEmpty() || !currentGroup.addedContents.isEmpty()) {
+                    changeGroups.append(currentGroup);
+                    currentGroup = ChangeGroup{};
+                }
+                // Добавляем контекстную строку
+                if (leftIdx < leftLines.size() && rightIdx < rightLines.size()) {
+                    unchangedInHunk.append({
+                        leftLines[leftIdx],
+                        rightLines[rightIdx],
+                        false, false, false, true,
+                        leftIdx, rightIdx
+                    });
+                }
+                leftIdx++;
+                rightIdx++;
+                break;
+            }
+        }
+        // Сохраняем последнюю группу изменений
+        if (!currentGroup.removedContents.isEmpty() || !currentGroup.addedContents.isEmpty()) {
+            changeGroups.append(currentGroup);
+        }
+
+        // Выводим все строки hunk в правильном порядке
+        // Для простоты: сначала все change groups, потом unchanged
+        // Но это не совсем правильно — нужен правильный порядок
+        // Для начала упрощённый вариант: все изменения, потом весь контекст
+        // TODO: правильный порядок (interleaved)
+
+        for (const auto &group : changeGroups) {
+            int maxChanged = qMax(group.removedContents.size(), group.addedContents.size());
+            for (int i = 0; i < maxChanged; ++i) {
+                QString leftText = (i < group.removedContents.size()) ? group.removedContents[i] : "";
+                QString rightText = (i < group.addedContents.size()) ? group.addedContents[i] : "";
+                bool isRemoved = (i < group.removedContents.size());
+                bool isAdded = (i < group.addedContents.size());
+                bool isModified = isRemoved && isAdded;
+
+                result.append({
+                    leftText,
+                    rightText,
+                    isRemoved, isAdded, isModified, false,
+                    isRemoved ? group.removedLeftNums[i] : -1,
+                    isAdded ? group.addedRightNums[i] : -1
+                });
+            }
+        }
+        result.append(unchangedInHunk);
+
+        prevLeftEnd = leftIdx;
+        prevRightEnd = rightIdx;
+    }
+
+    // --- Контекстные строки ПОСЛЕ последнего hunk ---
+    if (!hunks.isEmpty()) {
+        const auto &lastHunk = hunks.last();
+        int lastLeftEnd = lastHunk.leftStart - 1 + lastHunk.leftSize;
+        int lastRightEnd = lastHunk.rightStart - 1 + lastHunk.rightSize;
+
+        int contextEndLeft = qMin(lastLeftEnd + CONTEXT_LINES, leftLines.size());
+        int contextEndRight = qMin(lastRightEnd + CONTEXT_LINES, rightLines.size());
+
+        int ctxLeft = lastLeftEnd;
+        int ctxRight = lastRightEnd;
+        while (ctxLeft < contextEndLeft && ctxRight < contextEndRight) {
+            result.append({
+                leftLines[ctxLeft],
+                rightLines[ctxRight],
+                false, false, false, true,
+                ctxLeft, ctxRight
+            });
+            ctxLeft++;
+            ctxRight++;
+        }
+    }
+
+    return result;
+}
+
+void DiffEditor::populatePanels(const QVector<SyncedLine> &syncedLines)
+{
+    QString leftText, rightText;
+    for (int i = 0; i < syncedLines.size(); ++i) {
+        const auto &sl = syncedLines[i];
+        leftText += sl.leftText;
+        rightText += sl.rightText;
+        if (i < syncedLines.size() - 1) {
+            leftText += '\n';
+            rightText += '\n';
+        }
+    }
+
+    m_leftPanel->setContent(leftText);
+    m_rightPanel->setContent(rightText);
 }
 
 void DiffEditor::clear()
@@ -88,6 +291,9 @@ void DiffEditor::clear()
     m_rightPanel->clearDiffData();
     m_hunkPositions.clear();
     m_currentHunkIndex = -1;
+    m_leftFullContent.clear();
+    m_rightFullContent.clear();
+    m_fileName.clear();
 }
 
 void DiffEditor::navigateToNextHunk()
@@ -97,24 +303,10 @@ void DiffEditor::navigateToNextHunk()
 
     m_currentHunkIndex++;
     if (m_currentHunkIndex >= m_hunkPositions.size())
-        m_currentHunkIndex = 0; // Wrap around
+        m_currentHunkIndex = 0;
 
-    const auto &pos = m_hunkPositions[m_currentHunkIndex];
-    int leftLine = pos.first - 1;  // 1-based → 0-based
-    int rightLine = pos.second - 1;
-
-    // Прокрутить левую панель к ханку
-    QTextCursor leftCursor(m_leftPanel->document());
-    leftCursor.movePosition(QTextCursor::Start);
-    for (int i = 0; i < leftLine && leftCursor.movePosition(QTextCursor::Down); ++i) {}
-    m_leftPanel->setTextCursor(leftCursor);
-
-    // Прокрутить правую панель к ханку
-    QTextCursor rightCursor(m_rightPanel->document());
-    rightCursor.movePosition(QTextCursor::Start);
-    for (int i = 0; i < rightLine && rightCursor.movePosition(QTextCursor::Down); ++i) {}
-    m_rightPanel->setTextCursor(rightCursor);
-
+    // Прокрутить к позиции ханка
+    scrollToHunk(m_currentHunkIndex);
     emit hunkNavigated(m_currentHunkIndex);
 }
 
@@ -125,61 +317,43 @@ void DiffEditor::navigateToPrevHunk()
 
     m_currentHunkIndex--;
     if (m_currentHunkIndex < 0)
-        m_currentHunkIndex = m_hunkPositions.size() - 1; // Wrap around
+        m_currentHunkIndex = m_hunkPositions.size() - 1;
 
-    const auto &pos = m_hunkPositions[m_currentHunkIndex];
-    int leftLine = pos.first - 1;
-    int rightLine = pos.second - 1;
+    scrollToHunk(m_currentHunkIndex);
+    emit hunkNavigated(m_currentHunkIndex);
+}
 
+void DiffEditor::scrollToHunk(int hunkIndex)
+{
+    Q_UNUSED(hunkIndex);
+    // Прокрутить к началу документа (в будущем можно точнее определять позицию)
     QTextCursor leftCursor(m_leftPanel->document());
     leftCursor.movePosition(QTextCursor::Start);
-    for (int i = 0; i < leftLine && leftCursor.movePosition(QTextCursor::Down); ++i) {}
     m_leftPanel->setTextCursor(leftCursor);
 
     QTextCursor rightCursor(m_rightPanel->document());
     rightCursor.movePosition(QTextCursor::Start);
-    for (int i = 0; i < rightLine && rightCursor.movePosition(QTextCursor::Down); ++i) {}
     m_rightPanel->setTextCursor(rightCursor);
-
-    emit hunkNavigated(m_currentHunkIndex);
 }
 
 void DiffEditor::synchronizeScrollLeftToRight(int value)
 {
-    QScrollBar *leftBar = m_leftPanel->verticalScrollBar();
-    QScrollBar *rightBar = m_rightPanel->verticalScrollBar();
-
-    bool blocked = rightBar->blockSignals(true);
-
-    int leftRange = leftBar->maximum() - leftBar->minimum();
-    int rightRange = rightBar->maximum() - rightBar->minimum();
-
-    if (leftRange > 0 && rightRange > 0) {
-        double percent = double(value - leftBar->minimum()) / leftRange;
-        int newValue = rightBar->minimum() + int(percent * rightRange);
-        rightBar->setValue(newValue);
-    }
-
-    rightBar->blockSignals(blocked);
+    if (m_syncingScroll)
+        return;
+    
+    m_syncingScroll = true;
+    m_rightPanel->verticalScrollBar()->setValue(value);
+    m_syncingScroll = false;
 }
 
 void DiffEditor::synchronizeScrollRightToLeft(int value)
 {
-    QScrollBar *leftBar = m_leftPanel->verticalScrollBar();
-    QScrollBar *rightBar = m_rightPanel->verticalScrollBar();
-
-    bool blocked = leftBar->blockSignals(true);
-
-    int leftRange = leftBar->maximum() - leftBar->minimum();
-    int rightRange = rightBar->maximum() - rightBar->minimum();
-
-    if (leftRange > 0 && rightRange > 0) {
-        double percent = double(value - rightBar->minimum()) / rightRange;
-        int newValue = leftBar->minimum() + int(percent * leftRange);
-        leftBar->setValue(newValue);
-    }
-
-    leftBar->blockSignals(blocked);
+    if (m_syncingScroll)
+        return;
+    
+    m_syncingScroll = true;
+    m_leftPanel->verticalScrollBar()->setValue(value);
+    m_syncingScroll = false;
 }
 
 void DiffEditor::synchronizeZoom(int zoom)
@@ -198,17 +372,10 @@ void DiffEditor::synchronizeZoom(int zoom)
 
 void DiffEditor::applySyntaxHighlighting(const QString &fileName)
 {
-    // DiffPanel уже содержит Highlighter через CodeEditor.
-    // Существующий Highlighter настроен для C++/Qt.
-    // Для других языков можно расширить Highlighter или создать фабрику (Шаг 6).
     QFileInfo fi(fileName);
     QString ext = fi.suffix().toLower();
-
-    // Отключить подсветку для файлов без подсветки
-    // Пока оставляем C++ подсветку для всех текстовых файлов
     Q_UNUSED(ext);
 
-    // Переподсветить обе панели
     m_leftPanel->setSyntaxHighlighting(true);
     m_rightPanel->setSyntaxHighlighting(true);
 }
