@@ -15,13 +15,35 @@ SOURCES += \
     tst_commithistorymodel.cpp \
     tst_filemodel.cpp \
     tst_git.cpp \
-    tst_gitparser.cpp
+    tst_gitparser.cpp \
+    tst_intralinediff.cpp
 
 HEADERS += \
     tst_commithistorymodel.h \
     tst_filemodel.h \
     tst_git.h \
-    tst_gitparser.h
+    tst_gitparser.h \
+    tst_intralinediff.h
+
+# Include diff editor sources from the app directory
+SOURCES += \
+    $$PWD/../commit_craft_app/intralinediff.cpp \
+    $$PWD/../commit_craft_app/diffhighlighter.cpp \
+    $$PWD/../commit_craft_app/diffpanel.cpp \
+    $$PWD/../commit_craft_app/diffeditor.cpp \
+    $$PWD/../commit_craft_app/codeeditor.cpp \
+    $$PWD/../commit_craft_app/syntaxhighlighter.cpp
+
+HEADERS += \
+    $$PWD/../commit_craft_app/intralinediff.h \
+    $$PWD/../commit_craft_app/diffhighlighter.h \
+    $$PWD/../commit_craft_app/diffpanel.h \
+    $$PWD/../commit_craft_app/diffeditor.h \
+    $$PWD/../commit_craft_app/codeeditor.h \
+    $$PWD/../commit_craft_app/linenumberarea.h \
+    $$PWD/../commit_craft_app/syntaxhighlighter.h
+
+INCLUDEPATH += $$PWD/../commit_craft_app
 
 
 

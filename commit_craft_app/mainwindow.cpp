@@ -27,14 +27,12 @@ MainWindow::MainWindow(QWidget *parent)
     , settings(new QSettings("CommitCraft", "MainWindow"))
     , settingsDialog(nullptr)
     , repositoryPath(QDir::currentPath())
-    , stagedContentEditor(nullptr)
-    , currentContentEditor(nullptr)
+    , diffEditor(nullptr)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
     , commitHistoryModel(new CommitHistoryModel(this))
     , commitItemDelegate(new CommitItemDelegate(this))
     , git(new Git(this))
-    , currentHunkIndex(-1)
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -63,7 +61,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->commitHistoryList->setItemDelegate(commitItemDelegate);
 
     // Connect git process signals to DiffEditor
-    connect(git, &Git::diffReady, diffEditor, &DiffEditor::applyDiffData);
+    connect(git, &Git::diffReady, this, [this](const QString &diffOutput) {
+        GitParser parser;
+        QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
+        diffEditor->applyDiffData(hunks);
+    });
 
     // Connect hunk navigation buttons to DiffEditor
     connect(ui->actionPrevHunk, &QAction::triggered, this, &MainWindow::navigateToPrevHunk);
@@ -186,21 +188,35 @@ void MainWindow::refreshGitStatus()
 
 void MainWindow::onGitStatusFinished(const QString &output)
 {
-    parseGitStatusOutput(output);
+    // Parse status and update file models
+    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    QList<QPair<QString, QString>> unstagedFiles;
+    QList<QPair<QString, QString>> stagedFiles;
+
+    for (const QString &line : lines) {
+        if (line.length() < 4) continue;
+        auto indexedStatus = line.left(1);
+        auto workStatus = line.mid(1, 1);
+        QString file = line.mid(3);
+        if (indexedStatus != " " && indexedStatus != "?") {
+            stagedFiles.append(qMakePair(indexedStatus, file));
+        }
+        if (workStatus != " ") {
+            unstagedFiles.append(qMakePair(workStatus, file));
+        }
+    }
+
+    unstagedFilesModel->setFiles(unstagedFiles);
+    stagedFilesModel->setFiles(stagedFiles);
+    updateCommitButtonState();
+
     git->getCommitHistory();
 }
 
 void MainWindow::onGitDiffReady(const QString &output)
 {
-    // Extract hunk positions for navigation
-    extractHunkPositions(output);
-    
-    // Demonstrate advanced usage of GitParser
-    // Uncomment the following line to see hunk details in the debug output
-    // displayHunkDetails(output);
-    
-    // Parse and apply diff highlighting to the text edits
-    parseAndApplyDiffHighlighting(output);
+    // Diff-данные применяются через lambda в конструкторе
+    Q_UNUSED(output);
 }
 
 void MainWindow::onGitCommitHistoryReady(const QList<QList<QString>> &commits)
@@ -226,37 +242,6 @@ void MainWindow::onGitCommitFinished(bool success, const QString &message)
 void MainWindow::onGitError(const QString &error)
 {
     QMessageBox::warning(this, "Ошибка Git", error);
-}
-
-void MainWindow::parseGitStatusOutput(const QString &output)
-{
-    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-    
-    // Separate staged and unstaged files
-    QList<QPair<QString, QString>> unstagedFiles;
-    QList<QPair<QString, QString>> stagedFiles;
-    
-    for (const QString &line : lines) {
-        if (line.length() < 4) continue;
-
-        auto indexedStatus = line.left(1);
-        auto workStatus = line.mid(1, 1);
-        QString file = line.mid(3);
-
-        if (indexedStatus != " " && indexedStatus != "?") {
-            stagedFiles.append(qMakePair(indexedStatus, file));
-        }
-        if (workStatus != " ") {
-            unstagedFiles.append(qMakePair(workStatus, file));
-        }
-    }
-
-    // Update models with new data
-    unstagedFilesModel->setFiles(unstagedFiles);
-    stagedFilesModel->setFiles(stagedFiles);
-    
-    // Update commit button state
-    updateCommitButtonState();
 }
 
 void MainWindow::openRepository()
