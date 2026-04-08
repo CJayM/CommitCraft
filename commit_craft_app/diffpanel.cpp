@@ -3,6 +3,7 @@
 #include <QTextBlock>
 #include <QScrollBar>
 #include <QSignalBlocker>
+#include <QPainter>
 
 DiffPanel::DiffPanel(QWidget *parent)
     : CodeEditor(parent)
@@ -44,6 +45,53 @@ void DiffPanel::setPlaceholderLines(const QSet<int> &lines)
 {
     m_placeholderLines = lines;
     highlightCurrentLineNoEmit();
+}
+
+void DiffPanel::setLineNumbers(const QVector<int> &numbers)
+{
+    m_lineNumbers = numbers;
+    update();
+}
+
+void DiffPanel::lineNumberAreaPaintEvent(QPaintEvent *event)
+{
+    QPainter painter(lineNumberArea);
+    painter.fillRect(event->rect(), QColor(240, 240, 240));
+
+    QTextBlock block = firstVisibleBlock();
+    int blockNumber = block.blockNumber();
+    int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
+    int bottom = top + qRound(blockBoundingRect(block).height());
+
+    QColor textColor(140, 140, 140);
+    painter.setPen(textColor);
+
+    while (block.isValid() && top <= event->rect().bottom()) {
+        if (block.isVisible() && bottom >= event->rect().top()) {
+            QString numberStr;
+            if (blockNumber >= 0 && blockNumber < m_lineNumbers.size()) {
+                int realNum = m_lineNumbers[blockNumber];
+                if (realNum >= 0) {
+                    numberStr = QString::number(realNum + 1); // 1-based
+                } else {
+                    numberStr = ""; // Placeholder line
+                }
+            } else {
+                numberStr = QString::number(blockNumber + 1); // Fallback
+            }
+            painter.drawText(0,
+                             top,
+                             lineNumberArea->width() - 6,
+                             fontMetrics().height(),
+                             Qt::AlignRight,
+                             numberStr);
+        }
+
+        block = block.next();
+        top = bottom;
+        bottom = top + qRound(blockBoundingRect(block).height());
+        ++blockNumber;
+    }
 }
 
 void DiffPanel::setCursorToLine(int line)

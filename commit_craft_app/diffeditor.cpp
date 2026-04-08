@@ -88,6 +88,17 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     // Заполнить панели синхронизированным содержимым
     populatePanels(syncedLines);
 
+    // Извлечь и установить реальные номера строк
+    QVector<int> leftNums, rightNums;
+    leftNums.reserve(syncedLines.size());
+    rightNums.reserve(syncedLines.size());
+    for (const auto &sl : syncedLines) {
+        leftNums.append(sl.leftLineNum);
+        rightNums.append(sl.rightLineNum);
+    }
+    m_leftPanel->setLineNumbers(leftNums);
+    m_rightPanel->setLineNumbers(rightNums);
+
     // Вычислить intra-line diff для Modified строк
     auto leftMap = DiffHighlighter::buildLineDiffMapLeft(hunks);
     auto rightMap = DiffHighlighter::buildLineDiffMapRight(hunks);

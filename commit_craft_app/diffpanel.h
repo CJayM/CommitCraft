@@ -35,6 +35,12 @@ public:
     /// Установка diff-данных (вызывается после setContent)
     void setDiffData(const QMap<int, LineDiffInfo> &lineDiffMap);
 
+    /// Установить реальные номера строк для отображения (из исходного файла)
+    void setLineNumbers(const QVector<int> &numbers);
+
+    /// Переопределение отрисовки номеров строк
+    void lineNumberAreaPaintEvent(QPaintEvent *event) override;
+
     /// Очистить diff-данные
     void clearDiffData();
 
@@ -61,6 +67,7 @@ private:
     QMap<int, LineDiffInfo> m_lineDiffMap;
     bool m_updatingCursor = false;
     QSet<int> m_placeholderLines; // Номера строк-заполнителей (серый фон)
+    QVector<int> m_lineNumbers;   // Реальные номера строк (0-based, -1 для заполнителей)
 };
 
 #endif // DIFFPANEL_H
