@@ -33,6 +33,14 @@ DiffEditor::DiffEditor(QWidget *parent)
     // Подключить синхронизацию зума (через CodeEditor)
     connect(m_leftPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
     connect(m_rightPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
+
+    // Подключить синхронизацию подсветки текущей строки (перемещение курсора)
+    connect(m_leftPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
+        m_rightPanel->setCursorToLine(blockNum);
+    });
+    connect(m_rightPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
+        m_leftPanel->setCursorToLine(blockNum);
+    });
 }
 
 void DiffEditor::setContents(const QString &leftContent,

@@ -38,11 +38,25 @@ public:
     /// Очистить diff-данные
     void clearDiffData();
 
+    /// Переместить курсор на указанную строку (для синхронизации с другой панелью)
+    void setCursorToLine(int line);
+
+signals:
+    /// Сигнал перемещения курсора с номером строки (для синхронизации)
+    void panelCursorMoved(int blockNumber);
+
 private:
     /// Применить diff-подсветку через ExtraSelections (фон ПОД текстом)
     void applyDiffHighlighting();
 
+    /// Переопределение для сохранения diff-подсветки при выделении текущей строки
+    void highlightCurrentLine();
+
+    /// Подсветка без испускания сигнала (для программной синхронизации)
+    void highlightCurrentLineNoEmit();
+
     QMap<int, LineDiffInfo> m_lineDiffMap;
+    bool m_updatingCursor = false;
 };
 
 #endif // DIFFPANEL_H
