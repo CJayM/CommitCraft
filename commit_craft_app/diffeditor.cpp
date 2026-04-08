@@ -224,28 +224,28 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
         for (const auto &line : hunk.lines) {
             switch (line.type) {
             case HunkLine::Removed:
-                if (leftIdx < leftLines.size()) {
+                if (leftIdx >= 0 && leftIdx < leftLines.size()) {
                     currentGroup.removedContents.append(leftLines[leftIdx]);
                 } else {
                     currentGroup.removedContents.append(line.content);
                 }
-                currentGroup.removedLeftNums.append(leftIdx);
+                currentGroup.removedLeftNums.append(qMax(0, leftIdx));
                 leftIdx++;
                 break;
             case HunkLine::Added:
-                if (rightIdx < rightLines.size()) {
+                if (rightIdx >= 0 && rightIdx < rightLines.size()) {
                     currentGroup.addedContents.append(rightLines[rightIdx]);
                 } else {
                     currentGroup.addedContents.append(line.content);
                 }
-                currentGroup.addedRightNums.append(rightIdx);
+                currentGroup.addedRightNums.append(qMax(0, rightIdx));
                 rightIdx++;
                 break;
             case HunkLine::Unchanged:
                 // Сначала сбрасываем накопленные изменения (они были ДО этой контекстной строки)
                 flushChangeGroup();
                 // Добавляем контекстную строку
-                if (leftIdx < leftLines.size() && rightIdx < rightLines.size()) {
+                if (leftIdx >= 0 && leftIdx < leftLines.size() && rightIdx >= 0 && rightIdx < rightLines.size()) {
                     result.append({
                         leftLines[leftIdx],
                         rightLines[rightIdx],
@@ -269,15 +269,15 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
     // --- Контекстные строки ПОСЛЕ последнего hunk ---
     if (!hunks.isEmpty()) {
         const auto &lastHunk = hunks.last();
-        int lastLeftEnd = lastHunk.leftStart - 1 + lastHunk.leftSize;
-        int lastRightEnd = lastHunk.rightStart - 1 + lastHunk.rightSize;
+        int lastLeftEnd = qMax(0, lastHunk.leftStart - 1 + lastHunk.leftSize);
+        int lastRightEnd = qMax(0, lastHunk.rightStart - 1 + lastHunk.rightSize);
 
         int contextEndLeft = qMin(lastLeftEnd + CONTEXT_LINES, leftLines.size());
         int contextEndRight = qMin(lastRightEnd + CONTEXT_LINES, rightLines.size());
 
         int ctxLeft = lastLeftEnd;
         int ctxRight = lastRightEnd;
-        while (ctxLeft < contextEndLeft && ctxRight < contextEndRight) {
+        while (ctxLeft >= 0 && ctxLeft < contextEndLeft && ctxRight >= 0 && ctxRight < contextEndRight) {
             result.append({
                 leftLines[ctxLeft],
                 rightLines[ctxRight],
