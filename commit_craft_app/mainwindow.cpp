@@ -310,15 +310,31 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
     // Get the index at the position
     QModelIndex index = ui->filesTable->indexAt(pos);
     if (!index.isValid()) return;
-    
+
     // Create the context menu
     QMenu contextMenu(tr("Файл"), this);
+
+    // Get file status from the model (raw status, not display symbol)
+    FileModel *model = qobject_cast<FileModel*>(ui->filesTable->model());
+    if (!model) return;
     
-    // Create the "Добавить" action
-    QAction *addAction = new QAction(tr("Добавить"), this);
+    QString status = model->getFileStatus(index.row());
+    
+    // Determine action text based on status
+    QString actionText;
+    if (status == "?" || status.isEmpty()) {
+        // Untracked file
+        actionText = tr("Добавить");
+    } else {
+        // Modified, deleted, or other changed file
+        actionText = tr("Фиксировать");
+    }
+    
+    // Create the add/stage action with appropriate text
+    QAction *addAction = new QAction(actionText, this);
     connect(addAction, &QAction::triggered, this, &MainWindow::addSelectedFile);
     contextMenu.addAction(addAction);
-    
+
     // Show the context menu
     contextMenu.exec(ui->filesTable->viewport()->mapToGlobal(pos));
 }
