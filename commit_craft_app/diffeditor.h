@@ -91,7 +91,7 @@ private:
     DiffPanel *m_rightPanel;
 
     // Навигация по ханкам
-    QList<QPair<int, int>> m_hunkPositions; // (leftLine, rightLine)
+    QVector<int> m_hunkPositions; // Индексы первых строк ханков в syncedLines
     int m_currentHunkIndex;
 
     // Флаг для предотвращения рекурсии при синхронизации скролла

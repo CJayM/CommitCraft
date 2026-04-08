@@ -79,10 +79,16 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
 
     QVector<SyncedLine> syncedLines = buildSyncedLines(hunks, leftLines, rightLines);
 
-    // Сохранить ханки для навигации
+    // Сохранить позиции ханков для навигации (индексы в syncedLines)
     m_hunkPositions.clear();
-    for (const auto &hunk : hunks) {
-        m_hunkPositions.append(qMakePair(hunk.leftStart, hunk.rightStart));
+    int currentHunkIdx = -1;
+    for (int i = 0; i < syncedLines.size(); ++i) {
+        const auto &sl = syncedLines[i];
+        if (!sl.isSeparator && sl.hunkIndex != currentHunkIdx) {
+            // Нашли первую строку нового ханка
+            currentHunkIdx = sl.hunkIndex;
+            m_hunkPositions.append(i);
+        }
     }
 
     // Заполнить панели синхронизированным содержимым
@@ -406,15 +412,25 @@ void DiffEditor::navigateToPrevHunk()
 
 void DiffEditor::scrollToHunk(int hunkIndex)
 {
-    Q_UNUSED(hunkIndex);
-    // Прокрутить к началу документа (в будущем можно точнее определять позицию)
-    QTextCursor leftCursor(m_leftPanel->document());
-    leftCursor.movePosition(QTextCursor::Start);
-    m_leftPanel->setTextCursor(leftCursor);
+    if (hunkIndex < 0 || hunkIndex >= m_hunkPositions.size())
+        return;
 
-    QTextCursor rightCursor(m_rightPanel->document());
-    rightCursor.movePosition(QTextCursor::Start);
-    m_rightPanel->setTextCursor(rightCursor);
+    int lineIndex = m_hunkPositions[hunkIndex];
+
+    // Прокрутить к строке ханка
+    QTextBlock leftBlock = m_leftPanel->document()->findBlockByLineNumber(lineIndex);
+    if (leftBlock.isValid()) {
+        QTextCursor leftCursor(leftBlock);
+        m_leftPanel->setTextCursor(leftCursor);
+        m_leftPanel->ensureCursorVisible();
+    }
+
+    QTextBlock rightBlock = m_rightPanel->document()->findBlockByLineNumber(lineIndex);
+    if (rightBlock.isValid()) {
+        QTextCursor rightCursor(rightBlock);
+        m_rightPanel->setTextCursor(rightCursor);
+        m_rightPanel->ensureCursorVisible();
+    }
 }
 
 void DiffEditor::synchronizeScrollLeftToRight(int value)
