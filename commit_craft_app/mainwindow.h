@@ -85,5 +85,9 @@ private:
     QString m_lastSelectedFileName;
     enum class SelectionSource { Unstaged, Staged };
     SelectionSource m_lastSelectionSource = SelectionSource::Unstaged;
+
+    // Настройки шрифта DiffEditor
+    void saveFontSettings(const QString &fontFamily, int fontSize);
+    QPair<QString, int> loadFontSettings();
 };
 #endif // MAINWINDOW_H

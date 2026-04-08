@@ -531,3 +531,18 @@ void MainWindow::navigateToPrevHunk()
 {
     diffEditor->navigateToPrevHunk();
 }
+
+void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)
+{
+    QSettings fontSettings("CommitCraft", "DiffEditor");
+    fontSettings.setValue("fontFamily", fontFamily);
+    fontSettings.setValue("fontSize", fontSize);
+}
+
+QPair<QString, int> MainWindow::loadFontSettings()
+{
+    QSettings fontSettings("CommitCraft", "DiffEditor");
+    QString fontFamily = fontSettings.value("fontFamily", "Consolas").toString();
+    int fontSize = fontSettings.value("fontSize", 10).toInt();
+    return qMakePair(fontFamily, fontSize);
+}
