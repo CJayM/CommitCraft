@@ -124,6 +124,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::diffReady, this, &MainWindow::onGitDiffReady);
     connect(git, &Git::commitHistoryReady, this, &MainWindow::onGitCommitHistoryReady);
     connect(git, &Git::commitReady, this, &MainWindow::onGitCommitFinished);
+    connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
+    connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
     
     // Set up context menus
