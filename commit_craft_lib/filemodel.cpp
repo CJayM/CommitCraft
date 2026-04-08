@@ -1,5 +1,6 @@
 #include "filemodel.h"
 #include <QColor>
+#include <QFileInfo>
 
 FileModel::FileModel(QObject *parent)
     : QAbstractTableModel(parent)
@@ -17,7 +18,7 @@ int FileModel::columnCount(const QModelIndex &parent) const
 {
     if (parent.isValid())
         return 0;
-    return 2; // status, filename
+    return 3; // status, relative_dir, filename
 }
 
 QVariant FileModel::data(const QModelIndex &index, int role) const
@@ -26,6 +27,12 @@ QVariant FileModel::data(const QModelIndex &index, int role) const
         return QVariant();
 
     const auto &fileInfo = m_files.at(index.row());
+    QString relativePath = fileInfo.second;
+    QString fileName = QFileInfo(relativePath).fileName();
+    QString relativeDir = QFileInfo(relativePath).path();
+    // Если путь равен "." или пустой, значит файл в корне репозитория
+    if (relativeDir == "." || relativeDir.isEmpty()) relativeDir = "";
+    else relativeDir += "/";
 
     switch (role) {
     case Qt::DisplayRole:
@@ -33,15 +40,21 @@ QVariant FileModel::data(const QModelIndex &index, int role) const
             // Преобразуем букву статуса в юникод-символ
             return getStatusSymbol(fileInfo.first);
         } else if (index.column() == 1) {
-            return fileInfo.second; // filename
+            return fileName;
+        } else if (index.column() == 2) {
+            return relativeDir;
         }
         break;
-    case Qt::BackgroundRole:        
-            return getStatusBackgroundColor(fileInfo.first);        
+    case Qt::BackgroundRole:
+            return getStatusBackgroundColor(fileInfo.first);
         break;
     case Qt::TextAlignmentRole:
         if (index.column() == 0) {
             return Qt::AlignCenter;
+        } else if (index.column() == 2) {
+            return Qt::AlignLeft;
+        } else if (index.column() == 1) {
+            return Qt::AlignLeft;
         }
         break;
     }
@@ -56,6 +69,8 @@ QVariant FileModel::headerData(int section, Qt::Orientation orientation, int rol
             return QString(); // Пустой заголовок для столбца статуса
         } else if (section == 1) {
             return QString("Файл");
+        } else if (section == 2) {
+            return QString("Директория");
         }
     }
     return QVariant();
@@ -80,6 +95,14 @@ QString FileModel::getFileStatus(int row) const
 {
     if (row >= 0 && row < m_files.size()) {
         return m_files.at(row).first;
+    }
+    return QString();
+}
+
+QString FileModel::getRelativePath(int row) const
+{
+    if (row >= 0 && row < m_files.size()) {
+        return m_files.at(row).second;
     }
     return QString();
 }

@@ -23,9 +23,10 @@ public:
     void setFiles(const QList<QPair<QString, QString>> &files);
     QString getFileName(int row) const;
     QString getFileStatus(int row) const;
+    QString getRelativePath(int row) const;
 
 private:
-    QList<QPair<QString, QString>> m_files; // status, filename
+    QList<QPair<QString, QString>> m_files; // status, relative_path
     QColor getStatusBackgroundColor(const QString &status) const;
     QString getStatusSymbol(const QString &status) const;
 };

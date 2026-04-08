@@ -69,8 +69,12 @@ MainWindow::MainWindow(QWidget *parent)
     // Фиксированная ширина колонки статуса (только для символа)
     ui->filesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     ui->filesTable->setColumnWidth(0, 20);
+    ui->filesTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
+    ui->filesTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
     ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     ui->stagedFilesTable->setColumnWidth(0, 20);
+    ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
+    ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
 
     // Connect git process signals to DiffEditor
     connect(git, &Git::diffReady, this, [this](const QString &diffOutput) {
