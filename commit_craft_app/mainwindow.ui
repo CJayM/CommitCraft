@@ -562,6 +562,11 @@
      <string>Файл</string>
     </property>
     <addaction name="actionOpenRepository"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Редактировать</string>
+    </property>
     <addaction name="actionSettings"/>
    </widget>
    <widget class="QMenu" name="menu">
@@ -572,6 +577,7 @@
     <addaction name="actionCommit"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
    <addaction name="menu"/>
   </widget>
   <widget class="QToolBar" name="toolBar">
