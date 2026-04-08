@@ -238,9 +238,10 @@ void Git::onFileContentFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onAddFileFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-        emit statusReady(""); // Trigger a refresh
+        emit addFileReady(true, "File added successfully");
     } else {
         QString msg = m_addFileProcess->readAllStandardError();
+        emit addFileReady(false, QString("Failed to execute git add: %1").arg(msg));
         emit error(QString("Failed to execute git add: %1").arg(msg));
     }
 }
@@ -248,9 +249,10 @@ void Git::onAddFileFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-        emit statusReady(""); // Trigger a refresh
+        emit unstageFileReady(true, "File unstaged successfully");
     } else {
         QString msg = m_unstageFileProcess->readAllStandardError();
+        emit unstageFileReady(false, QString("Failed to execute git reset: %1").arg(msg));
         emit error(QString("Failed to execute git reset: %1").arg(msg));
     }
 }

@@ -40,6 +40,8 @@ signals:
     void commitHistoryReady(const QList<QList<QString>> &commits);
     void fileContentReady(const QString &content, bool staged);
     void commitReady(bool success, const QString &message);
+    void addFileReady(bool success, const QString &message);
+    void unstageFileReady(bool success, const QString &message);
     void error(const QString &error);
     
 private slots:

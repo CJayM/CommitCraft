@@ -11,6 +11,11 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QGuiApplication>
+#include <QClipboard>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QFileInfo>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
 #include "diffeditor.h"
@@ -35,6 +40,8 @@ MainWindow::MainWindow(QWidget *parent)
     , git(new Git(this))
     , m_lastSelectedFileName("")
     , m_lastSelectionSource(SelectionSource::Unstaged)
+    , m_fsWatcher(new QFileSystemWatcher(this))
+    , m_fsDebounceTimer(new QTimer(this))
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -52,6 +59,9 @@ MainWindow::MainWindow(QWidget *parent)
     // Set repository path for Git operations
     git->setRepositoryPath(repositoryPath);
 
+    // Setup file system watcher for auto-refresh
+    setupFileSystemWatcher();
+
     // DiffEditor создан через promoted widget в mainwindow.ui
     // Получаем ссылатель на него
     diffEditor = ui->diffEditor;
@@ -65,6 +75,16 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stagedFilesTable->setModel(stagedFilesModel);
     ui->commitHistoryList->setModel(commitHistoryModel);
     ui->commitHistoryList->setItemDelegate(commitItemDelegate);
+
+    // Фиксированная ширина колонки статуса (только для символа)
+    ui->filesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->filesTable->setColumnWidth(0, 20);
+    ui->filesTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
+    ui->filesTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
+    ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->stagedFilesTable->setColumnWidth(0, 20);
+    ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
+    ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
 
     // Connect git process signals to DiffEditor
     connect(git, &Git::diffReady, this, [this](const QString &diffOutput) {
@@ -103,6 +123,24 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect table selection changes
     connect(ui->filesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onFileTableSelectionChanged);
     connect(ui->stagedFilesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
+    
+    // Connect double-click to open file
+    connect(ui->filesTable, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (index.isValid() && index.column() >= 0) {
+            FileModel *model = qobject_cast<FileModel*>(ui->filesTable->model());
+            if (model) {
+                openFile(model->getFileName(index.row()));
+            }
+        }
+    });
+    connect(ui->stagedFilesTable, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (index.isValid() && index.column() >= 0) {
+            FileModel *model = qobject_cast<FileModel*>(ui->stagedFilesTable->model());
+            if (model) {
+                openFile(model->getFileName(index.row()));
+            }
+        }
+    });
 
     connect(ui->commitMessageTextEdit,
             &QTextEdit::textChanged,
@@ -114,6 +152,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::diffReady, this, &MainWindow::onGitDiffReady);
     connect(git, &Git::commitHistoryReady, this, &MainWindow::onGitCommitHistoryReady);
     connect(git, &Git::commitReady, this, &MainWindow::onGitCommitFinished);
+    connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
+    connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
     
     // Set up context menus
@@ -219,6 +259,9 @@ void MainWindow::onGitStatusFinished(const QString &output)
     stagedFilesModel->setFiles(stagedFiles);
     updateCommitButtonState();
 
+    // Включаем watcher обратно после обновления
+    m_fsWatcher->blockSignals(false);
+
     git->getCommitHistory();
 }
 
@@ -266,6 +309,11 @@ void MainWindow::openRepository()
             // Save the repository path to settings
             settings->setValue("repositoryPath", repositoryPath);
             setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
+            
+            // Обновляем watcher для нового репозитория
+            m_fsWatcher->removePaths(m_fsWatcher->directories());
+            m_fsWatcher->addPath(repositoryPath);
+            
             refreshGitStatus();
         } else {
             QMessageBox::warning(this, tr("Ошибка"), 
@@ -285,15 +333,70 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
     // Get the index at the position
     QModelIndex index = ui->filesTable->indexAt(pos);
     if (!index.isValid()) return;
-    
+
     // Create the context menu
     QMenu contextMenu(tr("Файл"), this);
+
+    // Get file status from the model (raw status, not display symbol)
+    FileModel *model = qobject_cast<FileModel*>(ui->filesTable->model());
+    if (!model) return;
     
-    // Create the "Добавить" action
-    QAction *addAction = new QAction(tr("Добавить"), this);
+    QString status = model->getFileStatus(index.row());
+    QString fileName = model->getFileName(index.row());
+    
+    // Determine action text based on status
+    QString actionText;
+    if (status == "?" || status.isEmpty()) {
+        // Untracked file
+        actionText = tr("Добавить");
+    } else {
+        // Modified, deleted, or other changed file
+        actionText = tr("Фиксировать");
+    }
+    
+    // Create the add/stage action with appropriate text
+    QAction *addAction = new QAction(actionText, this);
     connect(addAction, &QAction::triggered, this, &MainWindow::addSelectedFile);
     contextMenu.addAction(addAction);
     
+    // Add separator
+    contextMenu.addSeparator();
+    
+    // Copy file path
+    QAction *copyPathAction = new QAction(tr("Копировать путь"), this);
+    connect(copyPathAction, &QAction::triggered, this, [this, fileName]() { copyFilePath(fileName); });
+    contextMenu.addAction(copyPathAction);
+    
+    // Open file
+    QAction *openFileAction = new QAction(tr("Открыть файл"), this);
+    connect(openFileAction, &QAction::triggered, this, [this, fileName]() { openFile(fileName); });
+    contextMenu.addAction(openFileAction);
+    
+    // Open folder
+    QAction *openFolderAction = new QAction(tr("Открыть папку"), this);
+    connect(openFolderAction, &QAction::triggered, this, [this, fileName]() { openFolder(fileName); });
+    contextMenu.addAction(openFolderAction);
+    
+    // Delete
+    QAction *deleteAction = new QAction(tr("Удалить"), this);
+    connect(deleteAction, &QAction::triggered, this, [this, fileName]() { deleteFile(fileName); });
+    contextMenu.addAction(deleteAction);
+    
+    // Blame (stub)
+    QAction *blameAction = new QAction(tr("Blame"), this);
+    blameAction->setEnabled(false);
+    contextMenu.addAction(blameAction);
+    
+    // Add separator
+    contextMenu.addSeparator();
+    
+    // Discard changes (not available for untracked files)
+    if (status != "?" && !status.isEmpty()) {
+        QAction *discardAction = new QAction(tr("Отменить изменения"), this);
+        connect(discardAction, &QAction::triggered, this, [this, fileName]() { discardFileChanges(fileName); });
+        contextMenu.addAction(discardAction);
+    }
+
     // Show the context menu
     contextMenu.exec(ui->filesTable->viewport()->mapToGlobal(pos));
 }
@@ -309,7 +412,9 @@ void MainWindow::addSelectedFile()
     // Get the file name from the model
     QString fileName = unstagedFilesModel->getFileName(row);
     if (fileName.isEmpty()) return;
-    
+
+    // Временно отключаем watcher чтобы избежать двойного обновления
+    m_fsWatcher->blockSignals(true);
     git->addFile(fileName);
 }
 
@@ -318,15 +423,57 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
     // Get the index at the position
     QModelIndex index = ui->stagedFilesTable->indexAt(pos);
     if (!index.isValid()) return;
-    
+
     // Create the context menu
     QMenu contextMenu(tr("Файл"), this);
+
+    // Get file info from the model
+    FileModel *model = qobject_cast<FileModel*>(ui->stagedFilesTable->model());
+    if (!model) return;
     
+    QString fileName = model->getFileName(index.row());
+
     // Create the "Убрать из stage" action
     QAction *unstageAction = new QAction(tr("Убрать из stage"), this);
     connect(unstageAction, &QAction::triggered, this, &MainWindow::unstageSelectedFile);
     contextMenu.addAction(unstageAction);
     
+    // Add separator
+    contextMenu.addSeparator();
+    
+    // Copy file path
+    QAction *copyPathAction = new QAction(tr("Копировать путь"), this);
+    connect(copyPathAction, &QAction::triggered, this, [this, fileName]() { copyFilePath(fileName); });
+    contextMenu.addAction(copyPathAction);
+    
+    // Open file
+    QAction *openFileAction = new QAction(tr("Открыть файл"), this);
+    connect(openFileAction, &QAction::triggered, this, [this, fileName]() { openFile(fileName); });
+    contextMenu.addAction(openFileAction);
+    
+    // Open folder
+    QAction *openFolderAction = new QAction(tr("Открыть папку"), this);
+    connect(openFolderAction, &QAction::triggered, this, [this, fileName]() { openFolder(fileName); });
+    contextMenu.addAction(openFolderAction);
+    
+    // Delete
+    QAction *deleteAction = new QAction(tr("Удалить"), this);
+    connect(deleteAction, &QAction::triggered, this, [this, fileName]() { deleteFile(fileName); });
+    contextMenu.addAction(deleteAction);
+    
+    // Blame (stub)
+    QAction *blameAction = new QAction(tr("Blame"), this);
+    blameAction->setEnabled(false);
+    contextMenu.addAction(blameAction);
+    
+    // Add separator
+    contextMenu.addSeparator();
+    
+    // Discard changes (restore to HEAD for staged files)
+    QAction *discardAction = new QAction(tr("Отменить изменения"), this);
+    connect(discardAction, &QAction::triggered, this, [this, fileName]() { discardFileChanges(fileName); });
+    contextMenu.addAction(discardAction);
+
     // Show the context menu
     contextMenu.exec(ui->stagedFilesTable->viewport()->mapToGlobal(pos));
 }
@@ -342,7 +489,9 @@ void MainWindow::unstageSelectedFile()
     // Get the file name from the model
     QString fileName = stagedFilesModel->getFileName(row);
     if (fileName.isEmpty()) return;
-    
+
+    // Временно отключаем watcher чтобы избежать двойного обновления
+    m_fsWatcher->blockSignals(true);
     git->unstageFile(fileName);
 }
 
@@ -359,7 +508,9 @@ void MainWindow::commitChanges()
     
     // Check if amend is checked
     bool amend = ui->amend_chk->isChecked();
-    
+
+    // Временно отключаем watcher чтобы избежать двойного обновления
+    m_fsWatcher->blockSignals(true);
     git->commit(commitMessage, amend);
 }
 
@@ -559,4 +710,156 @@ QPair<QString, int> MainWindow::loadFontSettings()
     QString fontFamily = settings.value("fontFamily", "Consolas").toString();
     int fontSize = settings.value("fontSize", 10).toInt();
     return qMakePair(fontFamily, fontSize);
+}
+
+void MainWindow::setupFileSystemWatcher()
+{
+    // Настройка debounce-таймера
+    m_fsDebounceTimer->setSingleShot(true);
+    m_fsDebounceTimer->setInterval(500); // 500мс задержка
+    connect(m_fsDebounceTimer, &QTimer::timeout, this, [this]() {
+        refreshGitStatus();
+    });
+
+    // Подключение сигналов watcher
+    connect(m_fsWatcher, &QFileSystemWatcher::directoryChanged, this, &MainWindow::onFileSystemChanged);
+    connect(m_fsWatcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileSystemChanged);
+
+    // Добавляем корень репозитория в watcher
+    if (!repositoryPath.isEmpty() && QDir(repositoryPath).exists()) {
+        m_fsWatcher->addPath(repositoryPath);
+    }
+}
+
+void MainWindow::onFileSystemChanged()
+{
+    // Перезапускаем debounce-таймер
+    m_fsDebounceTimer->start();
+}
+
+void MainWindow::copyFilePath(const QString &fileName)
+{
+    QString absolutePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    QGuiApplication::clipboard()->setText(absolutePath);
+    statusBar()->showMessage(tr("Путь скопирован: %1").arg(absolutePath), 3000);
+}
+
+void MainWindow::openFile(const QString &fileName)
+{
+    QString absolutePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    if (QFile::exists(absolutePath)) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(absolutePath));
+    } else {
+        QMessageBox::warning(this, tr("Ошибка"), tr("Файл не существует: %1").arg(fileName));
+    }
+}
+
+void MainWindow::openFolder(const QString &fileName)
+{
+    QString absolutePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    QString folderPath = QFileInfo(absolutePath).absolutePath();
+    if (QDir(folderPath).exists()) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(folderPath));
+    } else {
+        QMessageBox::warning(this, tr("Ошибка"), tr("Директория не существует: %1").arg(folderPath));
+    }
+}
+
+void MainWindow::deleteFile(const QString &fileName)
+{
+    QString absolutePath = QDir(repositoryPath).absoluteFilePath(fileName);
+    
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, tr("Удалить файл"),
+        tr("Вы уверены, что хотите удалить файл '%1'?").arg(fileName),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+    );
+    
+    if (reply == QMessageBox::Yes) {
+        // If file is staged, unstage it first
+        bool isStaged = false;
+        for (int i = 0; i < stagedFilesModel->rowCount(); ++i) {
+            if (stagedFilesModel->getFileName(i) == fileName) {
+                isStaged = true;
+                break;
+            }
+        }
+        
+        if (isStaged) {
+            m_fsWatcher->blockSignals(true);
+            git->unstageFile(fileName);
+        }
+        
+        // Delete file from filesystem
+        if (QFile::remove(absolutePath)) {
+            statusBar()->showMessage(tr("Файл удалён: %1").arg(fileName), 3000);
+        } else {
+            QMessageBox::warning(this, tr("Ошибка"), tr("Не удалось удалить файл: %1").arg(fileName));
+        }
+    }
+}
+
+void MainWindow::discardFileChanges(const QString &fileName)
+{
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, tr("Отменить изменения"),
+        tr("Вы уверены, что хотите отменить изменения в '%1'? Все несохранённые изменения будут потеряны.").arg(fileName),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+    );
+    
+    if (reply == QMessageBox::Yes) {
+        // Check if file is staged
+        bool isStaged = false;
+        for (int i = 0; i < stagedFilesModel->rowCount(); ++i) {
+            if (stagedFilesModel->getFileName(i) == fileName) {
+                isStaged = true;
+                break;
+            }
+        }
+        
+        m_fsWatcher->blockSignals(true);
+        
+        if (isStaged) {
+            // File is staged: restore from index (staged version)
+            runGitCommand("checkout", QStringList() << "--" << fileName, repositoryPath);
+        } else {
+            // File is unstaged: restore from HEAD
+            runGitCommand("checkout", QStringList() << "HEAD" << "--" << fileName, repositoryPath);
+        }
+    }
+}
+
+void MainWindow::showBlameStub()
+{
+    QMessageBox::information(this, tr("Blame"), tr("Функция ещё не реализована."));
+}
+
+void MainWindow::runGitCommand(const QString &command, const QStringList &args, const QString &workingDir)
+{
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+    
+    QStringList allArgs = args;
+    allArgs.prepend(command);
+    
+    QProcess gitProcess;
+    gitProcess.setProgram(gitPath);
+    gitProcess.setArguments(allArgs);
+    gitProcess.setWorkingDirectory(workingDir);
+    gitProcess.start();
+    gitProcess.waitForFinished(5000);
+    
+    if (gitProcess.exitCode() == 0) {
+        refreshGitStatus();
+    } else {
+        QString errorMsg = gitProcess.readAllStandardError();
+        QMessageBox::warning(this, tr("Ошибка Git"), tr("Не удалось выполнить git %1: %2").arg(command, errorMsg));
+    }
+    
+    m_fsWatcher->blockSignals(false);
 }

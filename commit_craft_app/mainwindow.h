@@ -10,6 +10,8 @@
 #include <QList>
 #include <QPair>
 #include <QRegularExpression>
+#include <QFileSystemWatcher>
+#include <QTimer>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -89,5 +91,20 @@ private:
     // Настройки шрифта DiffEditor
     void saveFontSettings(const QString &fontFamily, int fontSize);
     QPair<QString, int> loadFontSettings();
+
+    // Файловый watcher для автообновления
+    QFileSystemWatcher *m_fsWatcher;
+    QTimer *m_fsDebounceTimer;
+    void setupFileSystemWatcher();
+    void onFileSystemChanged();
+    
+    // Дополнительные действия контекстного меню
+    void copyFilePath(const QString &fileName);
+    void openFile(const QString &fileName);
+    void openFolder(const QString &fileName);
+    void deleteFile(const QString &fileName);
+    void discardFileChanges(const QString &fileName);
+    void showBlameStub();
+    void runGitCommand(const QString &command, const QStringList &args, const QString &workingDir);
 };
 #endif // MAINWINDOW_H
