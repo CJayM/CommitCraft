@@ -27,6 +27,7 @@ public:
 private:
     QList<QPair<QString, QString>> m_files; // status, filename
     QColor getStatusBackgroundColor(const QString &status) const;
+    QString getStatusSymbol(const QString &status) const;
 };
 
 #endif // FILEMODEL_H

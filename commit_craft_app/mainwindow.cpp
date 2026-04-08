@@ -66,6 +66,12 @@ MainWindow::MainWindow(QWidget *parent)
     ui->commitHistoryList->setModel(commitHistoryModel);
     ui->commitHistoryList->setItemDelegate(commitItemDelegate);
 
+    // Фиксированная ширина колонки статуса (только для символа)
+    ui->filesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->filesTable->setColumnWidth(0, 20);
+    ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->stagedFilesTable->setColumnWidth(0, 20);
+
     // Connect git process signals to DiffEditor
     connect(git, &Git::diffReady, this, [this](const QString &diffOutput) {
         GitParser parser;
