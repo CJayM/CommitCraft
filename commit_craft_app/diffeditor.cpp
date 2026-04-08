@@ -138,6 +138,10 @@ void DiffEditor::applyFontSettings(const QString &fontFamily, int fontSize)
     QFont font(fontFamily, fontSize);
     m_leftPanel->setFont(font);
     m_rightPanel->setFont(font);
+
+    // Сброс зума на 100% чтобы избежать конфликта с новым размером шрифта
+    m_leftPanel->setZoom(100);
+    m_rightPanel->setZoom(100);
 }
 
 QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
