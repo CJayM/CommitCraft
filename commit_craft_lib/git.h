@@ -25,6 +25,8 @@ public:
     // Git commands
     void getStatus();
     void getDiff(const QString &fileName);
+    void getDiffStaged(const QString &fileName);
+    void getDiffWorkingTree(const QString &fileName);
     void getCommitHistory();
     void getFileContent(const QString &fileName, bool staged);
     void addFile(const QString &fileName);

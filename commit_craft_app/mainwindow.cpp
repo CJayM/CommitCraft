@@ -33,6 +33,8 @@ MainWindow::MainWindow(QWidget *parent)
     , commitHistoryModel(new CommitHistoryModel(this))
     , commitItemDelegate(new CommitItemDelegate(this))
     , git(new Git(this))
+    , m_lastSelectedFileName("")
+    , m_lastSelectionSource(SelectionSource::Unstaged)
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -379,6 +381,8 @@ void MainWindow::onFileTableSelectionChanged()
         int row = selectedIndexes.first().row();
         QString fileName = unstagedFilesModel->getFileName(row);
         if (!fileName.isEmpty()) {
+            m_lastSelectedFileName = fileName;
+            m_lastSelectionSource = SelectionSource::Unstaged;
             updateDiffPanel(fileName);
         }
     }
@@ -391,6 +395,8 @@ void MainWindow::onStagedFileTableSelectionChanged()
         int row = selectedIndexes.first().row();
         QString fileName = stagedFilesModel->getFileName(row);
         if (!fileName.isEmpty()) {
+            m_lastSelectedFileName = fileName;
+            m_lastSelectionSource = SelectionSource::Staged;
             updateDiffPanel(fileName);
         }
     }
@@ -398,11 +404,33 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
-    QString headContent = getFileContent(fileName, true);
-    QString currentContent = getFileContent(fileName, false);
+    QString leftContent, rightContent;
 
-    diffEditor->setContents(headContent, currentContent, fileName);
-    git->getDiff(fileName);
+    if (m_lastSelectionSource == SelectionSource::Staged) {
+        leftContent = getFileContent(fileName, false);   // HEAD
+        rightContent = getFileContent(fileName, true);   // staged
+        git->getDiffStaged(fileName);
+    } else {
+        bool isStaged = false;
+        for (int i = 0; i < stagedFilesModel->rowCount(); ++i) {
+            if (stagedFilesModel->getFileName(i) == fileName) {
+                isStaged = true;
+                break;
+            }
+        }
+
+        if (isStaged) {
+            leftContent = getFileContent(fileName, true);    // staged
+            rightContent = getFileContent(fileName, false);  // current
+            git->getDiffWorkingTree(fileName);
+        } else {
+            leftContent = getFileContent(fileName, true);    // HEAD
+            rightContent = getFileContent(fileName, false);  // current
+            git->getDiff(fileName);
+        }
+    }
+
+    diffEditor->setContents(leftContent, rightContent, fileName);
 }
 
 void MainWindow::synchronizeZoom(int zoom)
@@ -423,10 +451,10 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
         // Для staged версии получаем содержимое из индекса (git show :file)
         QProcess gitProcess;
         gitProcess.setProgram(gitPath);
-        gitProcess.setArguments(QStringList() << "show" << QString(":%1").arg(fileName));
+        gitProcess.setArguments(QStringList() << "show" << (":" + fileName));
         gitProcess.setWorkingDirectory(repositoryPath);
         gitProcess.start();
-        gitProcess.waitForFinished();
+        gitProcess.waitForFinished(5000);
 
         if (gitProcess.exitCode() == 0) {
             QString output = gitProcess.readAllStandardOutput();
@@ -436,9 +464,9 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
         }
 
         // Fallback: если файл не staged, берём из HEAD
-        gitProcess.setArguments(QStringList() << "show" << QString("HEAD:%1").arg(fileName));
+        gitProcess.setArguments(QStringList() << "show" << ("HEAD:" + fileName));
         gitProcess.start();
-        gitProcess.waitForFinished();
+        gitProcess.waitForFinished(5000);
 
         if (gitProcess.exitCode() == 0) {
             return gitProcess.readAllStandardOutput();

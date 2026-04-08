@@ -80,5 +80,10 @@ private:
     CommitHistoryModel *commitHistoryModel;
     CommitItemDelegate *commitItemDelegate;
     Git *git;
+
+    // Отслеживание последнего выбранного файла и источника
+    QString m_lastSelectedFileName;
+    enum class SelectionSource { Unstaged, Staged };
+    SelectionSource m_lastSelectionSource = SelectionSource::Unstaged;
 };
 #endif // MAINWINDOW_H

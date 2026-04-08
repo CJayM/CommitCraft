@@ -111,6 +111,20 @@ void Git::getDiff(const QString &fileName)
     m_diffProcess->start();
 }
 
+void Git::getDiffStaged(const QString &fileName)
+{
+    // Diff между HEAD и staged (индексом): git diff --cached HEAD
+    setupProcess(m_diffProcess, QStringList() << "diff" << "--cached" << "HEAD" << "--" << fileName);
+    m_diffProcess->start();
+}
+
+void Git::getDiffWorkingTree(const QString &fileName)
+{
+    // Diff между staged (индексом) и working tree: git diff -- file
+    setupProcess(m_diffProcess, QStringList() << "diff" << "--" << fileName);
+    m_diffProcess->start();
+}
+
 void Git::getCommitHistory()
 {
     setupProcess(m_commitHistoryProcess,
