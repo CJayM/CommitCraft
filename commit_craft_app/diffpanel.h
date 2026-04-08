@@ -11,7 +11,8 @@ enum class DiffType {
     Unchanged,
     Added,
     Removed,
-    Modified
+    Modified,
+    Separator
 };
 
 struct LineDiffInfo {

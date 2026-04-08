@@ -155,15 +155,23 @@ void DiffPanel::highlightCurrentLineNoEmit()
     int blockNumber = 0;
 
     while (block.isValid()) {
+        auto it = m_lineDiffMap.find(blockNumber);
         QColor bgColor;
+        QColor fgColor; // Цвет текста
+        bool setFg = false;
 
         // Проверяем placeholder (серый фон)
         if (m_placeholderLines.contains(blockNumber)) {
             bgColor = placeholderColor;
         }
+        // Проверяем разделитель чанков
+        else if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
+            bgColor = QColor(240, 240, 240); // Светло-серый фон
+            fgColor = QColor(150, 150, 150); // Темно-серый текст для "..."
+            setFg = true;
+        }
         // Проверяем diff (красный/зелёный/синий)
         else {
-            auto it = m_lineDiffMap.find(blockNumber);
             if (it != m_lineDiffMap.end() && it->type != DiffType::Unchanged) {
                 switch (it->type) {
                     case DiffType::Removed:  bgColor = removedColor; break;
@@ -181,6 +189,9 @@ void DiffPanel::highlightCurrentLineNoEmit()
             QTextEdit::ExtraSelection selection;
             selection.cursor = cursor;
             selection.format.setBackground(bgColor);
+            if (setFg) {
+                selection.format.setForeground(fgColor);
+            }
             selection.format.setProperty(QTextFormat::FullWidthSelection, true);
 
             selections.append(selection);

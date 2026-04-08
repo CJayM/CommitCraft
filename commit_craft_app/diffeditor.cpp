@@ -136,6 +136,12 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
             leftPlaceholders.insert(i);
         if (sl.rightIsPlaceholder)
             rightPlaceholders.insert(i);
+
+        // Обработка разделителей чанков
+        if (sl.isSeparator) {
+            leftDiffMap[i] = {DiffType::Separator, i, {}};
+            rightDiffMap[i] = {DiffType::Separator, i, {}};
+        }
     }
 
     m_leftPanel->setDiffData(leftDiffMap);
@@ -175,6 +181,19 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
         // --- Контекстные строки ДО hunk ---
         int contextStartLeft = qMax(prevLeftEnd, hunkLeftStart - 1 - CONTEXT_LINES);
         int contextStartRight = qMax(prevRightEnd, hunkRightStart - 1 - CONTEXT_LINES);
+
+        // Если есть разрыв между предыдущим чанком и текущим, добавляем разделитель
+        if (hunkIdx > 0 && (contextStartLeft > prevLeftEnd || contextStartRight > prevRightEnd)) {
+            result.append({
+                "", "",                 // empty text
+                false, false, false, false, // flags
+                false, false,           // not placeholders
+                -1, -1,                 // line nums
+                -1,                     // hunkIndex
+                false,                  // isHunkBoundary
+                true                    // isSeparator
+            });
+        }
 
         int ctxLeft = contextStartLeft;
         int ctxRight = contextStartRight;
@@ -325,8 +344,16 @@ void DiffEditor::populatePanels(const QVector<SyncedLine> &syncedLines)
     QString leftText, rightText;
     for (int i = 0; i < syncedLines.size(); ++i) {
         const auto &sl = syncedLines[i];
-        leftText += sl.leftText;
-        rightText += sl.rightText;
+        
+        if (sl.isSeparator) {
+            // Текст-разделитель между чанками
+            leftText += "...";
+            rightText += "...";
+        } else {
+            leftText += sl.leftText;
+            rightText += sl.rightText;
+        }
+        
         if (i < syncedLines.size() - 1) {
             leftText += '\n';
             rightText += '\n';
