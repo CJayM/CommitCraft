@@ -104,7 +104,10 @@ void Git::getStatus()
 
 void Git::getDiff(const QString &fileName)
 {
-    setupProcess(m_diffProcess, QStringList() << "diff" << fileName);
+    // Используем "git diff HEAD" чтобы получить diff между HEAD и рабочей директорией.
+    // Это важно для staged файлов: обычный "git diff" показывает diff между индексом
+    // и рабочей директорией, что для staged файлов может быть пустым.
+    setupProcess(m_diffProcess, QStringList() << "diff" << "HEAD" << "--" << fileName);
     m_diffProcess->start();
 }
 

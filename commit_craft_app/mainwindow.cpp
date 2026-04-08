@@ -398,14 +398,10 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
-    // Get file contents
-    QString stagedContent = getFileContent(fileName, true);
+    QString headContent = getFileContent(fileName, true);
     QString currentContent = getFileContent(fileName, false);
 
-    // Set content in DiffEditor
-    diffEditor->setContents(stagedContent, currentContent, fileName);
-
-    // Request diff data from Git (asynchronously)
+    diffEditor->setContents(headContent, currentContent, fileName);
     git->getDiff(fileName);
 }
 
@@ -417,28 +413,39 @@ void MainWindow::synchronizeZoom(int zoom)
 
 QString MainWindow::getFileContent(const QString &fileName, bool staged)
 {
-    if (staged) {
-        // For staged content, we need to get it from git
-        QSettings gitSettings("CommitCraft", "Settings");
-        QString gitPath = gitSettings.value("gitPath", "").toString();
-        if (gitPath.isEmpty()) {
-            gitPath = "git";
-        }
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
 
+    if (staged) {
+        // Для staged версии получаем содержимое из индекса (git show :file)
         QProcess gitProcess;
         gitProcess.setProgram(gitPath);
-        gitProcess.setArguments(QStringList() << "show" << QString("HEAD:%1").arg(fileName));
+        gitProcess.setArguments(QStringList() << "show" << QString(":%1").arg(fileName));
         gitProcess.setWorkingDirectory(repositoryPath);
         gitProcess.start();
         gitProcess.waitForFinished();
 
         if (gitProcess.exitCode() == 0) {
-            return gitProcess.readAllStandardOutput();
-        } else {
-            return "";
+            QString output = gitProcess.readAllStandardOutput();
+            if (!output.isEmpty()) {
+                return output;
+            }
         }
+
+        // Fallback: если файл не staged, берём из HEAD
+        gitProcess.setArguments(QStringList() << "show" << QString("HEAD:%1").arg(fileName));
+        gitProcess.start();
+        gitProcess.waitForFinished();
+
+        if (gitProcess.exitCode() == 0) {
+            return gitProcess.readAllStandardOutput();
+        }
+        return "";
     } else {
-        // For current content, read from file system
+        // Для current версии читаем из файловой системы
         QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
         QFile file(absoluteFilePath);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -446,9 +453,8 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
             QString content = in.readAll();
             file.close();
             return content;
-        } else {
-            return "";
         }
+        return "";
     }
 }
 

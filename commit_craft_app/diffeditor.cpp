@@ -59,14 +59,15 @@ void DiffEditor::setContents(const QString &leftContent,
 
 void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
 {
-    if (hunks.isEmpty())
+    if (hunks.isEmpty()) {
+        m_leftPanel->clearDiffData();
+        m_rightPanel->clearDiffData();
         return;
+    }
 
-    // Разбить содержимое на строки
     QStringList leftLines = m_leftFullContent.split('\n');
     QStringList rightLines = m_rightFullContent.split('\n');
 
-    // Построить синхронизированные строки
     QVector<SyncedLine> syncedLines = buildSyncedLines(hunks, leftLines, rightLines);
 
     // Сохранить ханки для навигации
@@ -83,9 +84,8 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     auto rightMap = DiffHighlighter::buildLineDiffMapRight(hunks);
     DiffHighlighter::computeIntraLineDiffs(leftMap, rightMap, hunks);
 
-    // НО: номера строк в leftMap/rightMap — это оригинальные номера файлов,
-    // а у нас теперь синхронизированные строки. Нужно пересчитать.
-    // Для простоты — создадим новую карту на основе syncedLines
+    // НО: номера строк в leftMap/rightMap — это оригинальные номера файлов (0-based),
+    // а syncedLines — это синхронизированные строки. Нужно пересчитать.
     QMap<int, LineDiffInfo> leftDiffMap, rightDiffMap;
     for (int i = 0; i < syncedLines.size(); ++i) {
         const auto &sl = syncedLines[i];
@@ -96,9 +96,10 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
             rightDiffMap[i] = {DiffType::Added, i, {}};
         }
         if (sl.isModified) {
-            leftDiffMap[i] = {DiffType::Modified, i, {}};
-            rightDiffMap[i] = {DiffType::Modified, i, {}};
-            // Вставить intra-line ranges если есть
+            // Полностью изменённые строки: слева красные (удалённые), справа зелёные (добавленные)
+            leftDiffMap[i] = {DiffType::Removed, i, {}};
+            rightDiffMap[i] = {DiffType::Added, i, {}};
+            // Вставить intra-line ranges если есть (хотя при таком подходе они не нужны)
             auto lit = leftMap.find(sl.leftLineNum);
             auto rit = rightMap.find(sl.rightLineNum);
             if (lit != leftMap.end()) {
@@ -150,20 +151,42 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
         }
 
         // --- Строки внутри hunk ---
-        // Обрабатываем строки hunk последовательно, сохраняя порядок.
-        // Removed и Added группируем в "change groups", Unchanged добавляем как контекст.
+        // Обрабатываем строки hunk последовательно, сохраняя порядок как в diff.
+        // Removed и Added синхронизируем попарно, Unchanged добавляем как контекст
+        // на свои позиции.
         struct ChangeGroup {
             QVector<QString> removedContents;
             QVector<int> removedLeftNums;
             QVector<QString> addedContents;
             QVector<int> addedRightNums;
         };
-        QVector<ChangeGroup> changeGroups;
-        QVector<SyncedLine> unchangedInHunk;
+        
         ChangeGroup currentGroup;
-
         int leftIdx = hunkLeftStart - 1; // 0-based
         int rightIdx = hunkRightStart - 1; // 0-based
+
+        // Вспомогательная функция для сброса текущей группы изменений в result
+        auto flushChangeGroup = [&]() {
+            if (!currentGroup.removedContents.isEmpty() || !currentGroup.addedContents.isEmpty()) {
+                int maxChanged = qMax(currentGroup.removedContents.size(), currentGroup.addedContents.size());
+                for (int i = 0; i < maxChanged; ++i) {
+                    QString leftText = (i < currentGroup.removedContents.size()) ? currentGroup.removedContents[i] : "";
+                    QString rightText = (i < currentGroup.addedContents.size()) ? currentGroup.addedContents[i] : "";
+                    bool isRemoved = (i < currentGroup.removedContents.size());
+                    bool isAdded = (i < currentGroup.addedContents.size());
+                    bool isModified = isRemoved && isAdded;
+
+                    result.append({
+                        leftText,
+                        rightText,
+                        isRemoved, isAdded, isModified, false,
+                        isRemoved ? currentGroup.removedLeftNums[i] : -1,
+                        isAdded ? currentGroup.addedRightNums[i] : -1
+                    });
+                }
+                currentGroup = ChangeGroup{};
+            }
+        };
 
         for (const auto &line : hunk.lines) {
             switch (line.type) {
@@ -186,14 +209,11 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                 rightIdx++;
                 break;
             case HunkLine::Unchanged:
-                // Сохраняем предыдущую группу изменений
-                if (!currentGroup.removedContents.isEmpty() || !currentGroup.addedContents.isEmpty()) {
-                    changeGroups.append(currentGroup);
-                    currentGroup = ChangeGroup{};
-                }
+                // Сначала сбрасываем накопленные изменения (они были ДО этой контекстной строки)
+                flushChangeGroup();
                 // Добавляем контекстную строку
                 if (leftIdx < leftLines.size() && rightIdx < rightLines.size()) {
-                    unchangedInHunk.append({
+                    result.append({
                         leftLines[leftIdx],
                         rightLines[rightIdx],
                         false, false, false, true,
@@ -205,36 +225,8 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                 break;
             }
         }
-        // Сохраняем последнюю группу изменений
-        if (!currentGroup.removedContents.isEmpty() || !currentGroup.addedContents.isEmpty()) {
-            changeGroups.append(currentGroup);
-        }
-
-        // Выводим все строки hunk в правильном порядке
-        // Для простоты: сначала все change groups, потом unchanged
-        // Но это не совсем правильно — нужен правильный порядок
-        // Для начала упрощённый вариант: все изменения, потом весь контекст
-        // TODO: правильный порядок (interleaved)
-
-        for (const auto &group : changeGroups) {
-            int maxChanged = qMax(group.removedContents.size(), group.addedContents.size());
-            for (int i = 0; i < maxChanged; ++i) {
-                QString leftText = (i < group.removedContents.size()) ? group.removedContents[i] : "";
-                QString rightText = (i < group.addedContents.size()) ? group.addedContents[i] : "";
-                bool isRemoved = (i < group.removedContents.size());
-                bool isAdded = (i < group.addedContents.size());
-                bool isModified = isRemoved && isAdded;
-
-                result.append({
-                    leftText,
-                    rightText,
-                    isRemoved, isAdded, isModified, false,
-                    isRemoved ? group.removedLeftNums[i] : -1,
-                    isAdded ? group.addedRightNums[i] : -1
-                });
-            }
-        }
-        result.append(unchangedInHunk);
+        // Сбрасываем последнюю группу изменений (после последнего контекста)
+        flushChangeGroup();
 
         prevLeftEnd = leftIdx;
         prevRightEnd = rightIdx;

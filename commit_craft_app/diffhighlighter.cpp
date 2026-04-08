@@ -170,7 +170,9 @@ void DiffHighlighter::computeIntraLineDiffs(QMap<int, LineDiffInfo> &leftMap,
 // ---------------------------------------------------------------------------
 bool DiffHighlighter::isModifiedPair(const QString &removed, const QString &added)
 {
-    return similarityRatio(removed, added) > 0.3;
+    // Высокий порог: только строки с >60% схожести считаются модификациями.
+    // Менее похожие строки остаются как отдельное удаление (красный) + добавление (зелёный).
+    return similarityRatio(removed, added) > 0.6;
 }
 
 double DiffHighlighter::similarityRatio(const QString &a, const QString &b)
