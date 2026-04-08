@@ -4,6 +4,7 @@
 
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QFontDatabase>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QScrollBar>
@@ -12,6 +13,16 @@
 
 CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent), m_zoom(100), m_syntaxHighlighting(true)
 {
+    // Установить шрифт Consolas по умолчанию (monospace)
+    QFont defaultFont;
+    if (QFontDatabase::hasFamily("Consolas")) {
+        defaultFont.setFamily("Consolas");
+    } else {
+        defaultFont.setFamily(QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
+    }
+    defaultFont.setPointSize(10);
+    setFont(defaultFont);
+
     lineNumberArea = new LineNumberArea(this);
     highlighter = new Highlighter(document());
 
