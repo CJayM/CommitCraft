@@ -42,6 +42,9 @@ public:
     /// Переопределение отрисовки номеров строк
     void lineNumberAreaPaintEvent(QPaintEvent *event) override;
 
+    /// Переопределение отрисовки для добавления линий-разделителей чанков
+    void paintEvent(QPaintEvent *event) override;
+
     /// Очистить diff-данные
     void clearDiffData();
 

@@ -251,3 +251,33 @@ void DiffPanel::applyDiffHighlighting()
     // Применяем выделения. Qt сам нарисует их ПОД текстом.
     setExtraSelections(selections);
 }
+
+void DiffPanel::paintEvent(QPaintEvent *event)
+{
+    // Сначала рисуем базовый контент
+    CodeEditor::paintEvent(event);
+
+    // Затем рисуем горизонтальные линии-разделители чанков
+    QPainter painter(viewport());
+    
+    QTextBlock block = document()->begin();
+    int blockNumber = 0;
+
+    while (block.isValid()) {
+        auto it = m_lineDiffMap.find(blockNumber);
+        if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
+            // Получаем геометрию блока строки-разделителя
+            QRectF blockRect = blockBoundingRect(block).translated(contentOffset());
+            
+            // Рисуем горизонтальную линию по центру строки-разделителя
+            int lineY = qRound(blockRect.top() + blockRect.height() / 2.0);
+            
+            QPen pen(QColor(180, 180, 180), 1, Qt::DashLine);
+            painter.setPen(pen);
+            painter.drawLine(0, lineY, viewport()->width(), lineY);
+        }
+
+        block = block.next();
+        blockNumber++;
+    }
+}
