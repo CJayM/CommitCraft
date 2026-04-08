@@ -97,5 +97,14 @@ private:
     QTimer *m_fsDebounceTimer;
     void setupFileSystemWatcher();
     void onFileSystemChanged();
+    
+    // Дополнительные действия контекстного меню
+    void copyFilePath(const QString &fileName);
+    void openFile(const QString &fileName);
+    void openFolder(const QString &fileName);
+    void deleteFile(const QString &fileName);
+    void discardFileChanges(const QString &fileName);
+    void showBlameStub();
+    void runGitCommand(const QString &command, const QStringList &args, const QString &workingDir);
 };
 #endif // MAINWINDOW_H
