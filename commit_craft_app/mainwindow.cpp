@@ -35,6 +35,8 @@ MainWindow::MainWindow(QWidget *parent)
     , git(new Git(this))
     , m_lastSelectedFileName("")
     , m_lastSelectionSource(SelectionSource::Unstaged)
+    , m_fsWatcher(new QFileSystemWatcher(this))
+    , m_fsDebounceTimer(new QTimer(this))
 {
     ui->setupUi(this);
     restoreSplitterState();
@@ -51,6 +53,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Set repository path for Git operations
     git->setRepositoryPath(repositoryPath);
+
+    // Setup file system watcher for auto-refresh
+    setupFileSystemWatcher();
 
     // DiffEditor создан через promoted widget в mainwindow.ui
     // Получаем ссылатель на него
@@ -124,6 +129,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::diffReady, this, &MainWindow::onGitDiffReady);
     connect(git, &Git::commitHistoryReady, this, &MainWindow::onGitCommitHistoryReady);
     connect(git, &Git::commitReady, this, &MainWindow::onGitCommitFinished);
+    connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
+    connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
     
     // Set up context menus
@@ -229,6 +236,9 @@ void MainWindow::onGitStatusFinished(const QString &output)
     stagedFilesModel->setFiles(stagedFiles);
     updateCommitButtonState();
 
+    // Включаем watcher обратно после обновления
+    m_fsWatcher->blockSignals(false);
+
     git->getCommitHistory();
 }
 
@@ -276,6 +286,11 @@ void MainWindow::openRepository()
             // Save the repository path to settings
             settings->setValue("repositoryPath", repositoryPath);
             setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
+            
+            // Обновляем watcher для нового репозитория
+            m_fsWatcher->removePaths(m_fsWatcher->directories());
+            m_fsWatcher->addPath(repositoryPath);
+            
             refreshGitStatus();
         } else {
             QMessageBox::warning(this, tr("Ошибка"), 
@@ -319,7 +334,9 @@ void MainWindow::addSelectedFile()
     // Get the file name from the model
     QString fileName = unstagedFilesModel->getFileName(row);
     if (fileName.isEmpty()) return;
-    
+
+    // Временно отключаем watcher чтобы избежать двойного обновления
+    m_fsWatcher->blockSignals(true);
     git->addFile(fileName);
 }
 
@@ -352,7 +369,9 @@ void MainWindow::unstageSelectedFile()
     // Get the file name from the model
     QString fileName = stagedFilesModel->getFileName(row);
     if (fileName.isEmpty()) return;
-    
+
+    // Временно отключаем watcher чтобы избежать двойного обновления
+    m_fsWatcher->blockSignals(true);
     git->unstageFile(fileName);
 }
 
@@ -369,7 +388,9 @@ void MainWindow::commitChanges()
     
     // Check if amend is checked
     bool amend = ui->amend_chk->isChecked();
-    
+
+    // Временно отключаем watcher чтобы избежать двойного обновления
+    m_fsWatcher->blockSignals(true);
     git->commit(commitMessage, amend);
 }
 
@@ -569,4 +590,29 @@ QPair<QString, int> MainWindow::loadFontSettings()
     QString fontFamily = settings.value("fontFamily", "Consolas").toString();
     int fontSize = settings.value("fontSize", 10).toInt();
     return qMakePair(fontFamily, fontSize);
+}
+
+void MainWindow::setupFileSystemWatcher()
+{
+    // Настройка debounce-таймера
+    m_fsDebounceTimer->setSingleShot(true);
+    m_fsDebounceTimer->setInterval(500); // 500мс задержка
+    connect(m_fsDebounceTimer, &QTimer::timeout, this, [this]() {
+        refreshGitStatus();
+    });
+
+    // Подключение сигналов watcher
+    connect(m_fsWatcher, &QFileSystemWatcher::directoryChanged, this, &MainWindow::onFileSystemChanged);
+    connect(m_fsWatcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileSystemChanged);
+
+    // Добавляем корень репозитория в watcher
+    if (!repositoryPath.isEmpty() && QDir(repositoryPath).exists()) {
+        m_fsWatcher->addPath(repositoryPath);
+    }
+}
+
+void MainWindow::onFileSystemChanged()
+{
+    // Перезапускаем debounce-таймер
+    m_fsDebounceTimer->start();
 }
