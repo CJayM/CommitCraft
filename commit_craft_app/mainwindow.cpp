@@ -123,6 +123,24 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect table selection changes
     connect(ui->filesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onFileTableSelectionChanged);
     connect(ui->stagedFilesTable->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::onStagedFileTableSelectionChanged);
+    
+    // Connect double-click to open file
+    connect(ui->filesTable, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (index.isValid() && index.column() >= 0) {
+            FileModel *model = qobject_cast<FileModel*>(ui->filesTable->model());
+            if (model) {
+                openFile(model->getFileName(index.row()));
+            }
+        }
+    });
+    connect(ui->stagedFilesTable, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (index.isValid() && index.column() >= 0) {
+            FileModel *model = qobject_cast<FileModel*>(ui->stagedFilesTable->model());
+            if (model) {
+                openFile(model->getFileName(index.row()));
+            }
+        }
+    });
 
     connect(ui->commitMessageTextEdit,
             &QTextEdit::textChanged,
