@@ -652,7 +652,20 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
 
 void MainWindow::navigateToNextHunk()
 {
-    diffEditor->navigateToNextHunk();
+    // 1. Пробуем перейти к следующему ханку в текущем файле
+    if (diffEditor->navigateToNextHunk())
+        return;
+
+    // 2. Если конец файла достигнут, переключаемся на следующий файл в списке unstaged
+    if (m_lastSelectionSource == SelectionSource::Unstaged) {
+        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
+        QModelIndex next = current.sibling(current.row() + 1, 0);
+        if (next.isValid()) {
+            // Выбираем следующий файл
+            ui->filesTable->selectionModel()->select(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->scrollTo(next);
+        }
+    }
 }
 
 void MainWindow::toggleLeftPanel(bool visible)
@@ -694,7 +707,20 @@ void MainWindow::onAmendCheckBoxChanged(int state)
 
 void MainWindow::navigateToPrevHunk()
 {
-    diffEditor->navigateToPrevHunk();
+    // 1. Пробуем перейти к предыдущему ханку в текущем файле
+    if (diffEditor->navigateToPrevHunk())
+        return;
+
+    // 2. Если начало файла достигнуто, переключаемся на предыдущий файл в списке unstaged
+    if (m_lastSelectionSource == SelectionSource::Unstaged) {
+        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
+        QModelIndex prev = current.sibling(current.row() - 1, 0);
+        if (prev.isValid()) {
+            // Выбираем предыдущий файл
+            ui->filesTable->selectionModel()->select(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->scrollTo(prev);
+        }
+    }
 }
 
 void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)

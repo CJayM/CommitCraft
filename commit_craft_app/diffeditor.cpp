@@ -383,29 +383,48 @@ void DiffEditor::clear()
     m_fileName.clear();
 }
 
-void DiffEditor::navigateToNextHunk()
+bool DiffEditor::navigateToNextHunk()
 {
     if (m_hunkPositions.isEmpty())
-        return;
+        return false;
+
+    if (m_currentHunkIndex >= m_hunkPositions.size() - 1)
+        return false; // Достигнут конец, не зацикливаем
 
     m_currentHunkIndex++;
-    if (m_currentHunkIndex >= m_hunkPositions.size())
-        m_currentHunkIndex = 0;
-
-    // Прокрутить к позиции ханка
     scrollToHunk(m_currentHunkIndex);
     emit hunkNavigated(m_currentHunkIndex);
+    return true;
 }
 
-void DiffEditor::navigateToPrevHunk()
+bool DiffEditor::navigateToPrevHunk()
+{
+    if (m_hunkPositions.isEmpty())
+        return false;
+
+    if (m_currentHunkIndex <= 0)
+        return false; // Достигнуто начало, не зацикливаем
+
+    m_currentHunkIndex--;
+    scrollToHunk(m_currentHunkIndex);
+    emit hunkNavigated(m_currentHunkIndex);
+    return true;
+}
+
+void DiffEditor::navigateToFirstHunk()
 {
     if (m_hunkPositions.isEmpty())
         return;
+    m_currentHunkIndex = 0;
+    scrollToHunk(0);
+    emit hunkNavigated(0);
+}
 
-    m_currentHunkIndex--;
-    if (m_currentHunkIndex < 0)
-        m_currentHunkIndex = m_hunkPositions.size() - 1;
-
+void DiffEditor::navigateToLastHunk()
+{
+    if (m_hunkPositions.isEmpty())
+        return;
+    m_currentHunkIndex = m_hunkPositions.size() - 1;
     scrollToHunk(m_currentHunkIndex);
     emit hunkNavigated(m_currentHunkIndex);
 }

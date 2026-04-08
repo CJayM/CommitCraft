@@ -62,10 +62,21 @@ signals:
     void hunkNavigated(int hunkIndex);
 
 public slots:
-    void navigateToNextHunk();
-    void navigateToPrevHunk();
+    /// Навигация к следующему ханку. Возвращает false если достигнут конец списка.
+    bool navigateToNextHunk();
+    /// Навигация к предыдущему ханку. Возвращает false если достигнуто начало списка.
+    bool navigateToPrevHunk();
+    /// Переход к первому ханку (начало файла)
+    void navigateToFirstHunk();
+    /// Переход к последнему ханку (конец файла)
+    void navigateToLastHunk();
+    
     int currentHunkIndex() const { return m_currentHunkIndex; }
     int hunkCount() const { return m_hunkPositions.size(); }
+    
+    /// Проверка границ навигации
+    bool isAtFirstHunk() const { return m_currentHunkIndex <= 0; }
+    bool isAtLastHunk() const { return m_hunkPositions.isEmpty() || m_currentHunkIndex >= m_hunkPositions.size() - 1; }
 
 private slots:
     void synchronizeScrollLeftToRight(int value);
