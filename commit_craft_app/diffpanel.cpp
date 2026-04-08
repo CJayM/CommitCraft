@@ -259,22 +259,34 @@ void DiffPanel::paintEvent(QPaintEvent *event)
 
     // Затем рисуем горизонтальные линии-разделители чанков
     QPainter painter(viewport());
+    painter.setClipRect(event->rect());
     
-    QTextBlock block = document()->begin();
-    int blockNumber = 0;
+    // Получаем видимую область
+    QRect visibleRect = viewport()->rect();
+    
+    // Находим первый видимый блок
+    QTextBlock block = firstVisibleBlock();
+    int blockNumber = block.blockNumber();
 
     while (block.isValid()) {
-        auto it = m_lineDiffMap.find(blockNumber);
-        if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
-            // Получаем геометрию блока строки-разделителя
-            QRectF blockRect = blockBoundingRect(block).translated(contentOffset());
-            
-            // Рисуем горизонтальную линию по центру строки-разделителя
-            int lineY = qRound(blockRect.top() + blockRect.height() / 2.0);
-            
-            QPen pen(QColor(180, 180, 180), 1, Qt::DashLine);
-            painter.setPen(pen);
-            painter.drawLine(0, lineY, viewport()->width(), lineY);
+        QRectF blockRect = blockBoundingGeometry(block).translated(contentOffset()).toRect();
+        
+        // Если блок вышел за видимую область, прерываем
+        if (blockRect.top() > visibleRect.bottom())
+            break;
+        
+        // Рисуем линию только если блок частично или полностью виден
+        if (blockRect.bottom() >= visibleRect.top()) {
+            auto it = m_lineDiffMap.find(blockNumber);
+            if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
+                // Рисуем горизонтальную линию по центру строки-разделителя
+                int lineY = blockRect.top() + blockRect.height() / 2;
+                
+                painter.save();
+                painter.setPen(QPen(QColor(180, 180, 180), 1, Qt::DashLine));
+                painter.drawLine(visibleRect.left(), lineY, visibleRect.right(), lineY);
+                painter.restore();
+            }
         }
 
         block = block.next();
