@@ -52,6 +52,9 @@ public:
     /// Применить diff-данные и перестроить side-by-side view
     void applyDiffData(const QList<Hunk> &hunks);
 
+    /// Применить настройки шрифта к обеим панелям
+    void applyFontSettings(const QString &fontFamily, int fontSize);
+
 signals:
     void hunkNavigated(int hunkIndex);
 

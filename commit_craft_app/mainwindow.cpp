@@ -56,6 +56,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Получаем ссылатель на него
     diffEditor = ui->diffEditor;
 
+    // Применяем сохранённые настройки шрифта
+    QPair<QString, int> fontSettings = loadFontSettings();
+    diffEditor->applyFontSettings(fontSettings.first, fontSettings.second);
+
     // Set up the table views with models
     ui->filesTable->setModel(unstagedFilesModel);
     ui->stagedFilesTable->setModel(stagedFilesModel);
@@ -179,8 +183,11 @@ void MainWindow::openSettingsDialog()
     if (!settingsDialog) {
         settingsDialog = new SettingsDialog(this);
     }
-    
-    settingsDialog->exec();
+
+    if (settingsDialog->exec() == QDialog::Accepted) {
+        // Применяем новые настройки шрифта к DiffEditor
+        diffEditor->applyFontSettings(settingsDialog->getFontFamily(), settingsDialog->getFontSize());
+    }
 }
 
 void MainWindow::refreshGitStatus()
@@ -534,15 +541,15 @@ void MainWindow::navigateToPrevHunk()
 
 void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)
 {
-    QSettings fontSettings("CommitCraft", "DiffEditor");
-    fontSettings.setValue("fontFamily", fontFamily);
-    fontSettings.setValue("fontSize", fontSize);
+    QSettings settings("CommitCraft", "AppSettings");
+    settings.setValue("fontFamily", fontFamily);
+    settings.setValue("fontSize", fontSize);
 }
 
 QPair<QString, int> MainWindow::loadFontSettings()
 {
-    QSettings fontSettings("CommitCraft", "DiffEditor");
-    QString fontFamily = fontSettings.value("fontFamily", "Consolas").toString();
-    int fontSize = fontSettings.value("fontSize", 10).toInt();
+    QSettings settings("CommitCraft", "AppSettings");
+    QString fontFamily = settings.value("fontFamily", "Consolas").toString();
+    int fontSize = settings.value("fontSize", 10).toInt();
     return qMakePair(fontFamily, fontSize);
 }

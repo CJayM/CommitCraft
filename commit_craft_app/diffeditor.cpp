@@ -133,6 +133,13 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     m_rightPanel->setPlaceholderLines(rightPlaceholders);
 }
 
+void DiffEditor::applyFontSettings(const QString &fontFamily, int fontSize)
+{
+    QFont font(fontFamily, fontSize);
+    m_leftPanel->setFont(font);
+    m_rightPanel->setFont(font);
+}
+
 QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                                                   const QStringList &leftLines,
                                                   const QStringList &rightLines)

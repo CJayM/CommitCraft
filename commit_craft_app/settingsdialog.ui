@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>500</width>
-    <height>200</height>
+    <height>300</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -47,6 +47,66 @@
       <widget class="QPushButton" name="gitPathButton">
        <property name="text">
         <string>Обзор...</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="Line" name="line_2">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="fontSectionLabel">
+     <property name="text">
+      <string>Шрифт DiffEditor</string>
+     </property>
+     <property name="font">
+      <font>
+       <bold>true</bold>
+      </font>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QFormLayout" name="fontFormLayout">
+     <property name="fieldGrowthPolicy">
+      <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+     </property>
+     <item row="0" column="0">
+      <widget class="QLabel" name="fontFamilyLabel">
+       <property name="text">
+        <string>Шрифт:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QFontComboBox" name="fontComboBox">
+       <property name="fontFilters">
+        <set>QFontComboBox::MonospacedFonts</set>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="fontSizeLabel">
+       <property name="text">
+        <string>Размер:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QSpinBox" name="fontSizeSpinBox">
+       <property name="minimum">
+        <number>8</number>
+       </property>
+       <property name="maximum">
+        <number>24</number>
+       </property>
+       <property name="value">
+        <number>10</number>
        </property>
       </widget>
      </item>

@@ -10,7 +10,6 @@ SOURCES += \
     diffeditor.cpp \
     diffhighlighter.cpp \
     diffpanel.cpp \
-    fontsettingsdialog.cpp \
     intralinediff.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -22,7 +21,6 @@ HEADERS += \
     diffeditor.h \
     diffhighlighter.h \
     diffpanel.h \
-    fontsettingsdialog.h \
     intralinediff.h \
     linenumberarea.h \
     mainwindow.h \

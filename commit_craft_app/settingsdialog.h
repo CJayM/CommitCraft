@@ -18,8 +18,15 @@ public:
     explicit SettingsDialog(QWidget *parent = nullptr);
     ~SettingsDialog();
 
+    // Git path
     QString getGitPath() const;
     void setGitPath(const QString &gitPath);
+
+    // Font settings
+    QString getFontFamily() const;
+    int getFontSize() const;
+    void setFontFamily(const QString &fontFamily);
+    void setFontSize(int fontSize);
 
 private slots:
     void onGitPathButtonClicked();
