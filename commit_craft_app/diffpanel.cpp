@@ -36,7 +36,14 @@ void DiffPanel::setDiffData(const QMap<int, LineDiffInfo> &lineDiffMap)
 void DiffPanel::clearDiffData()
 {
     m_lineDiffMap.clear();
+    m_placeholderLines.clear();
     setExtraSelections({});
+}
+
+void DiffPanel::setPlaceholderLines(const QSet<int> &lines)
+{
+    m_placeholderLines = lines;
+    highlightCurrentLineNoEmit();
 }
 
 void DiffPanel::setCursorToLine(int line)
@@ -88,37 +95,47 @@ void DiffPanel::highlightCurrentLineNoEmit()
     selection.cursor.clearSelection();
     selections.append(selection);
 
-    // Добавляем diff-подсветку поверх
+    // Цвета
+    const QColor removedColor(255, 200, 200);
+    const QColor addedColor(200, 255, 200);
+    const QColor modifiedColor(180, 200, 255);
+    const QColor placeholderColor(230, 230, 230); // серый для пустых строк
+
+    // Добавляем diff-подсветку и placeholder-подсветку
     QTextCursor cursor(document());
     QTextBlock block = document()->begin();
     int blockNumber = 0;
 
-    const QColor removedColor(255, 200, 200);
-    const QColor addedColor(200, 255, 200);
-    const QColor modifiedColor(180, 200, 255);
-
     while (block.isValid()) {
-        auto it = m_lineDiffMap.find(blockNumber);
-        if (it != m_lineDiffMap.end() && it->type != DiffType::Unchanged) {
-            QColor bgColor;
-            switch (it->type) {
-                case DiffType::Removed:  bgColor = removedColor; break;
-                case DiffType::Added:    bgColor = addedColor; break;
-                case DiffType::Modified: bgColor = modifiedColor; break;
-                default: break;
+        QColor bgColor;
+
+        // Проверяем placeholder (серый фон)
+        if (m_placeholderLines.contains(blockNumber)) {
+            bgColor = placeholderColor;
+        }
+        // Проверяем diff (красный/зелёный/синий)
+        else {
+            auto it = m_lineDiffMap.find(blockNumber);
+            if (it != m_lineDiffMap.end() && it->type != DiffType::Unchanged) {
+                switch (it->type) {
+                    case DiffType::Removed:  bgColor = removedColor; break;
+                    case DiffType::Added:    bgColor = addedColor; break;
+                    case DiffType::Modified: bgColor = modifiedColor; break;
+                    default: break;
+                }
             }
+        }
 
-            if (bgColor.isValid()) {
-                cursor.setPosition(block.position());
-                cursor.setPosition(block.position() + block.length() - 1, QTextCursor::KeepAnchor);
+        if (bgColor.isValid()) {
+            cursor.setPosition(block.position());
+            cursor.setPosition(block.position() + block.length() - 1, QTextCursor::KeepAnchor);
 
-                QTextEdit::ExtraSelection selection;
-                selection.cursor = cursor;
-                selection.format.setBackground(bgColor);
-                selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+            QTextEdit::ExtraSelection selection;
+            selection.cursor = cursor;
+            selection.format.setBackground(bgColor);
+            selection.format.setProperty(QTextFormat::FullWidthSelection, true);
 
-                selections.append(selection);
-            }
+            selections.append(selection);
         }
 
         block = block.next();

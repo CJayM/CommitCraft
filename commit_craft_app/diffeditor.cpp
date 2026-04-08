@@ -4,6 +4,7 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QTextBlock>
+#include <QSet>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
@@ -95,6 +96,8 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     // НО: номера строк в leftMap/rightMap — это оригинальные номера файлов (0-based),
     // а syncedLines — это синхронизированные строки. Нужно пересчитать.
     QMap<int, LineDiffInfo> leftDiffMap, rightDiffMap;
+    QSet<int> leftPlaceholders, rightPlaceholders;
+
     for (int i = 0; i < syncedLines.size(); ++i) {
         const auto &sl = syncedLines[i];
         if (sl.isRemoved) {
@@ -117,10 +120,17 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
                 rightDiffMap[i].changedRanges = rit->changedRanges;
             }
         }
+        // Собираем placeholder-строки
+        if (sl.leftIsPlaceholder)
+            leftPlaceholders.insert(i);
+        if (sl.rightIsPlaceholder)
+            rightPlaceholders.insert(i);
     }
 
     m_leftPanel->setDiffData(leftDiffMap);
     m_rightPanel->setDiffData(rightDiffMap);
+    m_leftPanel->setPlaceholderLines(leftPlaceholders);
+    m_rightPanel->setPlaceholderLines(rightPlaceholders);
 }
 
 QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
@@ -152,6 +162,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                 leftLines[ctxLeft],
                 rightLines[ctxRight],
                 false, false, false, true, // context
+                false, false,              // not placeholders
                 ctxLeft, ctxRight
             });
             ctxLeft++;
@@ -183,11 +194,14 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                     bool isRemoved = (i < currentGroup.removedContents.size());
                     bool isAdded = (i < currentGroup.addedContents.size());
                     bool isModified = isRemoved && isAdded;
+                    bool leftPlaceholder = !isRemoved;  // левая сторона — пустой заполнитель
+                    bool rightPlaceholder = !isAdded;   // правая сторона — пустой заполнитель
 
                     result.append({
                         leftText,
                         rightText,
                         isRemoved, isAdded, isModified, false,
+                        leftPlaceholder, rightPlaceholder,
                         isRemoved ? currentGroup.removedLeftNums[i] : -1,
                         isAdded ? currentGroup.addedRightNums[i] : -1
                     });
@@ -225,6 +239,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                         leftLines[leftIdx],
                         rightLines[rightIdx],
                         false, false, false, true,
+                        false, false,          // not placeholders
                         leftIdx, rightIdx
                     });
                 }
@@ -256,6 +271,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                 leftLines[ctxLeft],
                 rightLines[ctxRight],
                 false, false, false, true,
+                false, false,              // not placeholders
                 ctxLeft, ctxRight
             });
             ctxLeft++;

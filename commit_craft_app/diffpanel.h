@@ -38,6 +38,9 @@ public:
     /// Очистить diff-данные
     void clearDiffData();
 
+    /// Установить строки-заполнители (серый фон для пустых строк)
+    void setPlaceholderLines(const QSet<int> &lines);
+
     /// Переместить курсор на указанную строку (для синхронизации с другой панелью)
     void setCursorToLine(int line);
 
@@ -57,6 +60,7 @@ private:
 
     QMap<int, LineDiffInfo> m_lineDiffMap;
     bool m_updatingCursor = false;
+    QSet<int> m_placeholderLines; // Номера строк-заполнителей (серый фон)
 };
 
 #endif // DIFFPANEL_H

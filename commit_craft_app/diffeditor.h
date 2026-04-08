@@ -24,6 +24,8 @@ struct SyncedLine {
     bool isAdded;       // Строка добавлена (отображается справа)
     bool isModified;    // Строка модифицирована
     bool isContext;     // Контекстная строка (без изменений)
+    bool leftIsPlaceholder;  // Левая строка — пустой заполнитель (серый фон)
+    bool rightIsPlaceholder; // Правая строка — пустой заполнитель (серый фон)
     int leftLineNum;    // Номер строки в левом файле (-1 если не применяется)
     int rightLineNum;   // Номер строки в правом файле (-1 если не применяется)
 };
