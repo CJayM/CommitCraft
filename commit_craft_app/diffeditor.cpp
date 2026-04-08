@@ -167,6 +167,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
 
         int ctxLeft = contextStartLeft;
         int ctxRight = contextStartRight;
+        bool isFirstChunk = (hunkIdx == 0);
         while (ctxLeft < hunkLeftStart - 1 && ctxRight < hunkRightStart - 1
                && ctxLeft < leftLines.size() && ctxRight < rightLines.size()) {
             result.append({
@@ -174,7 +175,10 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                 rightLines[ctxRight],
                 false, false, false, true, // context
                 false, false,              // not placeholders
-                ctxLeft, ctxRight
+                ctxLeft, ctxRight,
+                hunkIdx,                   // hunkIndex
+                !isFirstChunk && (ctxLeft == contextStartLeft), // isHunkBoundary (first line of context after gap)
+                false                      // isSeparator
             });
             ctxLeft++;
             ctxRight++;
@@ -199,6 +203,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
         auto flushChangeGroup = [&]() {
             if (!currentGroup.removedContents.isEmpty() || !currentGroup.addedContents.isEmpty()) {
                 int maxChanged = qMax(currentGroup.removedContents.size(), currentGroup.addedContents.size());
+                bool isFirstInHunk = true;
                 for (int i = 0; i < maxChanged; ++i) {
                     QString leftText = (i < currentGroup.removedContents.size()) ? currentGroup.removedContents[i] : "";
                     QString rightText = (i < currentGroup.addedContents.size()) ? currentGroup.addedContents[i] : "";
@@ -214,8 +219,12 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                         isRemoved, isAdded, isModified, false,
                         leftPlaceholder, rightPlaceholder,
                         isRemoved ? currentGroup.removedLeftNums[i] : -1,
-                        isAdded ? currentGroup.addedRightNums[i] : -1
+                        isAdded ? currentGroup.addedRightNums[i] : -1,
+                        hunkIdx,                        // hunkIndex
+                        isFirstInHunk,                  // isHunkBoundary (first changed line in hunk)
+                        false                           // isSeparator
                     });
+                    isFirstInHunk = false;
                 }
                 currentGroup = ChangeGroup{};
             }
@@ -251,7 +260,10 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
                         rightLines[rightIdx],
                         false, false, false, true,
                         false, false,          // not placeholders
-                        leftIdx, rightIdx
+                        leftIdx, rightIdx,
+                        hunkIdx,               // hunkIndex
+                        false,                 // isHunkBoundary (context lines are not boundaries)
+                        false                  // isSeparator
                     });
                 }
                 leftIdx++;
@@ -277,13 +289,17 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
 
         int ctxLeft = lastLeftEnd;
         int ctxRight = lastRightEnd;
+        int lastHunkIdx = hunks.size() - 1;
         while (ctxLeft >= 0 && ctxLeft < contextEndLeft && ctxRight >= 0 && ctxRight < contextEndRight) {
             result.append({
                 leftLines[ctxLeft],
                 rightLines[ctxRight],
                 false, false, false, true,
                 false, false,              // not placeholders
-                ctxLeft, ctxRight
+                ctxLeft, ctxRight,
+                lastHunkIdx,               // hunkIndex (last hunk)
+                false,                     // isHunkBoundary
+                false                      // isSeparator
             });
             ctxLeft++;
             ctxRight++;
