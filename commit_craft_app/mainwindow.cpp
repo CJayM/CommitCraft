@@ -481,6 +481,13 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
     } else {
         // Для current версии читаем из файловой системы
         QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+        
+        // Проверяем, существует ли файл
+        if (!QFile::exists(absoluteFilePath)) {
+            // Файл удалён из working tree
+            return "";
+        }
+        
         QFile file(absoluteFilePath);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
