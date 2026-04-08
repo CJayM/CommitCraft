@@ -234,7 +234,6 @@ void MainWindow::onGitCommitFinished(bool success, const QString &message)
         // Uncheck amend checkbox after successful commit
         ui->amend_chk->setChecked(false);
         refreshGitStatus();
-        QMessageBox::information(this, tr("Успех"), tr("Коммит успешно выполнен."));
     } else {
         // Error - show message
         QMessageBox::warning(this, tr("Ошибка Git"), message);
