@@ -19,6 +19,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QFileInfo>
+#include <QPixmap>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
 #include "diffeditor.h"
@@ -1082,11 +1083,19 @@ void MainWindow::updateNavigationButtonsState()
 void MainWindow::showAboutDialog()
 {
     QString appVersion = QCoreApplication::applicationVersion();
-    QString aboutText = tr("<h2>Commit Craft</h2>"
-                           "<p>Версия: %1</p>"
-                           "<p>Десктопное приложение для удобной работы с Git.</p>"
-                           "<p>Позволяет просматривать изменения, управлять staged/unstaged файлами,"
-                           " навигировать по ханкам diff и создавать коммиты.</p>").arg(appVersion);
     
-    QMessageBox::about(this, tr("О программе Commit Craft"), aboutText);
+    QMessageBox aboutBox(this);
+    aboutBox.setWindowTitle(tr("О программе Commit Craft"));
+    aboutBox.setIconPixmap(QPixmap(":/icons/icons/icon.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    QString aboutText
+        = tr("<h2>Commit Craft</h2>"
+             "<p><b>Версия:</b> %1</p>"
+             "<p>Десктопное приложение для удобной работы с Git.</p>"
+             "<p>Позволяет просматривать изменения, управлять staged/unstaged файлами,"
+             " навигировать по ханкам diff и создавать коммиты.</p>")
+              .arg(appVersion);
+
+    aboutBox.setText(aboutText);
+    aboutBox.exec();
 }

@@ -39,6 +39,10 @@ FORMS += \
 RESOURCES += \
     icons.qrc
 
+win32 {
+    RC_ICONS = icons/app.ico
+}
+
 
 
 # Default rules for deployment.
