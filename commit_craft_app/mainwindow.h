@@ -54,6 +54,10 @@ private slots:
     void showStagedFileContextMenu(const QPoint &pos);
     void addSelectedFile();
     void unstageSelectedFile();
+    void unstageSelectedFiles(const QStringList &files);
+    void stageSelectedFiles(const QStringList &files);
+    void deleteSelectedFiles(const QStringList &files);
+    void stashSelectedFiles(const QStringList &files);
     void commitChanges();
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();

@@ -256,7 +256,7 @@
             <item>
              <widget class="QTableView" name="filesTable">
               <property name="selectionMode">
-               <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+               <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
               </property>
               <property name="selectionBehavior">
                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
@@ -282,7 +282,7 @@
             <item>
              <widget class="QTableView" name="stagedFilesTable">
               <property name="selectionMode">
-               <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+               <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
               </property>
               <property name="selectionBehavior">
                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
@@ -677,15 +677,15 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>BranchesWidget</class>
-   <extends>QWidget</extends>
-   <header>brancheswidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
    <class>DiffEditor</class>
    <extends>QWidget</extends>
    <header>diffeditor.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>BranchesWidget</class>
+   <extends>QWidget</extends>
+   <header>brancheswidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
