@@ -32,6 +32,13 @@ public:
     void addFile(const QString &fileName);
     void unstageFile(const QString &fileName);
     void commit(const QString &message, bool amend = false);
+
+    // Branch operations
+    void getLocalBranches();
+    void getRemotes();
+    void getRemoteBranches(const QString &remote);
+    void getTags();
+    void getStashes();
     
 signals:
     // Git operation results
@@ -43,6 +50,13 @@ signals:
     void addFileReady(bool success, const QString &message);
     void unstageFileReady(bool success, const QString &message);
     void error(const QString &error);
+
+    // Branch operation results
+    void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
+    void remotesReady(const QList<QString> &remotes);
+    void remoteBranchesReady(const QString &remote, const QList<QString> &branches);
+    void tagsReady(const QList<QString> &tags);
+    void stashesReady(const QList<QString> &stashes);
     
 private slots:
     void onStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -53,6 +67,14 @@ private slots:
     void onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onCommitFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProcessError(QProcess::ProcessError error);
+
+    // Branch operation slots
+    void onLocalBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onCurrentBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRemotesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRemoteBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onTagsFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onStashesFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
 private:
     QString m_repositoryPath;
@@ -66,7 +88,18 @@ private:
     QProcess *m_addFileProcess;
     QProcess *m_unstageFileProcess;
     QProcess *m_commitProcess;
-    
+
+    // Processes for branch operations
+    QProcess *m_branchesProcess;
+    QProcess *m_currentBranchProcess;
+    QProcess *m_remotesProcess;
+    QProcess *m_remoteBranchesProcess;
+    QProcess *m_tagsProcess;
+    QProcess *m_stashesProcess;
+
+    // Temporary storage for async operations
+    QList<QString> m_currentBranchesList;
+
     // Git parser
     GitParser m_gitParser;
     
