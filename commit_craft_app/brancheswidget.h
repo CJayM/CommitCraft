@@ -65,6 +65,7 @@ private:
     // Текущий элемент для контекстного меню
     QTreeWidgetItem *m_contextMenuItem;
     QString m_currentBranchName; // Для проверки, можно ли удалить/переименовать
+    QString m_lastFailedDeleteBranch; // Для повторной попытки Force Delete
 
     // Корневые элементы дерева
     QTreeWidgetItem *m_localBranchesRoot;

@@ -15,6 +15,7 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     : QFrame(parent)
     , m_git(nullptr)
     , m_contextMenuItem(nullptr)
+    , m_lastFailedDeleteBranch("")
 {
     m_layout = new QVBoxLayout(this);
     m_layout->setContentsMargins(0, 0, 0, 0);
@@ -69,7 +70,20 @@ void BranchesWidget::setGit(Git *git)
             if (success) {
                 refresh(); // Обновляем дерево
             } else {
-                QMessageBox::warning(this, tr("Error"), message);
+                // Если ветка не слита, предлагаем Force Delete
+                if (message.contains("not fully merged") && !m_lastFailedDeleteBranch.isEmpty()) {
+                    QMessageBox::StandardButton reply = QMessageBox::question(
+                        this, tr("Branch Not Merged"),
+                        tr("The branch '%1' is not fully merged.\nForce delete it?").arg(m_lastFailedDeleteBranch),
+                        QMessageBox::Yes | QMessageBox::No
+                    );
+                    
+                    if (reply == QMessageBox::Yes) {
+                        m_git->deleteBranch(m_lastFailedDeleteBranch, true);
+                    }
+                } else {
+                    QMessageBox::warning(this, tr("Error"), message);
+                }
             }
         });
         
@@ -355,6 +369,7 @@ void BranchesWidget::onDeleteBranchAction()
     );
 
     if (reply == QMessageBox::Yes) {
-        m_git->deleteBranch(branchName, false); // force = false by default
+        m_lastFailedDeleteBranch = branchName;
+        m_git->deleteBranch(branchName, false);
     }
 }
