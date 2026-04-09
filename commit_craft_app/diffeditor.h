@@ -7,13 +7,15 @@
 #include <gitparser.h>
 
 #include <QWidget>
-#include <QVBoxLayout>
-#include <QSplitter>
-#include <QScrollBar>
-#include <QLabel>
 #include <QFileInfo>
-#include <QTextDocument>
 
+QT_BEGIN_NAMESPACE
+namespace Ui {
+class DiffEditor;
+}
+QT_END_NAMESPACE
+
+class DiffPanel;
 class Highlighter;
 
 /// Структура для синхронизированной строки diff
@@ -40,14 +42,17 @@ class DiffEditor : public QWidget
 
 public:
     explicit DiffEditor(QWidget *parent = nullptr);
+    ~DiffEditor();
 
     /// Установка содержимого для сравнения.
     /// \param leftContent  Содержимое левой панели (staged / HEAD)
     /// \param rightContent Содержимое правой панели (current / working tree)
     /// \param fileName     Имя файла (для определения типа подсветки синтаксиса)
+    /// \param repositoryPath Путь к репозиторию (для загрузки изображений)
     void setContents(const QString &leftContent,
                      const QString &rightContent,
-                     const QString &fileName);
+                     const QString &fileName,
+                     const QString &repositoryPath = QString());
 
     /// Очистить содержимое
     void clear();
@@ -58,6 +63,11 @@ public:
     /// Применить настройки шрифта к обеим панелям
     void applyFontSettings(const QString &fontFamily, int fontSize);
 
+    /// Проверка, является ли файл графическим
+    bool isImageFile() const;
+
+    /// Проверка, нужна ли подсветка синтаксиса
+    bool isSyntaxFile() const;
 
     /// Обновить настройки расширений из QSettings
     void updateFileTypeSettings();
@@ -102,10 +112,14 @@ private:
     /// Применить подсветку синтаксиса по типу файла
     void applySyntaxHighlighting(const QString &fileName);
 
-    DiffPanel *m_leftPanel;
-    DiffPanel *m_rightPanel;
+    /// Проверить тип файла и вернуть true если это графический файл
+    bool checkFileType(const QString &fileName);
+
+    Ui::DiffEditor *ui;
+    bool m_isImageFile;         // Флаг графического файла
     QStringList m_imageExtensions;  // Расширения графических файлов
     QStringList m_syntaxExtensions; // Расширения для подсветки синтаксиса
+    QString m_repositoryPath;   // Путь к репозиторию для загрузки изображений
 
     // Навигация по ханкам
     QVector<int> m_hunkPositions; // Индексы первых строк ханков в syncedLines
@@ -113,10 +127,6 @@ private:
 
     // Флаг для предотвращения рекурсии при синхронизации скролла
     bool m_syncingScroll;
-
-    // Layout
-    QVBoxLayout *m_layout;
-    QSplitter *m_splitter;
 
     // Полное содержимое файлов (для side-by-side diff)
     QString m_leftFullContent;

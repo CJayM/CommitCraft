@@ -34,7 +34,8 @@ HEADERS += \
 
 FORMS += \
     mainwindow.ui \
-    settingsdialog.ui
+    settingsdialog.ui \
+    diffeditor.ui
 
 RESOURCES += \
     icons.qrc

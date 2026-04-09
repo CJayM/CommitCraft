@@ -1,29 +1,23 @@
 #include "diffeditor.h"
+#include "ui_diffeditor.h"
 
 #include <QScrollBar>
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QTextBlock>
 #include <QSet>
+#include <QSettings>
+#include <QPixmap>
+#include <QDir>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
-    , m_leftPanel(new DiffPanel(this))
-    , m_rightPanel(new DiffPanel(this))
+    , ui(new Ui::DiffEditor)
+    , m_isImageFile(false)
     , m_currentHunkIndex(-1)
     , m_syncingScroll(false)
-    , m_layout(new QVBoxLayout(this))
-    , m_splitter(new QSplitter(Qt::Horizontal, this))
 {
-    m_layout->setContentsMargins(0, 0, 0, 0);
-    m_layout->setSpacing(0);
-
-    // Добавить панели в splitter
-    m_splitter->addWidget(m_leftPanel);
-    m_splitter->addWidget(m_rightPanel);
-
-    m_layout->addWidget(m_splitter);
-    setLayout(m_layout);
+    ui->setupUi(this);
 
     // Загрузить настройки расширений
     QSettings settings("CommitCraft", "AppSettings");
@@ -34,41 +28,106 @@ DiffEditor::DiffEditor(QWidget *parent)
     m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
 
     // Подключить синхронизацию скролла
-    connect(m_leftPanel->verticalScrollBar(), &QScrollBar::valueChanged,
+    connect(ui->leftPanel->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &DiffEditor::synchronizeScrollLeftToRight);
-    connect(m_rightPanel->verticalScrollBar(), &QScrollBar::valueChanged,
+    connect(ui->rightPanel->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &DiffEditor::synchronizeScrollRightToLeft);
 
     // Подключить синхронизацию зума (через CodeEditor)
-    connect(m_leftPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
-    connect(m_rightPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
+    connect(ui->leftPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
+    connect(ui->rightPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
 
     // Подключить синхронизацию подсветки текущей строки (перемещение курсора)
-    connect(m_leftPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
-        m_rightPanel->setCursorToLine(blockNum);
+    connect(ui->leftPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
+        ui->rightPanel->setCursorToLine(blockNum);
     });
-    connect(m_rightPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
-        m_leftPanel->setCursorToLine(blockNum);
+    connect(ui->rightPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
+        ui->leftPanel->setCursorToLine(blockNum);
     });
+}
+
+DiffEditor::~DiffEditor()
+{
+    delete ui;
 }
 
 void DiffEditor::setContents(const QString &leftContent,
                               const QString &rightContent,
-                              const QString &fileName)
+                              const QString &fileName,
+                              const QString &repositoryPath)
 {
+    // Убираем лишние кавычки если есть
+    QString cleanFileName = fileName.trimmed();
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    }
+
     m_leftFullContent = leftContent;
     m_rightFullContent = rightContent;
-    m_fileName = fileName;
+    m_fileName = cleanFileName;
+    m_repositoryPath = repositoryPath;
 
     // Очистить предыдущие diff-данные
-    m_leftPanel->clearDiffData();
-    m_rightPanel->clearDiffData();
+    ui->leftPanel->clearDiffData();
+    ui->rightPanel->clearDiffData();
     m_hunkPositions.clear();
     m_currentHunkIndex = -1;
 
-    // Показать полное содержимое (будет заменено на side-by-side diff в applyDiffData)
-    m_leftPanel->setContent(leftContent);
-    m_rightPanel->setContent(rightContent);
+    // Проверить тип файла
+    bool isImage = checkFileType(cleanFileName);
+
+    if (isImage) {
+        // Для графических файлов - показываем изображение
+        ui->stackedWidget->setCurrentWidget(ui->imagePreviewPage);
+        
+        // Очищаем старые данные
+        ui->imageDisplayLabel->clear();
+        ui->imageInfoLabel->clear();
+        
+        // Пытаемся загрузить изображение
+        QPixmap pixmap;
+        QFileInfo fi(cleanFileName);
+        QString fullPath;
+        
+        if (fi.isAbsolute()) {
+            fullPath = cleanFileName;
+        } else if (!m_repositoryPath.isEmpty()) {
+            // Используем QDir для корректной сборки пути
+            QDir dir(m_repositoryPath);
+            fullPath = dir.filePath(cleanFileName);
+            // Преобразуем в нативный формат для Windows
+            fullPath = QDir::toNativeSeparators(fullPath);
+        } else {
+            fullPath = QDir::current().absoluteFilePath(cleanFileName);
+        }
+
+        // Для Qt 6 используем load с QString напрямую
+        if (QFile::exists(fullPath)) {
+            pixmap.load(fullPath);
+        }
+        
+        if (!pixmap.isNull()) {
+            // Показываем изображение
+            ui->imageDisplayLabel->setPixmap(pixmap);
+            
+            // Информация о файле
+            QString sizeText = QString("%1 x %2 px").arg(pixmap.width()).arg(pixmap.height());
+            QString infoText = QString("<b>%1</b><br>%2: %3")
+                                    .arg(cleanFileName,
+                                         QStringLiteral("Размер изображения"),
+                                         sizeText);
+            ui->imageInfoLabel->setText(infoText);
+        } else {
+            ui->imageInfoLabel->setText(QStringLiteral("Не удалось загрузить изображение: %1<br>Путь: %2").arg(cleanFileName, fullPath));
+        }
+    } else {
+        // Для текстовых файлов - используем обычный diff
+        ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
+        
+        // Показать полное содержимое (будет заменено на side-by-side diff в applyDiffData)
+        ui->leftPanel->setContent(leftContent);
+        ui->rightPanel->setContent(rightContent);
+    }
 
     // Применить подсветку синтаксиса
     applySyntaxHighlighting(fileName);
@@ -77,8 +136,8 @@ void DiffEditor::setContents(const QString &leftContent,
 void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
 {
     if (hunks.isEmpty()) {
-        m_leftPanel->clearDiffData();
-        m_rightPanel->clearDiffData();
+        ui->leftPanel->clearDiffData();
+        ui->rightPanel->clearDiffData();
         return;
     }
 
@@ -110,8 +169,8 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         leftNums.append(sl.leftLineNum);
         rightNums.append(sl.rightLineNum);
     }
-    m_leftPanel->setLineNumbers(leftNums);
-    m_rightPanel->setLineNumbers(rightNums);
+    ui->leftPanel->setLineNumbers(leftNums);
+    ui->rightPanel->setLineNumbers(rightNums);
 
     // Вычислить intra-line diff для Modified строк
     auto leftMap = DiffHighlighter::buildLineDiffMapLeft(hunks);
@@ -158,21 +217,41 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         }
     }
 
-    m_leftPanel->setDiffData(leftDiffMap);
-    m_rightPanel->setDiffData(rightDiffMap);
-    m_leftPanel->setPlaceholderLines(leftPlaceholders);
-    m_rightPanel->setPlaceholderLines(rightPlaceholders);
+    ui->leftPanel->setDiffData(leftDiffMap);
+    ui->rightPanel->setDiffData(rightDiffMap);
+    ui->leftPanel->setPlaceholderLines(leftPlaceholders);
+    ui->rightPanel->setPlaceholderLines(rightPlaceholders);
 }
 
 void DiffEditor::applyFontSettings(const QString &fontFamily, int fontSize)
 {
     QFont font(fontFamily, fontSize);
-    m_leftPanel->setFont(font);
-    m_rightPanel->setFont(font);
+    ui->leftPanel->setFont(font);
+    ui->rightPanel->setFont(font);
 
     // Сброс зума на 100% чтобы избежать конфликта с новым размером шрифта
-    m_leftPanel->setZoom(100);
-    m_rightPanel->setZoom(100);
+    ui->leftPanel->setZoom(100);
+    ui->rightPanel->setZoom(100);
+}
+
+bool DiffEditor::isImageFile() const
+{
+    return m_isImageFile;
+}
+
+bool DiffEditor::isSyntaxFile() const
+{
+    return !m_isImageFile && !m_syntaxExtensions.isEmpty();
+}
+
+void DiffEditor::updateFileTypeSettings()
+{
+    QSettings settings("CommitCraft", "AppSettings");
+    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
+    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
+                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
+    m_imageExtensions = settings.value("imageExtensions", defaultImageExts).toStringList();
+    m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
 }
 
 QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
@@ -238,7 +317,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
             QVector<QString> addedContents;
             QVector<int> addedRightNums;
         };
-        
+
         ChangeGroup currentGroup;
         int leftIdx = hunkLeftStart - 1; // 0-based
         int rightIdx = hunkRightStart - 1; // 0-based
@@ -358,7 +437,7 @@ void DiffEditor::populatePanels(const QVector<SyncedLine> &syncedLines)
     QString leftText, rightText;
     for (int i = 0; i < syncedLines.size(); ++i) {
         const auto &sl = syncedLines[i];
-        
+
         if (sl.isSeparator) {
             // Текст-разделитель между чанками
             leftText += "...";
@@ -367,28 +446,32 @@ void DiffEditor::populatePanels(const QVector<SyncedLine> &syncedLines)
             leftText += sl.leftText;
             rightText += sl.rightText;
         }
-        
+
         if (i < syncedLines.size() - 1) {
             leftText += '\n';
             rightText += '\n';
         }
     }
 
-    m_leftPanel->setContent(leftText);
-    m_rightPanel->setContent(rightText);
+    ui->leftPanel->setContent(leftText);
+    ui->rightPanel->setContent(rightText);
 }
 
 void DiffEditor::clear()
 {
-    m_leftPanel->setPlainText("");
-    m_rightPanel->setPlainText("");
-    m_leftPanel->clearDiffData();
-    m_rightPanel->clearDiffData();
+    ui->leftPanel->setPlainText("");
+    ui->rightPanel->setPlainText("");
+    ui->leftPanel->clearDiffData();
+    ui->rightPanel->clearDiffData();
     m_hunkPositions.clear();
     m_currentHunkIndex = -1;
     m_leftFullContent.clear();
     m_rightFullContent.clear();
     m_fileName.clear();
+    
+    // Показать текстовый diff
+    ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
+    m_isImageFile = false;
 }
 
 bool DiffEditor::navigateToNextHunk()
@@ -445,18 +528,18 @@ void DiffEditor::scrollToHunk(int hunkIndex)
     int lineIndex = m_hunkPositions[hunkIndex];
 
     // Прокрутить к строке ханка
-    QTextBlock leftBlock = m_leftPanel->document()->findBlockByLineNumber(lineIndex);
+    QTextBlock leftBlock = ui->leftPanel->document()->findBlockByLineNumber(lineIndex);
     if (leftBlock.isValid()) {
         QTextCursor leftCursor(leftBlock);
-        m_leftPanel->setTextCursor(leftCursor);
-        m_leftPanel->ensureCursorVisible();
+        ui->leftPanel->setTextCursor(leftCursor);
+        ui->leftPanel->ensureCursorVisible();
     }
 
-    QTextBlock rightBlock = m_rightPanel->document()->findBlockByLineNumber(lineIndex);
+    QTextBlock rightBlock = ui->rightPanel->document()->findBlockByLineNumber(lineIndex);
     if (rightBlock.isValid()) {
         QTextCursor rightCursor(rightBlock);
-        m_rightPanel->setTextCursor(rightCursor);
-        m_rightPanel->ensureCursorVisible();
+        ui->rightPanel->setTextCursor(rightCursor);
+        ui->rightPanel->ensureCursorVisible();
     }
 }
 
@@ -464,9 +547,9 @@ void DiffEditor::synchronizeScrollLeftToRight(int value)
 {
     if (m_syncingScroll)
         return;
-    
+
     m_syncingScroll = true;
-    m_rightPanel->verticalScrollBar()->setValue(value);
+    ui->rightPanel->verticalScrollBar()->setValue(value);
     m_syncingScroll = false;
 }
 
@@ -474,24 +557,24 @@ void DiffEditor::synchronizeScrollRightToLeft(int value)
 {
     if (m_syncingScroll)
         return;
-    
+
     m_syncingScroll = true;
-    m_leftPanel->verticalScrollBar()->setValue(value);
+    ui->leftPanel->verticalScrollBar()->setValue(value);
     m_syncingScroll = false;
 }
 
 void DiffEditor::synchronizeZoom(int zoom)
 {
-    bool leftBlocked = m_leftPanel->blockSignals(true);
-    bool rightBlocked = m_rightPanel->blockSignals(true);
+    bool leftBlocked = ui->leftPanel->blockSignals(true);
+    bool rightBlocked = ui->rightPanel->blockSignals(true);
 
-    if (sender() == m_leftPanel)
-        m_rightPanel->setZoom(zoom);
-    else if (sender() == m_rightPanel)
-        m_leftPanel->setZoom(zoom);
+    if (sender() == ui->leftPanel)
+        ui->rightPanel->setZoom(zoom);
+    else if (sender() == ui->rightPanel)
+        ui->leftPanel->setZoom(zoom);
 
-    m_leftPanel->blockSignals(leftBlocked);
-    m_rightPanel->blockSignals(rightBlocked);
+    ui->leftPanel->blockSignals(leftBlocked);
+    ui->rightPanel->blockSignals(rightBlocked);
 }
 
 void DiffEditor::applySyntaxHighlighting(const QString &fileName)
@@ -500,16 +583,15 @@ void DiffEditor::applySyntaxHighlighting(const QString &fileName)
     QString ext = fi.suffix().toLower();
     
     bool useSyntax = m_syntaxExtensions.contains(ext);
-    m_leftPanel->setSyntaxHighlighting(useSyntax);
-    m_rightPanel->setSyntaxHighlighting(useSyntax);
+    ui->leftPanel->setSyntaxHighlighting(useSyntax);
+    ui->rightPanel->setSyntaxHighlighting(useSyntax);
 }
 
-void DiffEditor::updateFileTypeSettings()
+bool DiffEditor::checkFileType(const QString &fileName)
 {
-    QSettings settings("CommitCraft", "AppSettings");
-    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
-    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
-                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
-    m_imageExtensions = settings.value("imageExtensions", defaultImageExts).toStringList();
-    m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
+    QFileInfo fi(fileName);
+    QString ext = fi.suffix().toLower();
+    
+    m_isImageFile = m_imageExtensions.contains(ext);
+    return m_isImageFile;
 }

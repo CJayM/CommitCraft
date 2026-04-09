@@ -295,6 +295,14 @@ void MainWindow::openSettingsDialog()
     if (settingsDialog->exec() == QDialog::Accepted) {
         // Применяем новые настройки шрифта к DiffEditor
         diffEditor->applyFontSettings(settingsDialog->getFontFamily(), settingsDialog->getFontSize());
+        
+        // Обновляем настройки расширений файлов
+        diffEditor->updateFileTypeSettings();
+        
+        // Перезагружаем diff если открыт файл
+        if (!m_lastSelectedFileName.isEmpty()) {
+            updateDiffPanel(m_lastSelectedFileName);
+        }
     }
 }
 
@@ -744,7 +752,7 @@ void MainWindow::updateDiffPanel(const QString &fileName)
                                     .arg(fileNameOnly, filePath, versionText));
     ui->diffFileNameLabel->setTextFormat(Qt::RichText);
 
-    diffEditor->setContents(leftContent, rightContent, fileName);
+    diffEditor->setContents(leftContent, rightContent, fileName, repositoryPath);
 }
 
 void MainWindow::synchronizeZoom(int zoom)
