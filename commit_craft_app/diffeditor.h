@@ -58,6 +58,10 @@ public:
     /// Применить настройки шрифта к обеим панелям
     void applyFontSettings(const QString &fontFamily, int fontSize);
 
+
+    /// Обновить настройки расширений из QSettings
+    void updateFileTypeSettings();
+
 signals:
     void hunkNavigated(int hunkIndex);
 
@@ -100,6 +104,8 @@ private:
 
     DiffPanel *m_leftPanel;
     DiffPanel *m_rightPanel;
+    QStringList m_imageExtensions;  // Расширения графических файлов
+    QStringList m_syntaxExtensions; // Расширения для подсветки синтаксиса
 
     // Навигация по ханкам
     QVector<int> m_hunkPositions; // Индексы первых строк ханков в syncedLines

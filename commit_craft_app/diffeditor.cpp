@@ -25,6 +25,14 @@ DiffEditor::DiffEditor(QWidget *parent)
     m_layout->addWidget(m_splitter);
     setLayout(m_layout);
 
+    // Загрузить настройки расширений
+    QSettings settings("CommitCraft", "AppSettings");
+    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
+    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
+                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
+    m_imageExtensions = settings.value("imageExtensions", defaultImageExts).toStringList();
+    m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
+
     // Подключить синхронизацию скролла
     connect(m_leftPanel->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &DiffEditor::synchronizeScrollLeftToRight);
@@ -490,8 +498,18 @@ void DiffEditor::applySyntaxHighlighting(const QString &fileName)
 {
     QFileInfo fi(fileName);
     QString ext = fi.suffix().toLower();
-    Q_UNUSED(ext);
+    
+    bool useSyntax = m_syntaxExtensions.contains(ext);
+    m_leftPanel->setSyntaxHighlighting(useSyntax);
+    m_rightPanel->setSyntaxHighlighting(useSyntax);
+}
 
-    m_leftPanel->setSyntaxHighlighting(true);
-    m_rightPanel->setSyntaxHighlighting(true);
+void DiffEditor::updateFileTypeSettings()
+{
+    QSettings settings("CommitCraft", "AppSettings");
+    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
+    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
+                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
+    m_imageExtensions = settings.value("imageExtensions", defaultImageExts).toStringList();
+    m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
 }

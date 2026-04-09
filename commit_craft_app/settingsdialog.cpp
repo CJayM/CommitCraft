@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QFontDatabase>
+#include <QRegularExpression>
 
 SettingsDialog::SettingsDialog(QWidget *parent) :
     QDialog(parent),
@@ -61,6 +62,32 @@ void SettingsDialog::setFontSize(int fontSize)
     ui->fontSizeSpinBox->setValue(fontSize);
 }
 
+QStringList SettingsDialog::getImageExtensions() const
+{
+    QString text = ui->imageExtensionsTextEdit->toPlainText().trimmed();
+    if (text.isEmpty())
+        return QStringList();
+    return text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+}
+
+QStringList SettingsDialog::getSyntaxExtensions() const
+{
+    QString text = ui->syntaxExtensionsTextEdit->toPlainText().trimmed();
+    if (text.isEmpty())
+        return QStringList();
+    return text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+}
+
+void SettingsDialog::setImageExtensions(const QStringList &extensions)
+{
+    ui->imageExtensionsTextEdit->setPlainText(extensions.join(" "));
+}
+
+void SettingsDialog::setSyntaxExtensions(const QStringList &extensions)
+{
+    ui->syntaxExtensionsTextEdit->setPlainText(extensions.join(" "));
+}
+
 void SettingsDialog::onGitPathButtonClicked()
 {
     QString fileName = QFileDialog::getOpenFileName(this, tr("Выберите Git executable"),
@@ -83,6 +110,16 @@ void SettingsDialog::loadSettings()
     int fontSize = settings->value("fontSize", 10).toInt();
     setFontFamily(fontFamily);
     setFontSize(fontSize);
+
+    // File type settings (defaults)
+    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
+    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
+                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
+
+    QStringList imageExts = settings->value("imageExtensions", defaultImageExts).toStringList();
+    QStringList syntaxExts = settings->value("syntaxExtensions", defaultSyntaxExts).toStringList();
+    setImageExtensions(imageExts);
+    setSyntaxExtensions(syntaxExts);
 }
 
 void SettingsDialog::saveSettings()
@@ -93,4 +130,8 @@ void SettingsDialog::saveSettings()
     // Font settings
     settings->setValue("fontFamily", getFontFamily());
     settings->setValue("fontSize", getFontSize());
+
+    // File type settings
+    settings->setValue("imageExtensions", getImageExtensions());
+    settings->setValue("syntaxExtensions", getSyntaxExtensions());
 }
