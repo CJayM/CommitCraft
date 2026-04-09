@@ -144,46 +144,13 @@
             </item>
            </layout>
           </widget>
-          <widget class="QFrame" name="branchesWidget">
+          <widget class="BranchesWidget" name="branchesWidget" native="true">
            <property name="minimumSize">
             <size>
              <width>0</width>
              <height>100</height>
             </size>
            </property>
-           <property name="frameShape">
-            <enum>QFrame::Shape::Panel</enum>
-           </property>
-           <property name="frameShadow">
-            <enum>QFrame::Shadow::Raised</enum>
-           </property>
-           <layout class="QVBoxLayout" name="verticalLayout_5">
-            <property name="spacing">
-             <number>2</number>
-            </property>
-            <property name="leftMargin">
-             <number>0</number>
-            </property>
-            <property name="topMargin">
-             <number>0</number>
-            </property>
-            <property name="rightMargin">
-             <number>0</number>
-            </property>
-            <property name="bottomMargin">
-             <number>0</number>
-            </property>
-            <item>
-             <widget class="QLabel" name="branchesLabel">
-              <property name="text">
-               <string>Branches Panel</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignmentFlag::AlignCenter</set>
-              </property>
-             </widget>
-            </item>
-           </layout>
           </widget>
          </widget>
         </item>
@@ -709,6 +676,12 @@
   </action>
  </widget>
  <customwidgets>
+  <customwidget>
+   <class>BranchesWidget</class>
+   <extends>QWidget</extends>
+   <header>brancheswidget.h</header>
+   <container>1</container>
+  </customwidget>
   <customwidget>
    <class>DiffEditor</class>
    <extends>QWidget</extends>
