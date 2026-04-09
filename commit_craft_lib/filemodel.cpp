@@ -32,7 +32,6 @@ QVariant FileModel::data(const QModelIndex &index, int role) const
     QString relativeDir = QFileInfo(relativePath).path();
     // Если путь равен "." или пустой, значит файл в корне репозитория
     if (relativeDir == "." || relativeDir.isEmpty()) relativeDir = "";
-    else relativeDir += "/";
 
     switch (role) {
     case Qt::DisplayRole:
@@ -43,6 +42,12 @@ QVariant FileModel::data(const QModelIndex &index, int role) const
             return fileName;
         } else if (index.column() == 2) {
             return relativeDir;
+        }
+        break;
+    case Qt::ForegroundRole:
+        if (index.column() == 2) {
+            // Серый цвет для директории
+            return QColor(128, 128, 128);
         }
         break;
     case Qt::BackgroundRole:
