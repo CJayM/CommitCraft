@@ -577,10 +577,13 @@ void MainWindow::onStagedFileTableSelectionChanged()
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
     QString leftContent, rightContent;
+    QString leftVersion, rightVersion;
 
     if (m_lastSelectionSource == SelectionSource::Staged) {
         leftContent = getFileContent(fileName, false);   // HEAD
         rightContent = getFileContent(fileName, true);   // staged
+        leftVersion = "HEAD";
+        rightVersion = "Staged";
         git->getDiffStaged(fileName);
     } else {
         bool isStaged = false;
@@ -594,13 +597,21 @@ void MainWindow::updateDiffPanel(const QString &fileName)
         if (isStaged) {
             leftContent = getFileContent(fileName, true);    // staged
             rightContent = getFileContent(fileName, false);  // current
+            leftVersion = "Staged";
+            rightVersion = "Current";
             git->getDiffWorkingTree(fileName);
         } else {
             leftContent = getFileContent(fileName, true);    // HEAD
             rightContent = getFileContent(fileName, false);  // current
+            leftVersion = "HEAD";
+            rightVersion = "Current";
             git->getDiff(fileName);
         }
     }
+
+    // Обновляем информацию о файле и версиях
+    QString infoText = QString("%1\t%2 vs %3").arg(fileName, leftVersion, rightVersion);
+    ui->diffInfoLabel->setText(infoText);
 
     diffEditor->setContents(leftContent, rightContent, fileName);
 }
