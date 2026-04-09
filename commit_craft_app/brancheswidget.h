@@ -50,8 +50,8 @@ private:
     /// Контекстное меню
     void contextMenuEvent(QContextMenuEvent *event) override;
     
-    /// Возвращает элемент ветки под курсором, если есть
-    QTreeWidgetItem* getBranchItemUnderCursor(const QPoint &pos) const;
+    /// Возвращает элемент ветки под курсором, если есть (принимает глобальные координаты)
+    QTreeWidgetItem* getBranchItemUnderCursor(const QPoint &globalPos) const;
     
     // Context menu slots
     void onCheckoutAction();

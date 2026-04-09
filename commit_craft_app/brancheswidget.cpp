@@ -346,7 +346,8 @@ void BranchesWidget::onTreeItemDoubleClicked(QTreeWidgetItem *item, int column)
 
 void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
 {
-    QTreeWidgetItem *item = getBranchItemUnderCursor(event->pos());
+    // Передаем глобальные координаты для корректного преобразования
+    QTreeWidgetItem *item = getBranchItemUnderCursor(event->globalPos());
     m_contextMenuItem = item;
 
     if (!item) return;
@@ -422,10 +423,19 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
     m_contextMenu->exec(event->globalPos());
 }
 
-QTreeWidgetItem* BranchesWidget::getBranchItemUnderCursor(const QPoint &pos) const
+QTreeWidgetItem* BranchesWidget::getBranchItemUnderCursor(const QPoint &globalPos) const
 {
-    QTreeWidgetItem *item = m_treeWidget->itemAt(pos);
+    // Преобразуем глобальные координаты в локальные координаты дерева
+    QPoint localPos = m_treeWidget->viewport()->mapFromGlobal(globalPos);
+    
+    // Проверяем, находится ли точка внутри области дерева
+    if (!m_treeWidget->viewport()->rect().contains(localPos)) {
+        return nullptr;
+    }
+
+    QTreeWidgetItem *item = m_treeWidget->itemAt(localPos);
     if (!item) return nullptr;
+    
     QString type = item->data(0, Qt::UserRole).toString();
     if (type == "branch" || type == "remote" || type == "stash") return item;
     return nullptr;
