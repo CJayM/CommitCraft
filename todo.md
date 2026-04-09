@@ -5,6 +5,8 @@
 - [x] Разделить колонки на Name и Relative Directory
 - [x] Обновлять панели после изменений файлов на диске или после выполнения git-действий
 - [x] В контекстном меню для модифицированных файлов отображать название пункта "добавить" как "Фиксировать", а для недобавленных как "Добавить"
+- [ ] Название директории сделать серым и без слеща в конце
+- [ ] Добавить панель с директориями (как фильтр)
 - [x] Добавить в контекстное меню пункты:
   - [x] Copy file path
   - [x] Open file
@@ -19,6 +21,54 @@
 - [ ] Для графических файлов отображать текущую картинку
 - [ ] Позволять делать stage и revert для отдельных строк кода
 - [x] Поправить нумерацию строк
+- [ ] Разделить название файла и путь к директории
+- [ ] Index Editor
+  - [ ] 
+
+
+
+## Repositories
+
+- [ ] Группы репозитариев
+- [ ] Favorite
+
+
+
+## Menu
+
+- [ ] Добавить в главное меню:
+
+  - [ ] File
+
+  - [ ] Edit
+
+    - [ ] gitignore
+
+  - [ ] View
+
+    - [ ] Repositories
+    - [ ] Journal
+    - [ ] Log
+    - [ ] Branches
+    - [ ] Commit message
+    - [ ] Diff
+    - [ ] Changes
+    - [ ] Directory
+
+  - [ ] Local
+
+    - [ ] Create Branch
+
+  - [ ] Remote
+
+    - [ ] Add remote
+
+  - [ ] Help
+
+    - [ ] Reference
+    - [ ] About
+
+    
 
 
 
@@ -30,6 +80,8 @@
 - [ ] Esc - убрать выделение файла (очистить DiffEditor)
 - [ ] F6 - следующее изменение
 - [ ] shift+F6 - предыдущее изменение
+- [ ] Push
+- [ ] Pull
 
 
 
@@ -50,3 +102,17 @@
 - [x] Добавлять remote
 - [ ] Добавлять Tags
 - [x] Добавлять Stashes
+- [ ] Создание Merge
+
+
+
+## Из дополнительного
+
+- [ ] The **Reflog** view shows the chronological history of `HEAD` to help you access “lost” commits.
+- [ ] **Submodules**
+- [ ] GraphView
+- [ ] Blame
+- [ ] Bisect
+- [ ] Conflict solver
+- [ ] Save Patch
+- [ ] Apply Patch
