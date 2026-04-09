@@ -64,6 +64,9 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
+    
+    /// Обновляет состояние кнопок навигации (Prev/Next Hunk)
+    void updateNavigationButtonsState();
 
 private:
     void saveSplitterState();
@@ -97,6 +100,10 @@ private:
     QTimer *m_fsDebounceTimer;
     void setupFileSystemWatcher();
     void onFileSystemChanged();
+
+    // Отложенная навигация для асинхронной загрузки
+    enum class PendingNavigation { None, GoNext, GoPrev };
+    PendingNavigation m_pendingNavigation = PendingNavigation::None;
     
     // Дополнительные действия контекстного меню
     void copyFilePath(const QString &fileName);

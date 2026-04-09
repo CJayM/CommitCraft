@@ -91,6 +91,18 @@ MainWindow::MainWindow(QWidget *parent)
         GitParser parser;
         QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
         diffEditor->applyDiffData(hunks);
+
+        // Обработка отложенной навигации
+        if (m_pendingNavigation == PendingNavigation::GoNext) {
+            diffEditor->navigateToFirstHunk();
+            m_pendingNavigation = PendingNavigation::None;
+        } else if (m_pendingNavigation == PendingNavigation::GoPrev) {
+            diffEditor->navigateToLastHunk();
+            m_pendingNavigation = PendingNavigation::None;
+        }
+        
+        // Обновляем состояние кнопок навигации
+        updateNavigationButtonsState();
     });
 
     // Connect hunk navigation buttons to DiffEditor
@@ -543,6 +555,9 @@ void MainWindow::onFileTableSelectionChanged()
             updateDiffPanel(fileName);
         }
     }
+    
+    // Обновляем состояние кнопок при смене файла
+    updateNavigationButtonsState();
 }
 
 void MainWindow::onStagedFileTableSelectionChanged()
@@ -661,11 +676,17 @@ void MainWindow::navigateToNextHunk()
         QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
         QModelIndex next = current.sibling(current.row() + 1, 0);
         if (next.isValid()) {
-            // Выбираем следующий файл
+            // Устанавливаем флаг отложенной навигации
+            m_pendingNavigation = PendingNavigation::GoNext;
+            
+            // Выбираем следующий файл (это вызовет асинхронную загрузку diff)
             ui->filesTable->selectionModel()->select(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
             ui->filesTable->scrollTo(next);
         }
     }
+    
+    // Обновляем состояние кнопок
+    updateNavigationButtonsState();
 }
 
 void MainWindow::toggleLeftPanel(bool visible)
@@ -716,11 +737,17 @@ void MainWindow::navigateToPrevHunk()
         QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
         QModelIndex prev = current.sibling(current.row() - 1, 0);
         if (prev.isValid()) {
-            // Выбираем предыдущий файл
+            // Устанавливаем флаг отложенной навигации
+            m_pendingNavigation = PendingNavigation::GoPrev;
+            
+            // Выбираем предыдущий файл (это вызовет асинхронную загрузку diff)
             ui->filesTable->selectionModel()->select(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
             ui->filesTable->scrollTo(prev);
         }
     }
+    
+    // Обновляем состояние кнопок
+    updateNavigationButtonsState();
 }
 
 void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)
@@ -888,4 +915,37 @@ void MainWindow::runGitCommand(const QString &command, const QStringList &args, 
     }
     
     m_fsWatcher->blockSignals(false);
+}
+
+void MainWindow::updateNavigationButtonsState()
+{
+    bool hasNext = false;
+    bool hasPrev = false;
+
+    // Получаем информацию о текущем файле
+    QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
+    int totalFiles = ui->filesTable->model()->rowCount();
+
+    if (totalFiles > 0 && current.isValid()) {
+        bool isFirstFile = (current.row() == 0);
+        bool isLastFile = (current.row() == totalFiles - 1);
+
+        // Проверяем состояние ханков
+        bool isHunkEmpty = (diffEditor->hunkCount() == 0);
+        bool atHunkStart = diffEditor->isAtFirstHunk();
+        bool atHunkEnd = diffEditor->isAtLastHunk();
+
+        // Логика для кнопки Next:
+        // Можно идти дальше, если мы не в конце списка ханков текущего файла
+        // ИЛИ если мы в конце ханков, но есть еще файлы в списке
+        hasNext = (!atHunkEnd && !isHunkEmpty) || !isLastFile;
+
+        // Логика для кнопки Prev:
+        // Можно идти назад, если мы не в начале списка ханков
+        // ИЛИ если мы в начале ханков, но есть предыдущие файлы
+        hasPrev = (!atHunkStart && !isHunkEmpty) || !isFirstFile;
+    }
+
+    ui->actionPrevHunk->setEnabled(hasPrev);
+    ui->actionNextHunk->setEnabled(hasNext);
 }
