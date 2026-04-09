@@ -110,6 +110,18 @@ Git::Git(QObject *parent)
 void Git::setRepositoryPath(const QString &path)
 {
     m_repositoryPath = path;
+    
+    // Настраиваем Git на использование UTF-8 и отключение quotePath
+    QProcess configProcess;
+    configProcess.setProgram(gitPath());
+    configProcess.setArguments(QStringList() << "config" << "core.quotePath" << "false");
+    configProcess.setWorkingDirectory(m_repositoryPath);
+    configProcess.start();
+    configProcess.waitForFinished(2000);
+    
+    configProcess.setArguments(QStringList() << "config" << "i18n.commitencoding" << "utf-8");
+    configProcess.start();
+    configProcess.waitForFinished(2000);
 }
 
 QString Git::repositoryPath() const
