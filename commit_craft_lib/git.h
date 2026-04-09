@@ -45,6 +45,11 @@ public:
     void createBranch(const QString &name, const QString &fromRef = "");
     void deleteBranch(const QString &branch, bool force = false);
     void renameBranch(const QString &oldName, const QString &newName);
+
+    // Remote operations
+    void fetchRemote(const QString &remote);
+    void pruneRemote(const QString &remote);
+    void getRemoteUrl(const QString &remote);
     
 signals:
     // Git operation results
@@ -62,6 +67,11 @@ signals:
     void branchCreated(bool success, const QString &message);
     void branchDeleted(bool success, const QString &message);
     void branchRenamed(bool success, const QString &message);
+
+    // Remote signals
+    void fetchReady(bool success, const QString &message);
+    void pruneReady(bool success, const QString &message);
+    void remoteUrlReady(const QString &remote, const QString &url);
 
     // Branch operation results
     void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
@@ -94,6 +104,11 @@ private slots:
     void onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
+    // Remote slots
+    void onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onPruneFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRemoteUrlFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    
 private:
     QString m_repositoryPath;
     QString m_gitPath;
@@ -118,6 +133,7 @@ private:
     // Process for branch modification
     QProcess *m_checkoutProcess;
     QProcess *m_branchModifyProcess; // Для create/delete/rename
+    QProcess *m_remoteProcess;       // Для fetch/prune/url
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;

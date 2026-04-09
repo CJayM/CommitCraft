@@ -57,6 +57,8 @@ private:
     void onCreateBranchAction();
     void onDeleteBranchAction();
     void onRenameBranchAction();
+    void onFetchAction();
+    void onPruneAction();
 
     QVBoxLayout *m_layout;
     QTreeWidget *m_treeWidget;
@@ -79,6 +81,10 @@ private:
     QAction *m_createBranchAction;
     QAction *m_deleteBranchAction;
     QAction *m_renameBranchAction;
+    QAction *m_fetchAction;
+    QAction *m_pruneAction;
+    
+    QString m_contextRemoteName; // Для операций с remote
 };
 
 #endif // BRANCHESWIDGET_H

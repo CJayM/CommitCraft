@@ -16,6 +16,7 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     , m_git(nullptr)
     , m_contextMenuItem(nullptr)
     , m_lastFailedDeleteBranch("")
+    , m_contextRemoteName("")
 {
     m_layout = new QVBoxLayout(this);
     m_layout->setContentsMargins(0, 0, 0, 0);
@@ -36,11 +37,16 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     m_renameBranchAction = m_contextMenu->addAction(tr("Rename"));
     m_contextMenu->addSeparator();
     m_deleteBranchAction = m_contextMenu->addAction(tr("Delete"));
+    m_contextMenu->addSeparator();
+    m_fetchAction = m_contextMenu->addAction(tr("Fetch"));
+    m_pruneAction = m_contextMenu->addAction(tr("Prune"));
     
     connect(m_checkoutAction, &QAction::triggered, this, &BranchesWidget::onCheckoutAction);
     connect(m_createBranchAction, &QAction::triggered, this, &BranchesWidget::onCreateBranchAction);
     connect(m_renameBranchAction, &QAction::triggered, this, &BranchesWidget::onRenameBranchAction);
     connect(m_deleteBranchAction, &QAction::triggered, this, &BranchesWidget::onDeleteBranchAction);
+    connect(m_fetchAction, &QAction::triggered, this, &BranchesWidget::onFetchAction);
+    connect(m_pruneAction, &QAction::triggered, this, &BranchesWidget::onPruneAction);
 
     setupTree();
     m_layout->addWidget(m_treeWidget);
@@ -90,6 +96,23 @@ void BranchesWidget::setGit(Git *git)
         connect(m_git, &Git::branchRenamed, this, [this](bool success, const QString &message) {
             if (success) {
                 refresh(); // Обновляем дерево
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
+        
+        // Remote signals
+        connect(m_git, &Git::fetchReady, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh();
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
+        
+        connect(m_git, &Git::pruneReady, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh();
             } else {
                 QMessageBox::warning(this, tr("Error"), message);
             }
@@ -296,11 +319,31 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         
         m_deleteBranchAction->setVisible(!isCurrentBranch);
         m_deleteBranchAction->setEnabled(!isCurrentBranch);
-    } else {
+        
+        m_fetchAction->setVisible(false);
+        m_pruneAction->setVisible(false);
+    } else if (type == "remote") {
+        // Для Remote показываем только Fetch/Prune
         m_checkoutAction->setVisible(false);
         m_createBranchAction->setVisible(false);
         m_renameBranchAction->setVisible(false);
         m_deleteBranchAction->setVisible(false);
+        
+        m_fetchAction->setVisible(true);
+        m_pruneAction->setVisible(true);
+        
+        // Сохраняем имя remote
+        m_contextRemoteName = item->text(0);
+        int bracketPos = m_contextRemoteName.indexOf(" (");
+        if (bracketPos != -1) m_contextRemoteName = m_contextRemoteName.left(bracketPos);
+    } else {
+        // Для остальных скрываем всё
+        m_checkoutAction->setVisible(false);
+        m_createBranchAction->setVisible(false);
+        m_renameBranchAction->setVisible(false);
+        m_deleteBranchAction->setVisible(false);
+        m_fetchAction->setVisible(false);
+        m_pruneAction->setVisible(false);
         return;
     }
 
@@ -312,7 +355,7 @@ QTreeWidgetItem* BranchesWidget::getBranchItemUnderCursor(const QPoint &pos) con
     QTreeWidgetItem *item = m_treeWidget->itemAt(pos);
     if (!item) return nullptr;
     QString type = item->data(0, Qt::UserRole).toString();
-    if (type == "branch") return item;
+    if (type == "branch" || type == "remote") return item;
     return nullptr;
 }
 
@@ -372,4 +415,16 @@ void BranchesWidget::onDeleteBranchAction()
         m_lastFailedDeleteBranch = branchName;
         m_git->deleteBranch(branchName, false);
     }
+}
+
+void BranchesWidget::onFetchAction()
+{
+    if (!m_git || m_contextRemoteName.isEmpty()) return;
+    m_git->fetchRemote(m_contextRemoteName);
+}
+
+void BranchesWidget::onPruneAction()
+{
+    if (!m_git || m_contextRemoteName.isEmpty()) return;
+    m_git->pruneRemote(m_contextRemoteName);
 }

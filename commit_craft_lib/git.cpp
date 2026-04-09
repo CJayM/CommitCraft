@@ -22,6 +22,7 @@ Git::Git(QObject *parent)
     , m_stashesProcess(new QProcess(this))
     , m_checkoutProcess(new QProcess(this))
     , m_branchModifyProcess(new QProcess(this))
+    , m_remoteProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -86,6 +87,11 @@ Git::Git(QObject *parent)
     connect(m_branchModifyProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCreateBranchFinished); // Универсальный слот для всех операций модификации
     connect(m_branchModifyProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Remote operations
+    connect(m_remoteProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onFetchFinished); // По умолчанию fetch, будем проверять property
+    connect(m_remoteProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -664,4 +670,91 @@ void Git::onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
+}
+
+// ==========================================
+// Remote Operations Implementation
+// ==========================================
+
+void Git::fetchRemote(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "fetch" << remote;
+    
+    m_remoteProcess->setProperty("operation", "fetch");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::pruneRemote(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "prune" << remote;
+    
+    m_remoteProcess->setProperty("operation", "prune");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::getRemoteUrl(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "get-url" << remote;
+    
+    m_remoteProcess->setProperty("operation", "url");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_remoteProcess->property("operation").toString();
+    QString remote = m_remoteProcess->property("remoteName").toString();
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        if (operation == "fetch") {
+            emit fetchReady(true, QString("Fetch from %1 successful").arg(remote));
+        } else if (operation == "prune") {
+            emit pruneReady(true, QString("Prune %1 successful").arg(remote));
+        } else if (operation == "url") {
+            QString url = m_remoteProcess->readAllStandardOutput().trimmed();
+            emit remoteUrlReady(remote, url);
+        }
+    } else {
+        QString errorMsg = m_remoteProcess->readAllStandardError();
+        if (operation == "fetch") {
+            emit fetchReady(false, QString("Fetch failed: %1").arg(errorMsg));
+            emit error(QString("Fetch failed: %1").arg(errorMsg));
+        } else if (operation == "prune") {
+            emit pruneReady(false, QString("Prune failed: %1").arg(errorMsg));
+            emit error(QString("Prune failed: %1").arg(errorMsg));
+        } else if (operation == "url") {
+            emit remoteUrlReady(remote, "");
+        }
+    }
+}
+
+void Git::onPruneFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onFetchFinished(exitCode, exitStatus);
+}
+
+void Git::onRemoteUrlFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onFetchFinished(exitCode, exitStatus);
 }
