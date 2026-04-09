@@ -176,6 +176,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect panel toggle actions
     connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
+    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::showAboutDialog);
     
     // Connect amend checkbox
     connect(ui->amend_chk, &QCheckBox::stateChanged, this, &MainWindow::onAmendCheckBoxChanged);
@@ -242,8 +243,8 @@ MainWindow::MainWindow(QWidget *parent)
         ui->commitButton->setEnabled(ui->actionCommit->isEnabled());
     });
     
-    // Set window title to show current repository
-    setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
+    // Set window title to show current repository and version
+    setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
     
     // Load initial git status and commit history
     refreshGitStatus();
@@ -376,7 +377,7 @@ void MainWindow::openRepository()
             repositoryPath = dir;
             // Save the repository path to settings
             settings->setValue("repositoryPath", repositoryPath);
-            setWindowTitle(QString("Commit Craft - %1").arg(repositoryPath));
+            setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
             
             // Обновляем watcher для нового репозитория
             m_fsWatcher->removePaths(m_fsWatcher->directories());
@@ -1076,4 +1077,16 @@ void MainWindow::updateNavigationButtonsState()
 
     ui->actionPrevHunk->setEnabled(hasPrev);
     ui->actionNextHunk->setEnabled(hasNext);
+}
+
+void MainWindow::showAboutDialog()
+{
+    QString appVersion = QCoreApplication::applicationVersion();
+    QString aboutText = tr("<h2>Commit Craft</h2>"
+                           "<p>Версия: %1</p>"
+                           "<p>Десктопное приложение для удобной работы с Git.</p>"
+                           "<p>Позволяет просматривать изменения, управлять staged/unstaged файлами,"
+                           " навигировать по ханкам diff и создавать коммиты.</p>").arg(appVersion);
+    
+    QMessageBox::about(this, tr("О программе Commit Craft"), aboutText);
 }

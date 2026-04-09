@@ -68,7 +68,8 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
-    
+    void showAboutDialog();
+
     /// Обновляет состояние кнопок навигации (Prev/Next Hunk)
     void updateNavigationButtonsState();
 
