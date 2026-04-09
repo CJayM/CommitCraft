@@ -1,9 +1,10 @@
 #ifndef BRANCHESWIDGET_H
 #define BRANCHESWIDGET_H
 
+#include <QAction>
 #include <QFrame>
 #include <QMenu>
-#include <QAction>
+#include <QToolButton>
 
 class QTreeWidget;
 class QTreeWidgetItem;
@@ -65,6 +66,7 @@ private:
     void onShowStashAction();
 
     QVBoxLayout *m_layout;
+    QToolButton *m_refreshButton; // Кнопка обновления
     QTreeWidget *m_treeWidget;
     Git *m_git;
     

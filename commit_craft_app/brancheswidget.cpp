@@ -1,15 +1,16 @@
 #include "brancheswidget.h"
-#include "git.h"
+#include <QAction>
+#include <QContextMenuEvent>
+#include <QFont>
+#include <QInputDialog>
+#include <QLabel>
+#include <QLineEdit>
+#include <QMenu>
+#include <QMessageBox>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
-#include <QFont>
-#include <QMenu>
-#include <QAction>
-#include <QContextMenuEvent>
-#include <QInputDialog>
-#include <QMessageBox>
-#include <QLineEdit>
+#include "git.h"
 
 BranchesWidget::BranchesWidget(QWidget *parent)
     : QFrame(parent)
@@ -19,8 +20,31 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     , m_contextRemoteName("")
 {
     m_layout = new QVBoxLayout(this);
-    m_layout->setContentsMargins(0, 0, 0, 0);
-    m_layout->setSpacing(0);
+    m_layout->setContentsMargins(2, 2, 2, 2);
+    m_layout->setSpacing(2);
+
+    // Верхняя панель с заголовком и кнопкой Refresh                                                                                                                                                │
+    QWidget *topBar = new QWidget(this);
+    QHBoxLayout *topLayout = new QHBoxLayout(topBar);
+    topLayout->setContentsMargins(0, 0, 0, 0);
+    topLayout->setSpacing(4);
+
+    QLabel *titleLabel = new QLabel(tr("Branches"), this);
+    QFont font = titleLabel->font();
+    font.setBold(true);
+    titleLabel->setFont(font);
+    topLayout->addWidget(titleLabel);
+
+    topLayout->addStretch();
+
+    m_refreshButton = new QToolButton(this);
+    m_refreshButton->setText("⟳");
+    m_refreshButton->setToolTip(tr("Refresh branches"));
+    m_refreshButton->setCursor(Qt::PointingHandCursor);
+    connect(m_refreshButton, &QToolButton::clicked, this, &BranchesWidget::refresh);
+    topLayout->addWidget(m_refreshButton);
+
+    m_layout->addWidget(topBar);
 
     m_treeWidget = new QTreeWidget(this);
     m_treeWidget->setHeaderHidden(true);
