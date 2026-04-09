@@ -30,7 +30,9 @@ public:
     void getCommitHistory();
     void getFileContent(const QString &fileName, bool staged);
     void addFile(const QString &fileName);
+    void addFiles(const QStringList &fileNames);
     void unstageFile(const QString &fileName);
+    void unstageFiles(const QStringList &fileNames);
     void commit(const QString &message, bool amend = false);
 
     // Branch operations

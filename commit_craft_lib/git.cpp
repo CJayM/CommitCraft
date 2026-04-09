@@ -213,10 +213,44 @@ void Git::addFile(const QString &fileName)
     m_addFileProcess->start();
 }
 
+void Git::addFiles(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty()) return;
+    
+    QStringList absoluteFilePaths;
+    for (const QString &file : fileNames) {
+        absoluteFilePaths << QDir(m_repositoryPath).absoluteFilePath(file);
+    }
+    
+    QStringList args;
+    args << "add" << "--";
+    args.append(absoluteFilePaths);
+    
+    setupProcess(m_addFileProcess, args);
+    m_addFileProcess->start();
+}
+
 void Git::unstageFile(const QString &fileName)
 {
     QString absoluteFilePath = QDir(m_repositoryPath).absoluteFilePath(fileName);
-    setupProcess(m_unstageFileProcess, QStringList() << "reset" << "HEAD" << absoluteFilePath);
+    setupProcess(m_unstageFileProcess, QStringList() << "reset" << "HEAD" << "--" << absoluteFilePath);
+    m_unstageFileProcess->start();
+}
+
+void Git::unstageFiles(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty()) return;
+
+    QStringList absoluteFilePaths;
+    for (const QString &file : fileNames) {
+        absoluteFilePaths << QDir(m_repositoryPath).absoluteFilePath(file);
+    }
+
+    QStringList args;
+    args << "reset" << "HEAD" << "--";
+    args.append(absoluteFilePaths);
+
+    setupProcess(m_unstageFileProcess, args);
     m_unstageFileProcess->start();
 }
 
