@@ -729,8 +729,20 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     }
 
     // Обновляем информацию о файле и версиях
-    QString infoText = QString("%1\t%2 vs %3").arg(fileName, leftVersion, rightVersion);
-    ui->diffInfoLabel->setText(infoText);
+    QFileInfo fileInfo(fileName);
+    QString fileNameOnly = fileInfo.fileName();
+    QString filePath = fileInfo.path();
+    
+    // Убираем "./" в начале пути и делаем его серым
+    if (filePath.startsWith("./")) {
+        filePath = filePath.mid(2);
+    }
+    
+    QString versionText = QString("%1 vs %2").arg(leftVersion, rightVersion);
+    
+    ui->diffFileNameLabel->setText(QString("<b>%1</b>  <span style='color: gray;'>%2</span>  <span style='color: gray;'>— %3</span>")
+                                    .arg(fileNameOnly, filePath, versionText));
+    ui->diffFileNameLabel->setTextFormat(Qt::RichText);
 
     diffEditor->setContents(leftContent, rightContent, fileName);
 }
