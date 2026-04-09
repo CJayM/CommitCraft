@@ -42,6 +42,9 @@ public:
     
     // Branch modification
     void checkoutBranch(const QString &branch, bool stashBeforeCheckout = false);
+    void createBranch(const QString &name, const QString &fromRef = "");
+    void deleteBranch(const QString &branch, bool force = false);
+    void renameBranch(const QString &oldName, const QString &newName);
     
 signals:
     // Git operation results
@@ -56,6 +59,9 @@ signals:
 
     // Branch modification results
     void checkoutReady(bool success, const QString &message);
+    void branchCreated(bool success, const QString &message);
+    void branchDeleted(bool success, const QString &message);
+    void branchRenamed(bool success, const QString &message);
 
     // Branch operation results
     void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
@@ -84,6 +90,9 @@ private slots:
 
     // Branch modification slots
     void onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onCreateBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
 private:
     QString m_repositoryPath;
@@ -108,6 +117,7 @@ private:
 
     // Process for branch modification
     QProcess *m_checkoutProcess;
+    QProcess *m_branchModifyProcess; // Для create/delete/rename
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;

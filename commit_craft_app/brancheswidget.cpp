@@ -55,6 +55,31 @@ void BranchesWidget::setGit(Git *git)
         connect(m_git, &Git::remoteBranchesReady, this, &BranchesWidget::populateRemoteBranches);
         connect(m_git, &Git::tagsReady, this, &BranchesWidget::populateTags);
         connect(m_git, &Git::stashesReady, this, &BranchesWidget::populateStashes);
+        
+        // Подключаем сигналы завершения операций модификации веток
+        connect(m_git, &Git::branchCreated, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh(); // Обновляем дерево
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
+        
+        connect(m_git, &Git::branchDeleted, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh(); // Обновляем дерево
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
+        
+        connect(m_git, &Git::branchRenamed, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh(); // Обновляем дерево
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
     }
 }
 
@@ -289,7 +314,7 @@ void BranchesWidget::onCheckoutAction()
 
 void BranchesWidget::onCreateBranchAction()
 {
-    if (!m_contextMenuItem) return;
+    if (!m_contextMenuItem || !m_git) return;
     QString baseBranch = m_contextMenuItem->text(0);
     if (baseBranch.startsWith("● ")) baseBranch = baseBranch.mid(2);
 
@@ -298,13 +323,13 @@ void BranchesWidget::onCreateBranchAction()
                                                   tr("New branch name (from \"%1\"):").arg(baseBranch),
                                                   QLineEdit::Normal, "", &ok);
     if (ok && !newBranchName.isEmpty()) {
-        QMessageBox::information(this, tr("Info"), tr("Create branch functionality not implemented yet."));
+        m_git->createBranch(newBranchName, baseBranch);
     }
 }
 
 void BranchesWidget::onRenameBranchAction()
 {
-    if (!m_contextMenuItem) return;
+    if (!m_contextMenuItem || !m_git) return;
     QString oldName = m_contextMenuItem->text(0);
     if (oldName.startsWith("● ")) oldName = oldName.mid(2);
 
@@ -313,13 +338,13 @@ void BranchesWidget::onRenameBranchAction()
                                             tr("New name for \"%1\":").arg(oldName),
                                             QLineEdit::Normal, oldName, &ok);
     if (ok && !newName.isEmpty() && newName != oldName) {
-        QMessageBox::information(this, tr("Info"), tr("Rename branch functionality not implemented yet."));
+        m_git->renameBranch(oldName, newName);
     }
 }
 
 void BranchesWidget::onDeleteBranchAction()
 {
-    if (!m_contextMenuItem) return;
+    if (!m_contextMenuItem || !m_git) return;
     QString branchName = m_contextMenuItem->text(0);
     if (branchName.startsWith("● ")) branchName = branchName.mid(2);
 
@@ -330,6 +355,6 @@ void BranchesWidget::onDeleteBranchAction()
     );
 
     if (reply == QMessageBox::Yes) {
-        QMessageBox::information(this, tr("Info"), tr("Delete branch functionality not implemented yet."));
+        m_git->deleteBranch(branchName, false); // force = false by default
     }
 }

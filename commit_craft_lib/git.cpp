@@ -21,6 +21,7 @@ Git::Git(QObject *parent)
     , m_tagsProcess(new QProcess(this))
     , m_stashesProcess(new QProcess(this))
     , m_checkoutProcess(new QProcess(this))
+    , m_branchModifyProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -81,6 +82,10 @@ Git::Git(QObject *parent)
     connect(m_checkoutProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCheckoutFinished);
     connect(m_checkoutProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_branchModifyProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCreateBranchFinished); // Универсальный слот для всех операций модификации
+    connect(m_branchModifyProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -575,4 +580,88 @@ void Git::onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus)
             emit error(QString("Failed to checkout branch: %1").arg(errorMsg));
         }
     }
+}
+
+void Git::createBranch(const QString &name, const QString &fromRef)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << name;
+    if (!fromRef.isEmpty()) {
+        args << fromRef;
+    }
+    
+    m_branchModifyProcess->setProperty("operation", "create");
+    m_branchModifyProcess->start(getGitExecutable(), args);
+}
+
+void Git::deleteBranch(const QString &branch, bool force)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << (force ? "-D" : "-d") << branch;
+    
+    m_branchModifyProcess->setProperty("operation", "delete");
+    m_branchModifyProcess->start(getGitExecutable(), args);
+}
+
+void Git::renameBranch(const QString &oldName, const QString &newName)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << "-m" << oldName << newName;
+    
+    m_branchModifyProcess->setProperty("operation", "rename");
+    m_branchModifyProcess->start(getGitExecutable(), args);
+}
+
+void Git::onCreateBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_branchModifyProcess->property("operation").toString();
+    
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        if (operation == "create") {
+            emit branchCreated(true, "Branch created successfully");
+        } else if (operation == "delete") {
+            emit branchDeleted(true, "Branch deleted successfully");
+        } else if (operation == "rename") {
+            emit branchRenamed(true, "Branch renamed successfully");
+        }
+    } else {
+        QString errorMsg = m_branchModifyProcess->readAllStandardError();
+        if (operation == "create") {
+            emit branchCreated(false, QString("Failed to create branch: %1").arg(errorMsg));
+            emit error(QString("Failed to create branch: %1").arg(errorMsg));
+        } else if (operation == "delete") {
+            emit branchDeleted(false, QString("Failed to delete branch: %1").arg(errorMsg));
+            emit error(QString("Failed to delete branch: %1").arg(errorMsg));
+        } else if (operation == "rename") {
+            emit branchRenamed(false, QString("Failed to rename branch: %1").arg(errorMsg));
+            emit error(QString("Failed to rename branch: %1").arg(errorMsg));
+        }
+    }
+}
+
+// Заглушки для остальных слотов, чтобы компилятор не ругался
+// В реальной реализации нужно разделить слоты или использовать один слот с проверкой property
+void Git::onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
+}
+
+void Git::onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
 }
