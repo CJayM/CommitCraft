@@ -59,6 +59,10 @@ private:
     void onRenameBranchAction();
     void onFetchAction();
     void onPruneAction();
+    void onApplyStashAction();
+    void onPopStashAction();
+    void onDropStashAction();
+    void onShowStashAction();
 
     QVBoxLayout *m_layout;
     QTreeWidget *m_treeWidget;
@@ -83,8 +87,13 @@ private:
     QAction *m_renameBranchAction;
     QAction *m_fetchAction;
     QAction *m_pruneAction;
+    QAction *m_applyStashAction;
+    QAction *m_popStashAction;
+    QAction *m_dropStashAction;
+    QAction *m_showStashAction;
     
     QString m_contextRemoteName; // Для операций с remote
+    QString m_contextStashRef;   // Для операций со stash
 };
 
 #endif // BRANCHESWIDGET_H

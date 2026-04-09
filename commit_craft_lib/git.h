@@ -50,6 +50,12 @@ public:
     void fetchRemote(const QString &remote);
     void pruneRemote(const QString &remote);
     void getRemoteUrl(const QString &remote);
+
+    // Stash operations
+    void createStash(const QStringList &files, const QString &message);
+    void applyStash(const QString &stashRef, bool drop = false);
+    void dropStash(const QString &stashRef);
+    void showStash(const QString &stashRef);
     
 signals:
     // Git operation results
@@ -72,6 +78,12 @@ signals:
     void fetchReady(bool success, const QString &message);
     void pruneReady(bool success, const QString &message);
     void remoteUrlReady(const QString &remote, const QString &url);
+
+    // Stash signals
+    void stashCreated(bool success, const QString &message);
+    void stashApplied(bool success, const QString &message);
+    void stashDropped(bool success, const QString &message);
+    void stashShown(const QString &diff);
 
     // Branch operation results
     void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
@@ -109,6 +121,12 @@ private slots:
     void onPruneFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onRemoteUrlFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
+    // Stash slots
+    void onCreateStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onApplyStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    
 private:
     QString m_repositoryPath;
     QString m_gitPath;
@@ -134,6 +152,8 @@ private:
     QProcess *m_checkoutProcess;
     QProcess *m_branchModifyProcess; // Для create/delete/rename
     QProcess *m_remoteProcess;       // Для fetch/prune/url
+    QProcess *m_stashProcess;        // Для stash операций (apply/drop/show)
+    QProcess *m_createStashProcess;  // Для создания stash
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;

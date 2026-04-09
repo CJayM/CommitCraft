@@ -40,6 +40,12 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     m_contextMenu->addSeparator();
     m_fetchAction = m_contextMenu->addAction(tr("Fetch"));
     m_pruneAction = m_contextMenu->addAction(tr("Prune"));
+    m_contextMenu->addSeparator();
+    m_applyStashAction = m_contextMenu->addAction(tr("Apply"));
+    m_popStashAction = m_contextMenu->addAction(tr("Pop"));
+    m_dropStashAction = m_contextMenu->addAction(tr("Drop"));
+    m_contextMenu->addSeparator();
+    m_showStashAction = m_contextMenu->addAction(tr("Show"));
     
     connect(m_checkoutAction, &QAction::triggered, this, &BranchesWidget::onCheckoutAction);
     connect(m_createBranchAction, &QAction::triggered, this, &BranchesWidget::onCreateBranchAction);
@@ -47,6 +53,10 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     connect(m_deleteBranchAction, &QAction::triggered, this, &BranchesWidget::onDeleteBranchAction);
     connect(m_fetchAction, &QAction::triggered, this, &BranchesWidget::onFetchAction);
     connect(m_pruneAction, &QAction::triggered, this, &BranchesWidget::onPruneAction);
+    connect(m_applyStashAction, &QAction::triggered, this, &BranchesWidget::onApplyStashAction);
+    connect(m_popStashAction, &QAction::triggered, this, &BranchesWidget::onPopStashAction);
+    connect(m_dropStashAction, &QAction::triggered, this, &BranchesWidget::onDropStashAction);
+    connect(m_showStashAction, &QAction::triggered, this, &BranchesWidget::onShowStashAction);
 
     setupTree();
     m_layout->addWidget(m_treeWidget);
@@ -111,6 +121,23 @@ void BranchesWidget::setGit(Git *git)
         });
         
         connect(m_git, &Git::pruneReady, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh();
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
+        
+        // Stash signals
+        connect(m_git, &Git::stashApplied, this, [this](bool success, const QString &message) {
+            if (success) {
+                refresh();
+            } else {
+                QMessageBox::warning(this, tr("Error"), message);
+            }
+        });
+        
+        connect(m_git, &Git::stashDropped, this, [this](bool success, const QString &message) {
             if (success) {
                 refresh();
             } else {
@@ -257,7 +284,7 @@ void BranchesWidget::populateStashes(const QList<QString> &stashes)
 {
     clearChildren(m_stashesRoot);
     m_stashesRoot->setText(0, QString("Stashes (%1)").arg(stashes.size()));
-    
+
     for (const QString &stash : stashes) {
         QTreeWidgetItem *item = new QTreeWidgetItem(m_stashesRoot);
         item->setText(0, stash);
@@ -336,8 +363,29 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         m_contextRemoteName = item->text(0);
         int bracketPos = m_contextRemoteName.indexOf(" (");
         if (bracketPos != -1) m_contextRemoteName = m_contextRemoteName.left(bracketPos);
+    } else if (type == "stash") {
+        // Для Stash показываем Apply/Pop/Drop/Show
+        m_checkoutAction->setVisible(false);
+        m_createBranchAction->setVisible(false);
+        m_renameBranchAction->setVisible(false);
+        m_deleteBranchAction->setVisible(false);
+        m_fetchAction->setVisible(false);
+        m_pruneAction->setVisible(false);
+        
+        m_applyStashAction->setVisible(true);
+        m_popStashAction->setVisible(true);
+        m_dropStashAction->setVisible(true);
+        m_showStashAction->setVisible(true);
+        
+        // Сохраняем ссылку на stash (первая часть строки, например "stash@{0}")
+        QString stashText = item->text(0);
+        int colonPos = stashText.indexOf(':');
+        if (colonPos != -1) {
+            m_contextStashRef = stashText.left(colonPos).trimmed();
+        } else {
+            m_contextStashRef = stashText;
+        }
     } else {
-        // Для остальных скрываем всё
         m_checkoutAction->setVisible(false);
         m_createBranchAction->setVisible(false);
         m_renameBranchAction->setVisible(false);
@@ -355,7 +403,7 @@ QTreeWidgetItem* BranchesWidget::getBranchItemUnderCursor(const QPoint &pos) con
     QTreeWidgetItem *item = m_treeWidget->itemAt(pos);
     if (!item) return nullptr;
     QString type = item->data(0, Qt::UserRole).toString();
-    if (type == "branch" || type == "remote") return item;
+    if (type == "branch" || type == "remote" || type == "stash") return item;
     return nullptr;
 }
 
@@ -427,4 +475,38 @@ void BranchesWidget::onPruneAction()
 {
     if (!m_git || m_contextRemoteName.isEmpty()) return;
     m_git->pruneRemote(m_contextRemoteName);
+}
+
+void BranchesWidget::onApplyStashAction()
+{
+    if (!m_git || m_contextStashRef.isEmpty()) return;
+    m_git->applyStash(m_contextStashRef, false); // false = apply only, don't drop
+}
+
+void BranchesWidget::onPopStashAction()
+{
+    if (!m_git || m_contextStashRef.isEmpty()) return;
+    m_git->applyStash(m_contextStashRef, true); // true = pop (apply + drop)
+}
+
+void BranchesWidget::onDropStashAction()
+{
+    if (!m_git || m_contextStashRef.isEmpty()) return;
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, tr("Drop Stash"),
+        tr("Are you sure you want to drop stash \"%1\"?").arg(m_contextStashRef),
+        QMessageBox::Yes | QMessageBox::No
+    );
+    
+    if (reply == QMessageBox::Yes) {
+        m_git->dropStash(m_contextStashRef);
+    }
+}
+
+void BranchesWidget::onShowStashAction()
+{
+    if (!m_git || m_contextStashRef.isEmpty()) return;
+    // TODO: Show stash diff in a dialog or panel
+    QMessageBox::information(this, tr("Show Stash"), 
+        tr("Showing stash \"%1\" is not implemented yet.\nDiff would be shown here.").arg(m_contextStashRef));
 }

@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QList>
 #include <QMessageBox>
 #include <QPair>
@@ -129,9 +131,9 @@ MainWindow::MainWindow(QWidget *parent)
             refreshGitStatus();
         } else {
             // Проверяем, можно ли заstashить изменения
-            if ((message.contains("would be overwritten by checkout") || 
+            if ((message.contains("would be overwritten by checkout") ||
                  message.contains("Please commit your changes or stash them")) && !m_lastCheckoutBranch.isEmpty()) {
-                
+
                 QMessageBox::StandardButton reply = QMessageBox::question(
                     this,
                     tr("Несохраненные изменения"),
@@ -145,6 +147,17 @@ MainWindow::MainWindow(QWidget *parent)
             } else {
                 QMessageBox::warning(this, tr("Ошибка Git"), message);
             }
+        }
+    });
+
+    // Подключаем сигнал создания stash для обновления интерфейса
+    connect(git, &Git::stashCreated, this, [this](bool success, const QString &message) {
+        if (success) {
+            // Обновляем panel веток (чтобы обновить список stash) и filesTable
+            ui->branchesWidget->refresh();
+            refreshGitStatus();
+        } else {
+            QMessageBox::warning(this, tr("Ошибка Git"), message);
         }
     });
     
@@ -444,13 +457,28 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
     
     // Add separator
     contextMenu.addSeparator();
-    
+
     // Discard changes (not available for untracked files)
     if (status != "?" && !status.isEmpty()) {
         QAction *discardAction = new QAction(tr("Отменить изменения"), this);
         connect(discardAction, &QAction::triggered, this, [this, fileName]() { discardFileChanges(fileName); });
         contextMenu.addAction(discardAction);
     }
+
+    // Stash action
+    QAction *stashAction = new QAction(tr("Спрятать в Stash"), this);
+    connect(stashAction, &QAction::triggered, this, [this, fileName]() {
+        bool ok;
+        QString message = QInputDialog::getText(this, tr("Create Stash"),
+                                                 tr("Stash message:"),
+                                                 QLineEdit::Normal,
+                                                 tr("WIP on %1").arg(fileName),
+                                                 &ok);
+        if (ok && !message.isEmpty()) {
+            git->createStash({fileName}, message);
+        }
+    });
+    contextMenu.addAction(stashAction);
 
     // Show the context menu
     contextMenu.exec(ui->filesTable->viewport()->mapToGlobal(pos));

@@ -23,6 +23,8 @@ Git::Git(QObject *parent)
     , m_checkoutProcess(new QProcess(this))
     , m_branchModifyProcess(new QProcess(this))
     , m_remoteProcess(new QProcess(this))
+    , m_stashProcess(new QProcess(this))
+    , m_createStashProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -92,6 +94,15 @@ Git::Git(QObject *parent)
     connect(m_remoteProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onFetchFinished); // По умолчанию fetch, будем проверять property
     connect(m_remoteProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Stash operations
+    connect(m_stashProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onApplyStashFinished); // По умолчанию apply, будем проверять property
+    connect(m_stashProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_createStashProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCreateStashFinished);
+    connect(m_createStashProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -384,7 +395,7 @@ void Git::getStashes()
     }
 
     QStringList args;
-    args << "stash" << "list" << "--format=%gd: %s";
+    args << "--no-pager" << "stash" << "list"; 
     setupProcess(m_stashesProcess, args);
     m_stashesProcess->start(getGitExecutable(), args);
 }
@@ -479,9 +490,10 @@ void Git::onTagsFinished(int exitCode, QProcess::ExitStatus exitStatus)
 
 void Git::onStashesFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
+    QString stdoutOutput = m_stashesProcess->readAllStandardOutput();
+    
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-        QString output = m_stashesProcess->readAllStandardOutput();
-        QList<QString> stashes = output.split('\n', Qt::SkipEmptyParts);
+        QList<QString> stashes = stdoutOutput.split('\n', Qt::SkipEmptyParts);
         
         for (auto &stash : stashes) {
             stash = stash.trimmed();
@@ -489,9 +501,9 @@ void Git::onStashesFinished(int exitCode, QProcess::ExitStatus exitStatus)
         
         emit stashesReady(stashes);
     } else {
-        QString errorMsg = m_stashesProcess->readAllStandardError();
+        QString stderrOutput = m_stashesProcess->readAllStandardError();
         emit stashesReady({});
-        emit error(QString("Failed to get stashes: %1").arg(errorMsg));
+        emit error(QString("Failed to get stashes: %1").arg(stderrOutput));
     }
 }
 
@@ -757,4 +769,141 @@ void Git::onPruneFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onRemoteUrlFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     onFetchFinished(exitCode, exitStatus);
+}
+
+// ==========================================
+// Stash Operations Implementation
+// ==========================================
+
+void Git::createStash(const QStringList &files, const QString &message)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "stash" << "push" << "-u" << "-m" << message << "--";
+    
+    // Нормализуем пути
+    QStringList normalizedFiles;
+    for (const QString &file : files) {
+        QString normalized = file;
+        normalized.replace("\\", "/");
+        
+        QFileInfo fi(normalized);
+        if (fi.isAbsolute()) {
+            normalized = QDir(m_repositoryPath).relativeFilePath(fi.absoluteFilePath());
+        }
+        normalizedFiles << normalized;
+    }
+    
+    args.append(normalizedFiles);
+    
+    m_createStashProcess->setWorkingDirectory(m_repositoryPath);
+    m_createStashProcess->start(getGitExecutable(), args);
+}
+
+void Git::onCreateStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString stdoutOutput = m_createStashProcess->readAllStandardOutput();
+    QString stderrOutput = m_createStashProcess->readAllStandardError();
+    
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        emit stashCreated(true, "Stash created successfully");
+    } else {
+        emit stashCreated(false, QString("Failed to create stash: %1").arg(stderrOutput));
+        emit error(QString("Failed to create stash: %1").arg(stderrOutput));
+    }
+}
+
+void Git::applyStash(const QString &stashRef, bool drop)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    if (drop) {
+        args << "stash" << "pop" << stashRef; // Pop applies and drops
+        m_stashProcess->setProperty("operation", "pop");
+    } else {
+        args << "stash" << "apply" << stashRef;
+        m_stashProcess->setProperty("operation", "apply");
+    }
+    
+    m_stashProcess->setProperty("stashRef", stashRef);
+    m_stashProcess->start(getGitExecutable(), args);
+}
+
+void Git::dropStash(const QString &stashRef)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "stash" << "drop" << stashRef;
+    
+    m_stashProcess->setProperty("operation", "drop");
+    m_stashProcess->setProperty("stashRef", stashRef);
+    m_stashProcess->start(getGitExecutable(), args);
+}
+
+void Git::showStash(const QString &stashRef)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "stash" << "show" << "-p" << stashRef;
+    
+    m_stashProcess->setProperty("operation", "show");
+    m_stashProcess->setProperty("stashRef", stashRef);
+    m_stashProcess->start(getGitExecutable(), args);
+}
+
+void Git::onApplyStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_stashProcess->property("operation").toString();
+    QString stashRef = m_stashProcess->property("stashRef").toString();
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        if (operation == "apply") {
+            emit stashApplied(true, QString("Stash %1 applied").arg(stashRef));
+        } else if (operation == "pop") {
+            emit stashApplied(true, QString("Stash %1 popped (applied and dropped)").arg(stashRef));
+        } else if (operation == "drop") {
+            emit stashDropped(true, QString("Stash %1 dropped").arg(stashRef));
+        } else if (operation == "show") {
+            QString diff = m_stashProcess->readAllStandardOutput();
+            emit stashShown(diff);
+        }
+    } else {
+        QString errorMsg = m_stashProcess->readAllStandardError();
+        if (operation == "apply" || operation == "pop") {
+            emit stashApplied(false, QString("Failed to apply stash: %1").arg(errorMsg));
+            emit error(QString("Failed to apply stash: %1").arg(errorMsg));
+        } else if (operation == "drop") {
+            emit stashDropped(false, QString("Failed to drop stash: %1").arg(errorMsg));
+            emit error(QString("Failed to drop stash: %1").arg(errorMsg));
+        } else if (operation == "show") {
+            emit stashShown("");
+            emit error(QString("Failed to show stash: %1").arg(errorMsg));
+        }
+    }
+}
+
+void Git::onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onApplyStashFinished(exitCode, exitStatus);
+}
+
+void Git::onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onApplyStashFinished(exitCode, exitStatus);
 }
