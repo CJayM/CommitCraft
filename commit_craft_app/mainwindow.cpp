@@ -112,6 +112,9 @@ MainWindow::MainWindow(QWidget *parent)
     // Set default actions for hunk navigation buttons
     ui->prevHunkButton->setDefaultAction(ui->actionPrevHunk);
     ui->nextHunkButton->setDefaultAction(ui->actionNextHunk);
+
+    // Подключаем BranchesWidget к Git
+    ui->branchesWidget->setGit(git);
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
@@ -325,8 +328,11 @@ void MainWindow::openRepository()
             // Обновляем watcher для нового репозитория
             m_fsWatcher->removePaths(m_fsWatcher->directories());
             m_fsWatcher->addPath(repositoryPath);
-            
+
             refreshGitStatus();
+            
+            // Обновляем панель веток
+            ui->branchesWidget->refresh();
         } else {
             QMessageBox::warning(this, tr("Ошибка"), 
                                 tr("Выбранная директория не является Git репозиторием."));

@@ -6,6 +6,7 @@
 class QTreeWidget;
 class QTreeWidgetItem;
 class QVBoxLayout;
+class Git;
 
 class BranchesWidget : public QFrame
 {
@@ -13,13 +14,28 @@ class BranchesWidget : public QFrame
 
 public:
     explicit BranchesWidget(QWidget *parent = nullptr);
+    
+    /// Установить Git-объект для получения данных
+    void setGit(Git *git);
+    
+    /// Обновить все данные дерева
+    void refresh();
+
+public slots:
+    void populateLocalBranches(const QList<QString> &branches, const QString &currentBranch);
+    void populateRemotes(const QList<QString> &remotes);
+    void populateRemoteBranches(const QString &remote, const QList<QString> &branches);
+    void populateTags(const QList<QString> &tags);
+    void populateStashes(const QList<QString> &stashes);
 
 private:
     void setupTree();
     void createRootItems();
+    void clearChildren(QTreeWidgetItem *parent);
 
     QVBoxLayout *m_layout;
     QTreeWidget *m_treeWidget;
+    Git *m_git;
 
     // Корневые элементы дерева
     QTreeWidgetItem *m_localBranchesRoot;
