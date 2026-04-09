@@ -3,6 +3,7 @@
 #include <QTextBlock>
 #include <QScrollBar>
 #include <QSignalBlocker>
+#include <QPainter>
 
 DiffPanel::DiffPanel(QWidget *parent)
     : CodeEditor(parent)
@@ -44,6 +45,53 @@ void DiffPanel::setPlaceholderLines(const QSet<int> &lines)
 {
     m_placeholderLines = lines;
     highlightCurrentLineNoEmit();
+}
+
+void DiffPanel::setLineNumbers(const QVector<int> &numbers)
+{
+    m_lineNumbers = numbers;
+    update();
+}
+
+void DiffPanel::lineNumberAreaPaintEvent(QPaintEvent *event)
+{
+    QPainter painter(lineNumberArea);
+    painter.fillRect(event->rect(), QColor(240, 240, 240));
+
+    QTextBlock block = firstVisibleBlock();
+    int blockNumber = block.blockNumber();
+    int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
+    int bottom = top + qRound(blockBoundingRect(block).height());
+
+    QColor textColor(140, 140, 140);
+    painter.setPen(textColor);
+
+    while (block.isValid() && top <= event->rect().bottom()) {
+        if (block.isVisible() && bottom >= event->rect().top()) {
+            QString numberStr;
+            if (blockNumber >= 0 && blockNumber < m_lineNumbers.size()) {
+                int realNum = m_lineNumbers[blockNumber];
+                if (realNum >= 0) {
+                    numberStr = QString::number(realNum + 1); // 1-based
+                } else {
+                    numberStr = ""; // Placeholder line
+                }
+            } else {
+                numberStr = QString::number(blockNumber + 1); // Fallback
+            }
+            painter.drawText(0,
+                             top,
+                             lineNumberArea->width() - 6,
+                             fontMetrics().height(),
+                             Qt::AlignRight,
+                             numberStr);
+        }
+
+        block = block.next();
+        top = bottom;
+        bottom = top + qRound(blockBoundingRect(block).height());
+        ++blockNumber;
+    }
 }
 
 void DiffPanel::setCursorToLine(int line)
@@ -107,15 +155,23 @@ void DiffPanel::highlightCurrentLineNoEmit()
     int blockNumber = 0;
 
     while (block.isValid()) {
+        auto it = m_lineDiffMap.find(blockNumber);
         QColor bgColor;
+        QColor fgColor; // Цвет текста
+        bool setFg = false;
 
         // Проверяем placeholder (серый фон)
         if (m_placeholderLines.contains(blockNumber)) {
             bgColor = placeholderColor;
         }
+        // Проверяем разделитель чанков
+        else if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
+            bgColor = QColor(240, 240, 240); // Светло-серый фон
+            fgColor = QColor(150, 150, 150); // Темно-серый текст для "..."
+            setFg = true;
+        }
         // Проверяем diff (красный/зелёный/синий)
         else {
-            auto it = m_lineDiffMap.find(blockNumber);
             if (it != m_lineDiffMap.end() && it->type != DiffType::Unchanged) {
                 switch (it->type) {
                     case DiffType::Removed:  bgColor = removedColor; break;
@@ -133,6 +189,9 @@ void DiffPanel::highlightCurrentLineNoEmit()
             QTextEdit::ExtraSelection selection;
             selection.cursor = cursor;
             selection.format.setBackground(bgColor);
+            if (setFg) {
+                selection.format.setForeground(fgColor);
+            }
             selection.format.setProperty(QTextFormat::FullWidthSelection, true);
 
             selections.append(selection);
@@ -191,4 +250,46 @@ void DiffPanel::applyDiffHighlighting()
 
     // Применяем выделения. Qt сам нарисует их ПОД текстом.
     setExtraSelections(selections);
+}
+
+void DiffPanel::paintEvent(QPaintEvent *event)
+{
+    // Сначала рисуем базовый контент
+    CodeEditor::paintEvent(event);
+
+    // Затем рисуем горизонтальные линии-разделители чанков
+    QPainter painter(viewport());
+    painter.setClipRect(event->rect());
+    
+    // Получаем видимую область
+    QRect visibleRect = viewport()->rect();
+    
+    // Находим первый видимый блок
+    QTextBlock block = firstVisibleBlock();
+    int blockNumber = block.blockNumber();
+
+    while (block.isValid()) {
+        QRectF blockRect = blockBoundingGeometry(block).translated(contentOffset()).toRect();
+        
+        // Если блок вышел за видимую область, прерываем
+        if (blockRect.top() > visibleRect.bottom())
+            break;
+        
+        // Рисуем линию только если блок частично или полностью виден
+        if (blockRect.bottom() >= visibleRect.top()) {
+            auto it = m_lineDiffMap.find(blockNumber);
+            if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
+                // Рисуем горизонтальную линию по центру строки-разделителя
+                int lineY = blockRect.top() + blockRect.height() / 2;
+                
+                painter.save();
+                painter.setPen(QPen(QColor(180, 180, 180), 1, Qt::DashLine));
+                painter.drawLine(visibleRect.left(), lineY, visibleRect.right(), lineY);
+                painter.restore();
+            }
+        }
+
+        block = block.next();
+        blockNumber++;
+    }
 }

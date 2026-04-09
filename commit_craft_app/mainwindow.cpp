@@ -2,7 +2,10 @@
 #include <QCloseEvent>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QList>
 #include <QMessageBox>
 #include <QPair>
@@ -91,6 +94,18 @@ MainWindow::MainWindow(QWidget *parent)
         GitParser parser;
         QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
         diffEditor->applyDiffData(hunks);
+
+        // Обработка отложенной навигации
+        if (m_pendingNavigation == PendingNavigation::GoNext) {
+            diffEditor->navigateToFirstHunk();
+            m_pendingNavigation = PendingNavigation::None;
+        } else if (m_pendingNavigation == PendingNavigation::GoPrev) {
+            diffEditor->navigateToLastHunk();
+            m_pendingNavigation = PendingNavigation::None;
+        }
+        
+        // Обновляем состояние кнопок навигации
+        updateNavigationButtonsState();
     });
 
     // Connect hunk navigation buttons to DiffEditor
@@ -100,6 +115,57 @@ MainWindow::MainWindow(QWidget *parent)
     // Set default actions for hunk navigation buttons
     ui->prevHunkButton->setDefaultAction(ui->actionPrevHunk);
     ui->nextHunkButton->setDefaultAction(ui->actionNextHunk);
+
+    // Подключаем BranchesWidget к Git
+    ui->branchesWidget->setGit(git);
+
+    // Сохраняем имя ветки при попытке checkout
+    connect(ui->branchesWidget, &BranchesWidget::checkoutAttempted, this, [this](const QString &branch) {
+        m_lastCheckoutBranch = branch;
+    });
+
+    // Подключаем сигнал checkout для обновления интерфейса
+    connect(git, &Git::checkoutReady, this, [this](bool success, const QString &message) {
+        if (success) {
+            // Обновляем панель веток, filesTable и diff
+            ui->branchesWidget->refresh();
+            refreshGitStatus();
+        } else {
+            // Проверяем, можно ли заstashить изменения
+            if ((message.contains("would be overwritten by checkout") ||
+                 message.contains("Please commit your changes or stash them")) && !m_lastCheckoutBranch.isEmpty()) {
+
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                    this,
+                    tr("Несохраненные изменения"),
+                    tr("У вас есть несохраненные изменения. Заstashить их и переключиться на ветку \"%1\"?").arg(m_lastCheckoutBranch),
+                    QMessageBox::Yes | QMessageBox::No
+                );
+
+                if (reply == QMessageBox::Yes) {
+                    git->checkoutBranch(m_lastCheckoutBranch, true);
+                }
+            } else {
+                QMessageBox::warning(this, tr("Ошибка Git"), message);
+            }
+        }
+    });
+
+    // Подключаем сигнал создания stash для обновления интерфейса
+    connect(git, &Git::stashCreated, this, [this](bool success, const QString &message) {
+        if (success) {
+            // Обновляем panel веток (чтобы обновить список stash) и filesTable
+            ui->branchesWidget->refresh();
+            refreshGitStatus();
+        } else {
+            QMessageBox::warning(this, tr("Ошибка Git"), message);
+        }
+    });
+    
+    // Если репозиторий загружен из настроек, обновляем панель веток
+    if (!repositoryPath.isEmpty() && isGitRepository(repositoryPath)) {
+        ui->branchesWidget->refresh();
+    }
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
@@ -284,6 +350,8 @@ void MainWindow::onGitCommitFinished(bool success, const QString &message)
         // Uncheck amend checkbox after successful commit
         ui->amend_chk->setChecked(false);
         refreshGitStatus();
+        // Обновляем панель веток после коммита
+        ui->branchesWidget->refresh();
     } else {
         // Error - show message
         QMessageBox::warning(this, tr("Ошибка Git"), message);
@@ -313,8 +381,11 @@ void MainWindow::openRepository()
             // Обновляем watcher для нового репозитория
             m_fsWatcher->removePaths(m_fsWatcher->directories());
             m_fsWatcher->addPath(repositoryPath);
-            
+
             refreshGitStatus();
+            
+            // Обновляем панель веток
+            ui->branchesWidget->refresh();
         } else {
             QMessageBox::warning(this, tr("Ошибка"), 
                                 tr("Выбранная директория не является Git репозиторием."));
@@ -330,75 +401,124 @@ bool MainWindow::isGitRepository(const QString &path)
 
 void MainWindow::showFileContextMenu(const QPoint &pos)
 {
-    // Get the index at the position
-    QModelIndex index = ui->filesTable->indexAt(pos);
-    if (!index.isValid()) return;
+    QModelIndexList selectedIndexes = ui->filesTable->selectionModel()->selectedRows();
+    if (selectedIndexes.isEmpty()) return;
 
-    // Create the context menu
-    QMenu contextMenu(tr("Файл"), this);
-
-    // Get file status from the model (raw status, not display symbol)
     FileModel *model = qobject_cast<FileModel*>(ui->filesTable->model());
     if (!model) return;
-    
-    QString status = model->getFileStatus(index.row());
-    QString fileName = model->getFileName(index.row());
-    
-    // Determine action text based on status
-    QString actionText;
-    if (status == "?" || status.isEmpty()) {
-        // Untracked file
-        actionText = tr("Добавить");
-    } else {
-        // Modified, deleted, or other changed file
-        actionText = tr("Фиксировать");
-    }
-    
-    // Create the add/stage action with appropriate text
-    QAction *addAction = new QAction(actionText, this);
-    connect(addAction, &QAction::triggered, this, &MainWindow::addSelectedFile);
-    contextMenu.addAction(addAction);
-    
-    // Add separator
-    contextMenu.addSeparator();
-    
-    // Copy file path
-    QAction *copyPathAction = new QAction(tr("Копировать путь"), this);
-    connect(copyPathAction, &QAction::triggered, this, [this, fileName]() { copyFilePath(fileName); });
-    contextMenu.addAction(copyPathAction);
-    
-    // Open file
-    QAction *openFileAction = new QAction(tr("Открыть файл"), this);
-    connect(openFileAction, &QAction::triggered, this, [this, fileName]() { openFile(fileName); });
-    contextMenu.addAction(openFileAction);
-    
-    // Open folder
-    QAction *openFolderAction = new QAction(tr("Открыть папку"), this);
-    connect(openFolderAction, &QAction::triggered, this, [this, fileName]() { openFolder(fileName); });
-    contextMenu.addAction(openFolderAction);
-    
-    // Delete
-    QAction *deleteAction = new QAction(tr("Удалить"), this);
-    connect(deleteAction, &QAction::triggered, this, [this, fileName]() { deleteFile(fileName); });
-    contextMenu.addAction(deleteAction);
-    
-    // Blame (stub)
-    QAction *blameAction = new QAction(tr("Blame"), this);
-    blameAction->setEnabled(false);
-    contextMenu.addAction(blameAction);
-    
-    // Add separator
-    contextMenu.addSeparator();
-    
-    // Discard changes (not available for untracked files)
-    if (status != "?" && !status.isEmpty()) {
-        QAction *discardAction = new QAction(tr("Отменить изменения"), this);
-        connect(discardAction, &QAction::triggered, this, [this, fileName]() { discardFileChanges(fileName); });
-        contextMenu.addAction(discardAction);
+
+    QStringList selectedFiles;
+    for (const QModelIndex &index : selectedIndexes) {
+        selectedFiles << model->getFileName(index.row());
     }
 
-    // Show the context menu
+    QMenu contextMenu(this);
+
+    // Stage Action
+    QString actionText = selectedFiles.size() > 1 ? tr("Добавить выделенные (%1)").arg(selectedFiles.size()) : tr("Добавить");
+    QAction *addAction = new QAction(actionText, this);
+    connect(addAction, &QAction::triggered, this, [this, selectedFiles]() { stageSelectedFiles(selectedFiles); });
+    contextMenu.addAction(addAction);
+
+    contextMenu.addSeparator();
+
+    if (selectedFiles.size() == 1) {
+        QString fileName = selectedFiles.first();
+        QAction *copyPathAction = new QAction(tr("Копировать путь"), this);
+        connect(copyPathAction, &QAction::triggered, this, [this, fileName]() { copyFilePath(fileName); });
+        contextMenu.addAction(copyPathAction);
+
+        QAction *openFileAction = new QAction(tr("Открыть файл"), this);
+        connect(openFileAction, &QAction::triggered, this, [this, fileName]() { openFile(fileName); });
+        contextMenu.addAction(openFileAction);
+
+        QAction *openFolderAction = new QAction(tr("Открыть папку"), this);
+        connect(openFolderAction, &QAction::triggered, this, [this, fileName]() { openFolder(fileName); });
+        contextMenu.addAction(openFolderAction);
+
+        QAction *deleteAction = new QAction(tr("Удалить"), this);
+        connect(deleteAction, &QAction::triggered, this, [this, fileName]() { deleteFile(fileName); });
+        contextMenu.addAction(deleteAction);
+
+        QAction *blameAction = new QAction(tr("Blame"), this);
+        blameAction->setEnabled(false);
+        contextMenu.addAction(blameAction);
+
+        contextMenu.addSeparator();
+
+        QAction *stashAction = new QAction(tr("Спрятать в Stash"), this);
+        connect(stashAction, &QAction::triggered, this, [this, fileName]() {
+            bool ok;
+            QString message = QInputDialog::getText(this, tr("Create Stash"),
+                                                     tr("Stash message:"),
+                                                     QLineEdit::Normal,
+                                                     tr("WIP on %1").arg(fileName),
+                                                     &ok);
+            if (ok && !message.isEmpty()) {
+                git->createStash({fileName}, message);
+            }
+        });
+        contextMenu.addAction(stashAction);
+    } else {
+        // Multi-file actions
+        QAction *deleteAction = new QAction(tr("Удалить выделенные"), this);
+        connect(deleteAction, &QAction::triggered, this, [this, selectedFiles]() { deleteSelectedFiles(selectedFiles); });
+        contextMenu.addAction(deleteAction);
+
+        contextMenu.addSeparator();
+
+        QAction *stashAction = new QAction(tr("Спрятать выделенные в Stash"), this);
+        connect(stashAction, &QAction::triggered, this, [this, selectedFiles]() { stashSelectedFiles(selectedFiles); });
+        contextMenu.addAction(stashAction);
+    }
+
     contextMenu.exec(ui->filesTable->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::stageSelectedFiles(const QStringList &files)
+{
+    if (files.isEmpty()) return;
+
+    m_fsWatcher->blockSignals(true);
+    // Используем метод addFiles, который принимает список и выполняет одну команду git add
+    git->addFiles(files);
+}
+
+void MainWindow::deleteSelectedFiles(const QStringList &files)
+{
+    if (files.isEmpty()) return;
+
+    QString message = files.size() > 1 
+        ? tr("Вы уверены, что хотите удалить %1 выделенных файлов?").arg(files.size())
+        : tr("Вы уверены, что хотите удалить файл \"%1\"?").arg(files.first());
+
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, tr("Удалить файлы"),
+        message,
+        QMessageBox::Yes | QMessageBox::No
+    );
+
+    if (reply == QMessageBox::Yes) {
+        for (const QString &file : files) {
+            QFile::remove(file);
+        }
+        refreshGitStatus();
+    }
+}
+
+void MainWindow::stashSelectedFiles(const QStringList &files)
+{
+    if (files.isEmpty()) return;
+
+    bool ok;
+    QString message = QInputDialog::getText(this, tr("Create Stash"),
+                                             tr("Stash message:"),
+                                             QLineEdit::Normal,
+                                             tr("WIP on selection"),
+                                             &ok);
+    if (ok && !message.isEmpty()) {
+        git->createStash(files, message);
+    }
 }
 
 void MainWindow::addSelectedFile()
@@ -420,62 +540,71 @@ void MainWindow::addSelectedFile()
 
 void MainWindow::showStagedFileContextMenu(const QPoint &pos)
 {
-    // Get the index at the position
-    QModelIndex index = ui->stagedFilesTable->indexAt(pos);
-    if (!index.isValid()) return;
+    QModelIndexList selectedIndexes = ui->stagedFilesTable->selectionModel()->selectedRows();
+    if (selectedIndexes.isEmpty()) return;
 
-    // Create the context menu
-    QMenu contextMenu(tr("Файл"), this);
-
-    // Get file info from the model
     FileModel *model = qobject_cast<FileModel*>(ui->stagedFilesTable->model());
     if (!model) return;
-    
-    QString fileName = model->getFileName(index.row());
 
-    // Create the "Убрать из stage" action
-    QAction *unstageAction = new QAction(tr("Убрать из stage"), this);
-    connect(unstageAction, &QAction::triggered, this, &MainWindow::unstageSelectedFile);
+    QStringList selectedFiles;
+    for (const QModelIndex &index : selectedIndexes) {
+        selectedFiles << model->getFileName(index.row());
+    }
+
+    QMenu contextMenu(this);
+
+    // Unstage Action
+    QString actionText = selectedFiles.size() > 1 ? tr("Убрать выделенные (%1)").arg(selectedFiles.size()) : tr("Убрать из stage");
+    QAction *unstageAction = new QAction(actionText, this);
+    connect(unstageAction, &QAction::triggered, this, [this, selectedFiles]() { unstageSelectedFiles(selectedFiles); });
     contextMenu.addAction(unstageAction);
-    
-    // Add separator
-    contextMenu.addSeparator();
-    
-    // Copy file path
-    QAction *copyPathAction = new QAction(tr("Копировать путь"), this);
-    connect(copyPathAction, &QAction::triggered, this, [this, fileName]() { copyFilePath(fileName); });
-    contextMenu.addAction(copyPathAction);
-    
-    // Open file
-    QAction *openFileAction = new QAction(tr("Открыть файл"), this);
-    connect(openFileAction, &QAction::triggered, this, [this, fileName]() { openFile(fileName); });
-    contextMenu.addAction(openFileAction);
-    
-    // Open folder
-    QAction *openFolderAction = new QAction(tr("Открыть папку"), this);
-    connect(openFolderAction, &QAction::triggered, this, [this, fileName]() { openFolder(fileName); });
-    contextMenu.addAction(openFolderAction);
-    
-    // Delete
-    QAction *deleteAction = new QAction(tr("Удалить"), this);
-    connect(deleteAction, &QAction::triggered, this, [this, fileName]() { deleteFile(fileName); });
-    contextMenu.addAction(deleteAction);
-    
-    // Blame (stub)
-    QAction *blameAction = new QAction(tr("Blame"), this);
-    blameAction->setEnabled(false);
-    contextMenu.addAction(blameAction);
-    
-    // Add separator
-    contextMenu.addSeparator();
-    
-    // Discard changes (restore to HEAD for staged files)
-    QAction *discardAction = new QAction(tr("Отменить изменения"), this);
-    connect(discardAction, &QAction::triggered, this, [this, fileName]() { discardFileChanges(fileName); });
-    contextMenu.addAction(discardAction);
 
-    // Show the context menu
+    contextMenu.addSeparator();
+
+    if (selectedFiles.size() == 1) {
+        QString fileName = selectedFiles.first();
+        QAction *copyPathAction = new QAction(tr("Копировать путь"), this);
+        connect(copyPathAction, &QAction::triggered, this, [this, fileName]() { copyFilePath(fileName); });
+        contextMenu.addAction(copyPathAction);
+
+        QAction *openFileAction = new QAction(tr("Открыть файл"), this);
+        connect(openFileAction, &QAction::triggered, this, [this, fileName]() { openFile(fileName); });
+        contextMenu.addAction(openFileAction);
+
+        QAction *openFolderAction = new QAction(tr("Открыть папку"), this);
+        connect(openFolderAction, &QAction::triggered, this, [this, fileName]() { openFolder(fileName); });
+        contextMenu.addAction(openFolderAction);
+
+        QAction *deleteAction = new QAction(tr("Удалить"), this);
+        connect(deleteAction, &QAction::triggered, this, [this, fileName]() { deleteFile(fileName); });
+        contextMenu.addAction(deleteAction);
+
+        QAction *blameAction = new QAction(tr("Blame"), this);
+        blameAction->setEnabled(false);
+        contextMenu.addAction(blameAction);
+
+        contextMenu.addSeparator();
+
+        QAction *discardAction = new QAction(tr("Отменить изменения"), this);
+        connect(discardAction, &QAction::triggered, this, [this, fileName]() { discardFileChanges(fileName); });
+        contextMenu.addAction(discardAction);
+    } else {
+        // Multi-file actions
+        QAction *deleteAction = new QAction(tr("Удалить выделенные"), this);
+        connect(deleteAction, &QAction::triggered, this, [this, selectedFiles]() { deleteSelectedFiles(selectedFiles); });
+        contextMenu.addAction(deleteAction);
+    }
+
     contextMenu.exec(ui->stagedFilesTable->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::unstageSelectedFiles(const QStringList &files)
+{
+    if (files.isEmpty()) return;
+
+    m_fsWatcher->blockSignals(true);
+    // Используем метод unstageFiles, который принимает список и выполняет одну команду git reset
+    git->unstageFiles(files);
 }
 
 void MainWindow::unstageSelectedFile()
@@ -543,6 +672,9 @@ void MainWindow::onFileTableSelectionChanged()
             updateDiffPanel(fileName);
         }
     }
+    
+    // Обновляем состояние кнопок при смене файла
+    updateNavigationButtonsState();
 }
 
 void MainWindow::onStagedFileTableSelectionChanged()
@@ -562,10 +694,13 @@ void MainWindow::onStagedFileTableSelectionChanged()
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
     QString leftContent, rightContent;
+    QString leftVersion, rightVersion;
 
     if (m_lastSelectionSource == SelectionSource::Staged) {
         leftContent = getFileContent(fileName, false);   // HEAD
         rightContent = getFileContent(fileName, true);   // staged
+        leftVersion = "HEAD";
+        rightVersion = "Staged";
         git->getDiffStaged(fileName);
     } else {
         bool isStaged = false;
@@ -579,13 +714,21 @@ void MainWindow::updateDiffPanel(const QString &fileName)
         if (isStaged) {
             leftContent = getFileContent(fileName, true);    // staged
             rightContent = getFileContent(fileName, false);  // current
+            leftVersion = "Staged";
+            rightVersion = "Current";
             git->getDiffWorkingTree(fileName);
         } else {
             leftContent = getFileContent(fileName, true);    // HEAD
             rightContent = getFileContent(fileName, false);  // current
+            leftVersion = "HEAD";
+            rightVersion = "Current";
             git->getDiff(fileName);
         }
     }
+
+    // Обновляем информацию о файле и версиях
+    QString infoText = QString("%1\t%2 vs %3").arg(fileName, leftVersion, rightVersion);
+    ui->diffInfoLabel->setText(infoText);
 
     diffEditor->setContents(leftContent, rightContent, fileName);
 }
@@ -652,7 +795,26 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
 
 void MainWindow::navigateToNextHunk()
 {
-    diffEditor->navigateToNextHunk();
+    // 1. Пробуем перейти к следующему ханку в текущем файле
+    if (diffEditor->navigateToNextHunk())
+        return;
+
+    // 2. Если конец файла достигнут, переключаемся на следующий файл в списке unstaged
+    if (m_lastSelectionSource == SelectionSource::Unstaged) {
+        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
+        QModelIndex next = current.sibling(current.row() + 1, 0);
+        if (next.isValid()) {
+            // Устанавливаем флаг отложенной навигации
+            m_pendingNavigation = PendingNavigation::GoNext;
+            
+            // Выбираем следующий файл (это вызовет асинхронную загрузку diff)
+            ui->filesTable->selectionModel()->select(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->scrollTo(next);
+        }
+    }
+    
+    // Обновляем состояние кнопок
+    updateNavigationButtonsState();
 }
 
 void MainWindow::toggleLeftPanel(bool visible)
@@ -694,7 +856,26 @@ void MainWindow::onAmendCheckBoxChanged(int state)
 
 void MainWindow::navigateToPrevHunk()
 {
-    diffEditor->navigateToPrevHunk();
+    // 1. Пробуем перейти к предыдущему ханку в текущем файле
+    if (diffEditor->navigateToPrevHunk())
+        return;
+
+    // 2. Если начало файла достигнуто, переключаемся на предыдущий файл в списке unstaged
+    if (m_lastSelectionSource == SelectionSource::Unstaged) {
+        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
+        QModelIndex prev = current.sibling(current.row() - 1, 0);
+        if (prev.isValid()) {
+            // Устанавливаем флаг отложенной навигации
+            m_pendingNavigation = PendingNavigation::GoPrev;
+            
+            // Выбираем предыдущий файл (это вызовет асинхронную загрузку diff)
+            ui->filesTable->selectionModel()->select(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->scrollTo(prev);
+        }
+    }
+    
+    // Обновляем состояние кнопок
+    updateNavigationButtonsState();
 }
 
 void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)
@@ -862,4 +1043,37 @@ void MainWindow::runGitCommand(const QString &command, const QStringList &args, 
     }
     
     m_fsWatcher->blockSignals(false);
+}
+
+void MainWindow::updateNavigationButtonsState()
+{
+    bool hasNext = false;
+    bool hasPrev = false;
+
+    // Получаем информацию о текущем файле
+    QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
+    int totalFiles = ui->filesTable->model()->rowCount();
+
+    if (totalFiles > 0 && current.isValid()) {
+        bool isFirstFile = (current.row() == 0);
+        bool isLastFile = (current.row() == totalFiles - 1);
+
+        // Проверяем состояние ханков
+        bool isHunkEmpty = (diffEditor->hunkCount() == 0);
+        bool atHunkStart = diffEditor->isAtFirstHunk();
+        bool atHunkEnd = diffEditor->isAtLastHunk();
+
+        // Логика для кнопки Next:
+        // Можно идти дальше, если мы не в конце списка ханков текущего файла
+        // ИЛИ если мы в конце ханков, но есть еще файлы в списке
+        hasNext = (!atHunkEnd && !isHunkEmpty) || !isLastFile;
+
+        // Логика для кнопки Prev:
+        // Можно идти назад, если мы не в начале списка ханков
+        // ИЛИ если мы в начале ханков, но есть предыдущие файлы
+        hasPrev = (!atHunkStart && !isHunkEmpty) || !isFirstFile;
+    }
+
+    ui->actionPrevHunk->setEnabled(hasPrev);
+    ui->actionNextHunk->setEnabled(hasNext);
 }

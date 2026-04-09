@@ -30,8 +30,34 @@ public:
     void getCommitHistory();
     void getFileContent(const QString &fileName, bool staged);
     void addFile(const QString &fileName);
+    void addFiles(const QStringList &fileNames);
     void unstageFile(const QString &fileName);
+    void unstageFiles(const QStringList &fileNames);
     void commit(const QString &message, bool amend = false);
+
+    // Branch operations
+    void getLocalBranches();
+    void getRemotes();
+    void getRemoteBranches(const QString &remote);
+    void getTags();
+    void getStashes();
+    
+    // Branch modification
+    void checkoutBranch(const QString &branch, bool stashBeforeCheckout = false);
+    void createBranch(const QString &name, const QString &fromRef = "");
+    void deleteBranch(const QString &branch, bool force = false);
+    void renameBranch(const QString &oldName, const QString &newName);
+
+    // Remote operations
+    void fetchRemote(const QString &remote);
+    void pruneRemote(const QString &remote);
+    void getRemoteUrl(const QString &remote);
+
+    // Stash operations
+    void createStash(const QStringList &files, const QString &message);
+    void applyStash(const QString &stashRef, bool drop = false);
+    void dropStash(const QString &stashRef);
+    void showStash(const QString &stashRef);
     
 signals:
     // Git operation results
@@ -43,6 +69,30 @@ signals:
     void addFileReady(bool success, const QString &message);
     void unstageFileReady(bool success, const QString &message);
     void error(const QString &error);
+
+    // Branch modification results
+    void checkoutReady(bool success, const QString &message);
+    void branchCreated(bool success, const QString &message);
+    void branchDeleted(bool success, const QString &message);
+    void branchRenamed(bool success, const QString &message);
+
+    // Remote signals
+    void fetchReady(bool success, const QString &message);
+    void pruneReady(bool success, const QString &message);
+    void remoteUrlReady(const QString &remote, const QString &url);
+
+    // Stash signals
+    void stashCreated(bool success, const QString &message);
+    void stashApplied(bool success, const QString &message);
+    void stashDropped(bool success, const QString &message);
+    void stashShown(const QString &diff);
+
+    // Branch operation results
+    void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
+    void remotesReady(const QList<QString> &remotes);
+    void remoteBranchesReady(const QString &remote, const QList<QString> &branches);
+    void tagsReady(const QList<QString> &tags);
+    void stashesReady(const QList<QString> &stashes);
     
 private slots:
     void onStatusFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -53,6 +103,31 @@ private slots:
     void onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onCommitFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProcessError(QProcess::ProcessError error);
+
+    // Branch operation slots
+    void onLocalBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onCurrentBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRemotesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRemoteBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onTagsFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onStashesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
+    // Branch modification slots
+    void onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onCreateBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    
+    // Remote slots
+    void onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onPruneFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onRemoteUrlFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    
+    // Stash slots
+    void onCreateStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onApplyStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
 private:
     QString m_repositoryPath;
@@ -66,7 +141,26 @@ private:
     QProcess *m_addFileProcess;
     QProcess *m_unstageFileProcess;
     QProcess *m_commitProcess;
-    
+
+    // Processes for branch operations
+    QProcess *m_branchesProcess;
+    QProcess *m_currentBranchProcess;
+    QProcess *m_remotesProcess;
+    QProcess *m_remoteBranchesProcess;
+    QProcess *m_tagsProcess;
+    QProcess *m_stashesProcess;
+
+    // Process for branch modification
+    QProcess *m_checkoutProcess;
+    QProcess *m_branchModifyProcess; // Для create/delete/rename
+    QProcess *m_remoteProcess;       // Для fetch/prune/url
+    QProcess *m_stashProcess;        // Для stash операций (apply/drop/show)
+    QProcess *m_createStashProcess;  // Для создания stash
+
+    // Temporary storage for async operations
+    QList<QString> m_currentBranchesList;
+    QString m_currentRemoteName; // Для отслеживания remote в async вызовах
+
     // Git parser
     GitParser m_gitParser;
     

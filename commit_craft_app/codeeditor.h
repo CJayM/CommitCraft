@@ -23,7 +23,7 @@ class CodeEditor : public QPlainTextEdit
 public:
     CodeEditor(QWidget *parent = nullptr);
 
-    void lineNumberAreaPaintEvent(QPaintEvent *event);
+    virtual void lineNumberAreaPaintEvent(QPaintEvent *event);
     int lineNumberAreaWidth();
     
     void zoomIn(int range = 1);
@@ -41,13 +41,12 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
 
-private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
     void highlightCurrentLine();
     void updateLineNumberArea(const QRect &rect, int dy);
+    QWidget *lineNumberArea;
 
 private:
-    QWidget *lineNumberArea;
     Highlighter *highlighter;
     int m_zoom;
     bool m_syntaxHighlighting;

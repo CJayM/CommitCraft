@@ -28,6 +28,9 @@ struct SyncedLine {
     bool rightIsPlaceholder; // Правая строка — пустой заполнитель (серый фон)
     int leftLineNum;    // Номер строки в левом файле (-1 если не применяется)
     int rightLineNum;   // Номер строки в правом файле (-1 если не применяется)
+    int hunkIndex;      // Индекс чанка, к которому принадлежит строка (-1 для разделителей)
+    bool isHunkBoundary; // true если это первая строка нового чанка (после gap)
+    bool isSeparator;    // true если это строка-разделитель между чанками
 };
 
 /// Виджет side-by-side diff с синхронным скроллом, зумом и подсветкой синтаксиса.
@@ -59,10 +62,21 @@ signals:
     void hunkNavigated(int hunkIndex);
 
 public slots:
-    void navigateToNextHunk();
-    void navigateToPrevHunk();
+    /// Навигация к следующему ханку. Возвращает false если достигнут конец списка.
+    bool navigateToNextHunk();
+    /// Навигация к предыдущему ханку. Возвращает false если достигнуто начало списка.
+    bool navigateToPrevHunk();
+    /// Переход к первому ханку (начало файла)
+    void navigateToFirstHunk();
+    /// Переход к последнему ханку (конец файла)
+    void navigateToLastHunk();
+    
     int currentHunkIndex() const { return m_currentHunkIndex; }
     int hunkCount() const { return m_hunkPositions.size(); }
+    
+    /// Проверка границ навигации
+    bool isAtFirstHunk() const { return m_currentHunkIndex <= 0; }
+    bool isAtLastHunk() const { return m_hunkPositions.isEmpty() || m_currentHunkIndex >= m_hunkPositions.size() - 1; }
 
 private slots:
     void synchronizeScrollLeftToRight(int value);
@@ -88,7 +102,7 @@ private:
     DiffPanel *m_rightPanel;
 
     // Навигация по ханкам
-    QList<QPair<int, int>> m_hunkPositions; // (leftLine, rightLine)
+    QVector<int> m_hunkPositions; // Индексы первых строк ханков в syncedLines
     int m_currentHunkIndex;
 
     // Флаг для предотвращения рекурсии при синхронизации скролла

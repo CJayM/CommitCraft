@@ -54,6 +54,10 @@ private slots:
     void showStagedFileContextMenu(const QPoint &pos);
     void addSelectedFile();
     void unstageSelectedFile();
+    void unstageSelectedFiles(const QStringList &files);
+    void stageSelectedFiles(const QStringList &files);
+    void deleteSelectedFiles(const QStringList &files);
+    void stashSelectedFiles(const QStringList &files);
     void commitChanges();
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
@@ -64,6 +68,9 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
+    
+    /// Обновляет состояние кнопок навигации (Prev/Next Hunk)
+    void updateNavigationButtonsState();
 
 private:
     void saveSplitterState();
@@ -97,6 +104,13 @@ private:
     QTimer *m_fsDebounceTimer;
     void setupFileSystemWatcher();
     void onFileSystemChanged();
+
+    // Отложенная навигация для асинхронной загрузки
+    enum class PendingNavigation { None, GoNext, GoPrev };
+    PendingNavigation m_pendingNavigation = PendingNavigation::None;
+    
+    // Для повторного checkout с stash
+    QString m_lastCheckoutBranch;
     
     // Дополнительные действия контекстного меню
     void copyFilePath(const QString &fileName);

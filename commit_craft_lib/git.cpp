@@ -14,6 +14,17 @@ Git::Git(QObject *parent)
     , m_addFileProcess(new QProcess(this))
     , m_unstageFileProcess(new QProcess(this))
     , m_commitProcess(new QProcess(this))
+    , m_branchesProcess(new QProcess(this))
+    , m_currentBranchProcess(new QProcess(this))
+    , m_remotesProcess(new QProcess(this))
+    , m_remoteBranchesProcess(new QProcess(this))
+    , m_tagsProcess(new QProcess(this))
+    , m_stashesProcess(new QProcess(this))
+    , m_checkoutProcess(new QProcess(this))
+    , m_branchModifyProcess(new QProcess(this))
+    , m_remoteProcess(new QProcess(this))
+    , m_stashProcess(new QProcess(this))
+    , m_createStashProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -44,6 +55,54 @@ Git::Git(QObject *parent)
     connect(m_commitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCommitFinished);
     connect(m_commitProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Branch operations
+    connect(m_branchesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onLocalBranchesFinished);
+    connect(m_branchesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_currentBranchProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCurrentBranchFinished);
+    connect(m_currentBranchProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_remotesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onRemotesFinished);
+    connect(m_remotesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_remoteBranchesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onRemoteBranchesFinished);
+    connect(m_remoteBranchesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_tagsProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onTagsFinished);
+    connect(m_tagsProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_stashesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onStashesFinished);
+    connect(m_stashesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Branch modification
+    connect(m_checkoutProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCheckoutFinished);
+    connect(m_checkoutProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_branchModifyProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCreateBranchFinished); // Универсальный слот для всех операций модификации
+    connect(m_branchModifyProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Remote operations
+    connect(m_remoteProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onFetchFinished); // По умолчанию fetch, будем проверять property
+    connect(m_remoteProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Stash operations
+    connect(m_stashProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onApplyStashFinished); // По умолчанию apply, будем проверять property
+    connect(m_stashProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_createStashProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCreateStashFinished);
+    connect(m_createStashProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -154,10 +213,44 @@ void Git::addFile(const QString &fileName)
     m_addFileProcess->start();
 }
 
+void Git::addFiles(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty()) return;
+    
+    QStringList absoluteFilePaths;
+    for (const QString &file : fileNames) {
+        absoluteFilePaths << QDir(m_repositoryPath).absoluteFilePath(file);
+    }
+    
+    QStringList args;
+    args << "add" << "--";
+    args.append(absoluteFilePaths);
+    
+    setupProcess(m_addFileProcess, args);
+    m_addFileProcess->start();
+}
+
 void Git::unstageFile(const QString &fileName)
 {
     QString absoluteFilePath = QDir(m_repositoryPath).absoluteFilePath(fileName);
-    setupProcess(m_unstageFileProcess, QStringList() << "reset" << "HEAD" << absoluteFilePath);
+    setupProcess(m_unstageFileProcess, QStringList() << "reset" << "HEAD" << "--" << absoluteFilePath);
+    m_unstageFileProcess->start();
+}
+
+void Git::unstageFiles(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty()) return;
+
+    QStringList absoluteFilePaths;
+    for (const QString &file : fileNames) {
+        absoluteFilePaths << QDir(m_repositoryPath).absoluteFilePath(file);
+    }
+
+    QStringList args;
+    args << "reset" << "HEAD" << "--";
+    args.append(absoluteFilePaths);
+
+    setupProcess(m_unstageFileProcess, args);
     m_unstageFileProcess->start();
 }
 
@@ -267,6 +360,187 @@ void Git::onCommitFinished(int exitCode, QProcess::ExitStatus exitStatus)
     }
 }
 
+// ==========================================
+// Branch Operations Implementation
+// ==========================================
+
+void Git::getLocalBranches()
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << "--format=%(refname:short)";
+    setupProcess(m_branchesProcess, args);
+    m_branchesProcess->start(getGitExecutable(), args);
+}
+
+void Git::getRemotes()
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote";
+    setupProcess(m_remotesProcess, args);
+    m_remotesProcess->start(getGitExecutable(), args);
+}
+
+void Git::getRemoteBranches(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    m_currentRemoteName = remote; // Запоминаем для слота
+
+    QStringList args;
+    args << "branch" << "-r" << "--format=%(refname:short)";
+    if (!remote.isEmpty()) {
+        args << "--list" << (remote + "/*");
+    }
+    setupProcess(m_remoteBranchesProcess, args);
+    m_remoteBranchesProcess->start(getGitExecutable(), args);
+}
+
+void Git::getTags()
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "tag" << "--list";
+    setupProcess(m_tagsProcess, args);
+    m_tagsProcess->start(getGitExecutable(), args);
+}
+
+void Git::getStashes()
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "--no-pager" << "stash" << "list"; 
+    setupProcess(m_stashesProcess, args);
+    m_stashesProcess->start(getGitExecutable(), args);
+}
+
+void Git::onLocalBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString output = m_branchesProcess->readAllStandardOutput();
+        QList<QString> branches = output.split('\n', Qt::SkipEmptyParts);
+
+        // Clean up branch names (remove * and whitespace)
+        for (auto &branch : branches) {
+            branch = branch.trimmed();
+        }
+
+        // Get current branch in parallel
+        m_currentBranchProcess->start(getGitExecutable(), {"rev-parse", "--abbrev-ref", "HEAD"});
+
+        // Store branches temporarily until we get current branch
+        m_currentBranchesList = branches;
+    } else {
+        QString errorMsg = m_branchesProcess->readAllStandardError();
+        emit localBranchesReady({}, "");
+        emit error(QString("Failed to get local branches: %1").arg(errorMsg));
+    }
+}
+
+void Git::onCurrentBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString currentBranch = m_currentBranchProcess->readAllStandardOutput().trimmed();
+        emit localBranchesReady(m_currentBranchesList, currentBranch);
+    } else {
+        // If we can't get current branch, still emit branches with empty current
+        emit localBranchesReady(m_currentBranchesList, "");
+    }
+}
+
+void Git::onRemotesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString output = m_remotesProcess->readAllStandardOutput();
+        QList<QString> remotes = output.split('\n', Qt::SkipEmptyParts);
+        
+        for (auto &remote : remotes) {
+            remote = remote.trimmed();
+        }
+        
+        emit remotesReady(remotes);
+    } else {
+        QString errorMsg = m_remotesProcess->readAllStandardError();
+        emit remotesReady({});
+        emit error(QString("Failed to get remotes: %1").arg(errorMsg));
+    }
+}
+
+void Git::onRemoteBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString output = m_remoteBranchesProcess->readAllStandardOutput();
+        QList<QString> branches = output.split('\n', Qt::SkipEmptyParts);
+        
+        for (auto &branch : branches) {
+            branch = branch.trimmed();
+        }
+        
+        emit remoteBranchesReady(m_currentRemoteName, branches);
+    } else {
+        QString errorMsg = m_remoteBranchesProcess->readAllStandardError();
+        emit remoteBranchesReady(m_currentRemoteName, {});
+        emit error(QString("Failed to get remote branches: %1").arg(errorMsg));
+    }
+}
+
+void Git::onTagsFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString output = m_tagsProcess->readAllStandardOutput();
+        QList<QString> tags = output.split('\n', Qt::SkipEmptyParts);
+        
+        for (auto &tag : tags) {
+            tag = tag.trimmed();
+        }
+        
+        emit tagsReady(tags);
+    } else {
+        QString errorMsg = m_tagsProcess->readAllStandardError();
+        emit tagsReady({});
+        emit error(QString("Failed to get tags: %1").arg(errorMsg));
+    }
+}
+
+void Git::onStashesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString stdoutOutput = m_stashesProcess->readAllStandardOutput();
+    
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QList<QString> stashes = stdoutOutput.split('\n', Qt::SkipEmptyParts);
+        
+        for (auto &stash : stashes) {
+            stash = stash.trimmed();
+        }
+        
+        emit stashesReady(stashes);
+    } else {
+        QString stderrOutput = m_stashesProcess->readAllStandardError();
+        emit stashesReady({});
+        emit error(QString("Failed to get stashes: %1").arg(stderrOutput));
+    }
+}
+
 void Git::onProcessError(QProcess::ProcessError err)
 {
     QProcess *process = qobject_cast<QProcess *>(sender());
@@ -296,4 +570,374 @@ void Git::onProcessError(QProcess::ProcessError err)
     }
 
     emit error(errorMessage);
+}
+
+// ==========================================
+// Branch Modification Implementation
+// ==========================================
+
+void Git::checkoutBranch(const QString &branch, bool stashBeforeCheckout)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    if (stashBeforeCheckout) {
+        // Сначала stash'им изменения, потом делаем checkout
+        QStringList stashArgs;
+        stashArgs << "stash" << "push" << "-u" << "-m" << "WIP before checkout to " + branch;
+        setupProcess(m_checkoutProcess, stashArgs);
+        
+        // Используем цепочку: stash -> checkout
+        // Для простоты делаем последовательные вызовы через сигнал finished
+        m_checkoutProcess->setProperty("checkoutBranch", branch);
+        m_checkoutProcess->setProperty("stashPhase", true);
+        m_checkoutProcess->start(getGitExecutable(), stashArgs);
+    } else {
+        QStringList args;
+        args << "checkout" << branch;
+        setupProcess(m_checkoutProcess, args);
+        m_checkoutProcess->setProperty("stashPhase", false);
+        m_checkoutProcess->start(getGitExecutable(), args);
+    }
+}
+
+void Git::onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    bool stashPhase = m_checkoutProcess->property("stashPhase").toBool();
+    
+    if (stashPhase) {
+        // Если это был stash, теперь делаем checkout
+        QString branch = m_checkoutProcess->property("checkoutBranch").toString();
+        
+        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+            // Stash успешен, теперь checkout
+            QStringList args;
+            args << "checkout" << branch;
+            m_checkoutProcess->setProperty("stashPhase", false);
+            m_checkoutProcess->start(getGitExecutable(), args);
+        } else {
+            QString errorMsg = m_checkoutProcess->readAllStandardError();
+            emit checkoutReady(false, QString("Failed to stash changes: %1").arg(errorMsg));
+            emit error(QString("Failed to stash changes: %1").arg(errorMsg));
+        }
+    } else {
+        // Это был checkout (или вторая фаза stash+checkout)
+        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+            emit checkoutReady(true, "Checkout successful");
+        } else {
+            QString errorMsg = m_checkoutProcess->readAllStandardError();
+            emit checkoutReady(false, QString("Failed to checkout branch: %1").arg(errorMsg));
+            emit error(QString("Failed to checkout branch: %1").arg(errorMsg));
+        }
+    }
+}
+
+void Git::createBranch(const QString &name, const QString &fromRef)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << name;
+    if (!fromRef.isEmpty()) {
+        args << fromRef;
+    }
+    
+    m_branchModifyProcess->setProperty("operation", "create");
+    m_branchModifyProcess->start(getGitExecutable(), args);
+}
+
+void Git::deleteBranch(const QString &branch, bool force)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << (force ? "-D" : "-d") << branch;
+    
+    m_branchModifyProcess->setProperty("operation", "delete");
+    m_branchModifyProcess->start(getGitExecutable(), args);
+}
+
+void Git::renameBranch(const QString &oldName, const QString &newName)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "branch" << "-m" << oldName << newName;
+    
+    m_branchModifyProcess->setProperty("operation", "rename");
+    m_branchModifyProcess->start(getGitExecutable(), args);
+}
+
+void Git::onCreateBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_branchModifyProcess->property("operation").toString();
+    
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        if (operation == "create") {
+            emit branchCreated(true, "Branch created successfully");
+        } else if (operation == "delete") {
+            emit branchDeleted(true, "Branch deleted successfully");
+        } else if (operation == "rename") {
+            emit branchRenamed(true, "Branch renamed successfully");
+        }
+    } else {
+        QString errorMsg = m_branchModifyProcess->readAllStandardError();
+        if (operation == "create") {
+            emit branchCreated(false, QString("Failed to create branch: %1").arg(errorMsg));
+            emit error(QString("Failed to create branch: %1").arg(errorMsg));
+        } else if (operation == "delete") {
+            emit branchDeleted(false, QString("Failed to delete branch: %1").arg(errorMsg));
+            emit error(QString("Failed to delete branch: %1").arg(errorMsg));
+        } else if (operation == "rename") {
+            emit branchRenamed(false, QString("Failed to rename branch: %1").arg(errorMsg));
+            emit error(QString("Failed to rename branch: %1").arg(errorMsg));
+        }
+    }
+}
+
+// Заглушки для остальных слотов, чтобы компилятор не ругался
+// В реальной реализации нужно разделить слоты или использовать один слот с проверкой property
+void Git::onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
+}
+
+void Git::onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
+}
+
+// ==========================================
+// Remote Operations Implementation
+// ==========================================
+
+void Git::fetchRemote(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "fetch" << remote;
+    
+    m_remoteProcess->setProperty("operation", "fetch");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::pruneRemote(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "prune" << remote;
+    
+    m_remoteProcess->setProperty("operation", "prune");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::getRemoteUrl(const QString &remote)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "get-url" << remote;
+    
+    m_remoteProcess->setProperty("operation", "url");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_remoteProcess->property("operation").toString();
+    QString remote = m_remoteProcess->property("remoteName").toString();
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        if (operation == "fetch") {
+            emit fetchReady(true, QString("Fetch from %1 successful").arg(remote));
+        } else if (operation == "prune") {
+            emit pruneReady(true, QString("Prune %1 successful").arg(remote));
+        } else if (operation == "url") {
+            QString url = m_remoteProcess->readAllStandardOutput().trimmed();
+            emit remoteUrlReady(remote, url);
+        }
+    } else {
+        QString errorMsg = m_remoteProcess->readAllStandardError();
+        if (operation == "fetch") {
+            emit fetchReady(false, QString("Fetch failed: %1").arg(errorMsg));
+            emit error(QString("Fetch failed: %1").arg(errorMsg));
+        } else if (operation == "prune") {
+            emit pruneReady(false, QString("Prune failed: %1").arg(errorMsg));
+            emit error(QString("Prune failed: %1").arg(errorMsg));
+        } else if (operation == "url") {
+            emit remoteUrlReady(remote, "");
+        }
+    }
+}
+
+void Git::onPruneFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onFetchFinished(exitCode, exitStatus);
+}
+
+void Git::onRemoteUrlFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onFetchFinished(exitCode, exitStatus);
+}
+
+// ==========================================
+// Stash Operations Implementation
+// ==========================================
+
+void Git::createStash(const QStringList &files, const QString &message)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "stash" << "push" << "-u" << "-m" << message << "--";
+    
+    // Нормализуем пути
+    QStringList normalizedFiles;
+    for (const QString &file : files) {
+        QString normalized = file;
+        normalized.replace("\\", "/");
+        
+        QFileInfo fi(normalized);
+        if (fi.isAbsolute()) {
+            normalized = QDir(m_repositoryPath).relativeFilePath(fi.absoluteFilePath());
+        }
+        normalizedFiles << normalized;
+    }
+    
+    args.append(normalizedFiles);
+    
+    m_createStashProcess->setWorkingDirectory(m_repositoryPath);
+    m_createStashProcess->start(getGitExecutable(), args);
+}
+
+void Git::onCreateStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString stdoutOutput = m_createStashProcess->readAllStandardOutput();
+    QString stderrOutput = m_createStashProcess->readAllStandardError();
+    
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        emit stashCreated(true, "Stash created successfully");
+    } else {
+        emit stashCreated(false, QString("Failed to create stash: %1").arg(stderrOutput));
+        emit error(QString("Failed to create stash: %1").arg(stderrOutput));
+    }
+}
+
+void Git::applyStash(const QString &stashRef, bool drop)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    if (drop) {
+        args << "stash" << "pop" << stashRef; // Pop applies and drops
+        m_stashProcess->setProperty("operation", "pop");
+    } else {
+        args << "stash" << "apply" << stashRef;
+        m_stashProcess->setProperty("operation", "apply");
+    }
+    
+    m_stashProcess->setProperty("stashRef", stashRef);
+    m_stashProcess->start(getGitExecutable(), args);
+}
+
+void Git::dropStash(const QString &stashRef)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "stash" << "drop" << stashRef;
+    
+    m_stashProcess->setProperty("operation", "drop");
+    m_stashProcess->setProperty("stashRef", stashRef);
+    m_stashProcess->start(getGitExecutable(), args);
+}
+
+void Git::showStash(const QString &stashRef)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "stash" << "show" << "-p" << stashRef;
+    
+    m_stashProcess->setProperty("operation", "show");
+    m_stashProcess->setProperty("stashRef", stashRef);
+    m_stashProcess->start(getGitExecutable(), args);
+}
+
+void Git::onApplyStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_stashProcess->property("operation").toString();
+    QString stashRef = m_stashProcess->property("stashRef").toString();
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        if (operation == "apply") {
+            emit stashApplied(true, QString("Stash %1 applied").arg(stashRef));
+        } else if (operation == "pop") {
+            emit stashApplied(true, QString("Stash %1 popped (applied and dropped)").arg(stashRef));
+        } else if (operation == "drop") {
+            emit stashDropped(true, QString("Stash %1 dropped").arg(stashRef));
+        } else if (operation == "show") {
+            QString diff = m_stashProcess->readAllStandardOutput();
+            emit stashShown(diff);
+        }
+    } else {
+        QString errorMsg = m_stashProcess->readAllStandardError();
+        if (operation == "apply" || operation == "pop") {
+            emit stashApplied(false, QString("Failed to apply stash: %1").arg(errorMsg));
+            emit error(QString("Failed to apply stash: %1").arg(errorMsg));
+        } else if (operation == "drop") {
+            emit stashDropped(false, QString("Failed to drop stash: %1").arg(errorMsg));
+            emit error(QString("Failed to drop stash: %1").arg(errorMsg));
+        } else if (operation == "show") {
+            emit stashShown("");
+            emit error(QString("Failed to show stash: %1").arg(errorMsg));
+        }
+    }
+}
+
+void Git::onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onApplyStashFinished(exitCode, exitStatus);
+}
+
+void Git::onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    onApplyStashFinished(exitCode, exitStatus);
 }

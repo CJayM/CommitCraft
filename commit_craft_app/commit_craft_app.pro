@@ -6,6 +6,7 @@ TARGET = commit_craft
 TEMPLATE = app
 
 SOURCES += \
+    brancheswidget.cpp \
     codeeditor.cpp \
     diffeditor.cpp \
     diffhighlighter.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
     syntaxhighlighter.cpp
 
 HEADERS += \
+    brancheswidget.h \
     codeeditor.h \
     diffeditor.h \
     diffhighlighter.h \
