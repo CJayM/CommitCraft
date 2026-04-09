@@ -4,10 +4,17 @@
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
 #include <QFont>
+#include <QMenu>
+#include <QAction>
+#include <QContextMenuEvent>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QLineEdit>
 
 BranchesWidget::BranchesWidget(QWidget *parent)
     : QFrame(parent)
     , m_git(nullptr)
+    , m_contextMenuItem(nullptr)
 {
     m_layout = new QVBoxLayout(this);
     m_layout->setContentsMargins(0, 0, 0, 0);
@@ -19,11 +26,22 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     m_treeWidget->setIndentation(20);
     m_treeWidget->setRootIsDecorated(true);
     
-    // Подключаем обработку двойного клика
     connect(m_treeWidget, &QTreeWidget::itemDoubleClicked, this, &BranchesWidget::onTreeItemDoubleClicked);
     
-    setupTree();
+    // Setup Context Menu
+    m_contextMenu = new QMenu(this);
+    m_checkoutAction = m_contextMenu->addAction(tr("Checkout"));
+    m_createBranchAction = m_contextMenu->addAction(tr("Create New Branch Here"));
+    m_renameBranchAction = m_contextMenu->addAction(tr("Rename"));
+    m_contextMenu->addSeparator();
+    m_deleteBranchAction = m_contextMenu->addAction(tr("Delete"));
     
+    connect(m_checkoutAction, &QAction::triggered, this, &BranchesWidget::onCheckoutAction);
+    connect(m_createBranchAction, &QAction::triggered, this, &BranchesWidget::onCreateBranchAction);
+    connect(m_renameBranchAction, &QAction::triggered, this, &BranchesWidget::onRenameBranchAction);
+    connect(m_deleteBranchAction, &QAction::triggered, this, &BranchesWidget::onDeleteBranchAction);
+
+    setupTree();
     m_layout->addWidget(m_treeWidget);
 }
 
@@ -31,7 +49,6 @@ void BranchesWidget::setGit(Git *git)
 {
     m_git = git;
     
-    // Подключаем сигналы Git к слотам виджета
     if (m_git) {
         connect(m_git, &Git::localBranchesReady, this, &BranchesWidget::populateLocalBranches);
         connect(m_git, &Git::remotesReady, this, &BranchesWidget::populateRemotes);
@@ -46,7 +63,6 @@ void BranchesWidget::refresh()
     if (!m_git)
         return;
 
-    // Запрашиваем все данные асинхронно
     m_git->getLocalBranches();
     m_git->getRemotes();
     m_git->getTags();
@@ -61,22 +77,18 @@ void BranchesWidget::setupTree()
 
 void BranchesWidget::createRootItems()
 {
-    // Local Branches
     m_localBranchesRoot = new QTreeWidgetItem(m_treeWidget);
     m_localBranchesRoot->setText(0, "Local Branches");
     m_localBranchesRoot->setExpanded(true);
     
-    // Remotes
     m_remotesRoot = new QTreeWidgetItem(m_treeWidget);
     m_remotesRoot->setText(0, "Remotes");
     m_remotesRoot->setExpanded(false);
     
-    // Tags
     m_tagsRoot = new QTreeWidgetItem(m_treeWidget);
     m_tagsRoot->setText(0, "Tags");
     m_tagsRoot->setExpanded(false);
     
-    // Stashes
     m_stashesRoot = new QTreeWidgetItem(m_treeWidget);
     m_stashesRoot->setText(0, "Stashes");
     m_stashesRoot->setExpanded(false);
@@ -92,21 +104,20 @@ void BranchesWidget::clearChildren(QTreeWidgetItem *parent)
 void BranchesWidget::populateLocalBranches(const QList<QString> &branches, const QString &currentBranch)
 {
     clearChildren(m_localBranchesRoot);
+    m_currentBranchName = currentBranch;
     
-    // Обновляем заголовок с количеством
     m_localBranchesRoot->setText(0, QString("Local Branches (%1)").arg(branches.size()));
     
     for (const QString &branch : branches) {
         QTreeWidgetItem *item = new QTreeWidgetItem(m_localBranchesRoot);
         item->setText(0, branch);
-        item->setData(0, Qt::UserRole, "branch"); // Тип для идентификации
+        item->setData(0, Qt::UserRole, "branch");
         
-        // Подсвечиваем текущую ветку жирным
         if (branch == currentBranch) {
             QFont font = item->font(0);
             font.setBold(true);
             item->setFont(0, font);
-            item->setText(0, "● " + branch); // Маркер текущей ветки
+            item->setText(0, "● " + branch);
         }
     }
 }
@@ -129,7 +140,6 @@ void BranchesWidget::populateRemotes(const QList<QString> &remotes)
         remoteItem->setExpanded(false);
     }
 
-    // Запрашиваем ВСЕ удаленные ветки одним запросом
     if (m_git) {
         m_git->getRemoteBranches(""); 
     }
@@ -138,8 +148,6 @@ void BranchesWidget::populateRemotes(const QList<QString> &remotes)
 void BranchesWidget::populateRemoteBranches(const QString &remote, const QList<QString> &branches)
 {
     Q_UNUSED(remote);
-    // Если remote пустой, значит нам пришли ВСЕ ветки (формат "remote/branch")
-    // Нам нужно распределить их по узлам.
     
     for (const QString &fullBranch : branches) {
         QStringList parts = fullBranch.split('/');
@@ -147,11 +155,9 @@ void BranchesWidget::populateRemoteBranches(const QString &remote, const QList<Q
             QString remoteName = parts[0];
             QString branchName = fullBranch.mid(remoteName.length() + 1);
             
-            // Ищем узел remote
             QTreeWidgetItem *remoteItem = nullptr;
             for (int i = 0; i < m_remotesRoot->childCount(); ++i) {
                 QTreeWidgetItem *child = m_remotesRoot->child(i);
-                // Ищем по точному совпадению имени
                 if (child->text(0) == remoteName) {
                     remoteItem = child;
                     break;
@@ -166,11 +172,9 @@ void BranchesWidget::populateRemoteBranches(const QString &remote, const QList<Q
         }
     }
     
-    // Обновляем заголовки remote-узлов с количеством веток
     for (int i = 0; i < m_remotesRoot->childCount(); ++i) {
         QTreeWidgetItem *item = m_remotesRoot->child(i);
         int count = item->childCount();
-        // Текст сейчас содержит чистое имя remote (из populateRemotes)
         item->setText(0, QString("%1 (%2)").arg(item->text(0), QString::number(count)));
     }
 }
@@ -178,7 +182,6 @@ void BranchesWidget::populateRemoteBranches(const QString &remote, const QList<Q
 void BranchesWidget::populateTags(const QList<QString> &tags)
 {
     clearChildren(m_tagsRoot);
-    
     m_tagsRoot->setText(0, QString("Tags (%1)").arg(tags.size()));
     
     for (const QString &tag : tags) {
@@ -191,7 +194,6 @@ void BranchesWidget::populateTags(const QList<QString> &tags)
 void BranchesWidget::populateStashes(const QList<QString> &stashes)
 {
     clearChildren(m_stashesRoot);
-    
     m_stashesRoot->setText(0, QString("Stashes (%1)").arg(stashes.size()));
     
     for (const QString &stash : stashes) {
@@ -210,24 +212,15 @@ void BranchesWidget::onTreeItemDoubleClicked(QTreeWidgetItem *item, int column)
     QString type = item->data(0, Qt::UserRole).toString();
     QString branchName;
 
-    // Определяем имя ветки в зависимости от типа элемента
     if (type == "branch") {
-        // Локальная ветка: убираем маркер текущей ветки если есть
         branchName = item->text(0);
-        if (branchName.startsWith("● ")) {
-            branchName = branchName.mid(2);
-        }
+        if (branchName.startsWith("● ")) branchName = branchName.mid(2);
     } else if (type == "remote_branch") {
-        // Remote ветка: нужно добавить префикс remote
-        // Находим родительский узел (remote name)
         QTreeWidgetItem *parent = item->parent();
         if (parent && parent->data(0, Qt::UserRole).toString() == "remote") {
             QString remoteName = parent->text(0);
-            // Убираем счетчик в скобках если есть
             int bracketPos = remoteName.indexOf(" (");
-            if (bracketPos != -1) {
-                remoteName = remoteName.left(bracketPos);
-            }
+            if (bracketPos != -1) remoteName = remoteName.left(bracketPos);
             branchName = remoteName + "/" + item->text(0);
         }
     }
@@ -235,5 +228,108 @@ void BranchesWidget::onTreeItemDoubleClicked(QTreeWidgetItem *item, int column)
     if (!branchName.isEmpty()) {
         emit checkoutAttempted(branchName);
         m_git->checkoutBranch(branchName);
+    }
+}
+
+void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+    QTreeWidgetItem *item = getBranchItemUnderCursor(event->pos());
+    m_contextMenuItem = item;
+
+    if (!item) return;
+
+    QString type = item->data(0, Qt::UserRole).toString();
+    bool isCurrentBranch = false;
+    
+    if (type == "branch") {
+        QString branchName = item->text(0);
+        if (branchName.startsWith("● ")) branchName = branchName.mid(2);
+        isCurrentBranch = (branchName == m_currentBranchName);
+    }
+
+    if (type == "branch") {
+        m_checkoutAction->setVisible(!isCurrentBranch);
+        m_checkoutAction->setEnabled(!isCurrentBranch);
+        
+        m_createBranchAction->setVisible(true);
+        m_renameBranchAction->setVisible(!isCurrentBranch);
+        m_renameBranchAction->setEnabled(!isCurrentBranch);
+        
+        m_deleteBranchAction->setVisible(!isCurrentBranch);
+        m_deleteBranchAction->setEnabled(!isCurrentBranch);
+    } else {
+        m_checkoutAction->setVisible(false);
+        m_createBranchAction->setVisible(false);
+        m_renameBranchAction->setVisible(false);
+        m_deleteBranchAction->setVisible(false);
+        return;
+    }
+
+    m_contextMenu->exec(event->globalPos());
+}
+
+QTreeWidgetItem* BranchesWidget::getBranchItemUnderCursor(const QPoint &pos) const
+{
+    QTreeWidgetItem *item = m_treeWidget->itemAt(pos);
+    if (!item) return nullptr;
+    QString type = item->data(0, Qt::UserRole).toString();
+    if (type == "branch") return item;
+    return nullptr;
+}
+
+void BranchesWidget::onCheckoutAction()
+{
+    if (!m_contextMenuItem || !m_git) return;
+    QString branchName = m_contextMenuItem->text(0);
+    if (branchName.startsWith("● ")) branchName = branchName.mid(2);
+    
+    emit checkoutAttempted(branchName);
+    m_git->checkoutBranch(branchName);
+}
+
+void BranchesWidget::onCreateBranchAction()
+{
+    if (!m_contextMenuItem) return;
+    QString baseBranch = m_contextMenuItem->text(0);
+    if (baseBranch.startsWith("● ")) baseBranch = baseBranch.mid(2);
+
+    bool ok;
+    QString newBranchName = QInputDialog::getText(this, tr("Create New Branch"),
+                                                  tr("New branch name (from \"%1\"):").arg(baseBranch),
+                                                  QLineEdit::Normal, "", &ok);
+    if (ok && !newBranchName.isEmpty()) {
+        QMessageBox::information(this, tr("Info"), tr("Create branch functionality not implemented yet."));
+    }
+}
+
+void BranchesWidget::onRenameBranchAction()
+{
+    if (!m_contextMenuItem) return;
+    QString oldName = m_contextMenuItem->text(0);
+    if (oldName.startsWith("● ")) oldName = oldName.mid(2);
+
+    bool ok;
+    QString newName = QInputDialog::getText(this, tr("Rename Branch"),
+                                            tr("New name for \"%1\":").arg(oldName),
+                                            QLineEdit::Normal, oldName, &ok);
+    if (ok && !newName.isEmpty() && newName != oldName) {
+        QMessageBox::information(this, tr("Info"), tr("Rename branch functionality not implemented yet."));
+    }
+}
+
+void BranchesWidget::onDeleteBranchAction()
+{
+    if (!m_contextMenuItem) return;
+    QString branchName = m_contextMenuItem->text(0);
+    if (branchName.startsWith("● ")) branchName = branchName.mid(2);
+
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, tr("Delete Branch"),
+        tr("Are you sure you want to delete branch \"%1\"?").arg(branchName),
+        QMessageBox::Yes | QMessageBox::No
+    );
+
+    if (reply == QMessageBox::Yes) {
+        QMessageBox::information(this, tr("Info"), tr("Delete branch functionality not implemented yet."));
     }
 }

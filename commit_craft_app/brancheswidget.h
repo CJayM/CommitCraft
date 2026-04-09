@@ -2,10 +2,13 @@
 #define BRANCHESWIDGET_H
 
 #include <QFrame>
+#include <QMenu>
+#include <QAction>
 
 class QTreeWidget;
 class QTreeWidgetItem;
 class QVBoxLayout;
+class QContextMenuEvent;
 class Git;
 
 class BranchesWidget : public QFrame
@@ -42,16 +45,39 @@ private:
     
     /// Обработка двойного клика по элементу дерева
     void onTreeItemDoubleClicked(QTreeWidgetItem *item, int column);
+    
+    /// Контекстное меню
+    void contextMenuEvent(QContextMenuEvent *event) override;
+    
+    /// Возвращает элемент ветки под курсором, если есть
+    QTreeWidgetItem* getBranchItemUnderCursor(const QPoint &pos) const;
+    
+    // Context menu slots
+    void onCheckoutAction();
+    void onCreateBranchAction();
+    void onDeleteBranchAction();
+    void onRenameBranchAction();
 
     QVBoxLayout *m_layout;
     QTreeWidget *m_treeWidget;
     Git *m_git;
+    
+    // Текущий элемент для контекстного меню
+    QTreeWidgetItem *m_contextMenuItem;
+    QString m_currentBranchName; // Для проверки, можно ли удалить/переименовать
 
     // Корневые элементы дерева
     QTreeWidgetItem *m_localBranchesRoot;
     QTreeWidgetItem *m_remotesRoot;
     QTreeWidgetItem *m_tagsRoot;
     QTreeWidgetItem *m_stashesRoot;
+    
+    // Context menu
+    QMenu *m_contextMenu;
+    QAction *m_checkoutAction;
+    QAction *m_createBranchAction;
+    QAction *m_deleteBranchAction;
+    QAction *m_renameBranchAction;
 };
 
 #endif // BRANCHESWIDGET_H
