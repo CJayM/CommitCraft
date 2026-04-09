@@ -335,10 +335,12 @@ void Git::getRemoteBranches(const QString &remote)
         return;
     }
 
+    m_currentRemoteName = remote; // Запоминаем для слота
+
     QStringList args;
     args << "branch" << "-r" << "--format=%(refname:short)";
     if (!remote.isEmpty()) {
-        args << remote;
+        args << "--list" << (remote + "/*");
     }
     setupProcess(m_remoteBranchesProcess, args);
     m_remoteBranchesProcess->start(getGitExecutable(), args);
@@ -375,15 +377,15 @@ void Git::onLocalBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus)
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
         QString output = m_branchesProcess->readAllStandardOutput();
         QList<QString> branches = output.split('\n', Qt::SkipEmptyParts);
-        
+
         // Clean up branch names (remove * and whitespace)
         for (auto &branch : branches) {
             branch = branch.trimmed();
         }
-        
+
         // Get current branch in parallel
         m_currentBranchProcess->start(getGitExecutable(), {"rev-parse", "--abbrev-ref", "HEAD"});
-        
+
         // Store branches temporarily until we get current branch
         m_currentBranchesList = branches;
     } else {
@@ -432,10 +434,10 @@ void Git::onRemoteBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus
             branch = branch.trimmed();
         }
         
-        emit remoteBranchesReady("", branches);
+        emit remoteBranchesReady(m_currentRemoteName, branches);
     } else {
         QString errorMsg = m_remoteBranchesProcess->readAllStandardError();
-        emit remoteBranchesReady("", {});
+        emit remoteBranchesReady(m_currentRemoteName, {});
         emit error(QString("Failed to get remote branches: %1").arg(errorMsg));
     }
 }

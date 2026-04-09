@@ -99,6 +99,7 @@ private:
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;
+    QString m_currentRemoteName; // Для отслеживания remote в async вызовах
 
     // Git parser
     GitParser m_gitParser;

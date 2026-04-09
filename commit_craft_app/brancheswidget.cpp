@@ -124,37 +124,50 @@ void BranchesWidget::populateRemotes(const QList<QString> &remotes)
         remoteItem->setText(0, remote);
         remoteItem->setData(0, Qt::UserRole, "remote");
         remoteItem->setExpanded(false);
-        
-        // Запрашиваем ветки для этого remote
-        if (m_git) {
-            m_git->getRemoteBranches(remote);
-        }
+    }
+
+    // Запрашиваем ВСЕ удаленные ветки одним запросом
+    if (m_git) {
+        m_git->getRemoteBranches(""); 
     }
 }
 
 void BranchesWidget::populateRemoteBranches(const QString &remote, const QList<QString> &branches)
 {
-    // Находим узел remote в дереве
-    for (int i = 0; i < m_remotesRoot->childCount(); ++i) {
-        QTreeWidgetItem *remoteItem = m_remotesRoot->child(i);
-        if (remoteItem->text(0) == remote) {
-            clearChildren(remoteItem);
+    // Если remote пустой, значит нам пришли ВСЕ ветки (формат "remote/branch")
+    // Нам нужно распределить их по узлам.
+    
+    for (const QString &fullBranch : branches) {
+        QStringList parts = fullBranch.split('/');
+        if (parts.size() >= 2) {
+            QString remoteName = parts[0];
+            QString branchName = fullBranch.mid(remoteName.length() + 1);
             
-            for (const QString &branch : branches) {
-                QTreeWidgetItem *branchItem = new QTreeWidgetItem(remoteItem);
-                // Убираем префикс remote/ из названия
-                QString displayName = branch;
-                if (displayName.startsWith(remote + "/")) {
-                    displayName = displayName.mid(remote.length() + 1);
+            // Ищем узел remote
+            QTreeWidgetItem *remoteItem = nullptr;
+            for (int i = 0; i < m_remotesRoot->childCount(); ++i) {
+                QTreeWidgetItem *child = m_remotesRoot->child(i);
+                // Ищем по точному совпадению имени
+                if (child->text(0) == remoteName) {
+                    remoteItem = child;
+                    break;
                 }
-                branchItem->setText(0, displayName);
-                branchItem->setData(0, Qt::UserRole, "remote_branch");
             }
             
-            // Обновляем заголовок remote с количеством веток
-            remoteItem->setText(0, QString("%1 (%2)").arg(remote, QString::number(branches.size())));
-            break;
+            if (remoteItem) {
+                QTreeWidgetItem *branchItem = new QTreeWidgetItem(remoteItem);
+                branchItem->setText(0, branchName);
+                branchItem->setData(0, Qt::UserRole, "remote_branch");
+            }
         }
+    }
+    
+    // Обновляем заголовки remote-узлов с количеством веток
+    for (int i = 0; i < m_remotesRoot->childCount(); ++i) {
+        QTreeWidgetItem *item = m_remotesRoot->child(i);
+        int count = item->childCount();
+        // Текст сейчас содержит чистое имя remote (из populateRemotes)
+        item->setText(0, QString("%1 (%2)").arg(item->text(0), QString::number(count)));
     }
 }
 

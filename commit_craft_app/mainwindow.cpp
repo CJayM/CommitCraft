@@ -116,6 +116,11 @@ MainWindow::MainWindow(QWidget *parent)
     // Подключаем BranchesWidget к Git
     ui->branchesWidget->setGit(git);
     
+    // Если репозиторий загружен из настроек, обновляем панель веток
+    if (!repositoryPath.isEmpty() && isGitRepository(repositoryPath)) {
+        ui->branchesWidget->refresh();
+    }
+    
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
