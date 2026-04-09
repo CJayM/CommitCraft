@@ -19,6 +19,9 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     m_treeWidget->setIndentation(20);
     m_treeWidget->setRootIsDecorated(true);
     
+    // Подключаем обработку двойного клика
+    connect(m_treeWidget, &QTreeWidget::itemDoubleClicked, this, &BranchesWidget::onTreeItemDoubleClicked);
+    
     setupTree();
     
     m_layout->addWidget(m_treeWidget);
@@ -134,6 +137,7 @@ void BranchesWidget::populateRemotes(const QList<QString> &remotes)
 
 void BranchesWidget::populateRemoteBranches(const QString &remote, const QList<QString> &branches)
 {
+    Q_UNUSED(remote);
     // Если remote пустой, значит нам пришли ВСЕ ветки (формат "remote/branch")
     // Нам нужно распределить их по узлам.
     
@@ -194,5 +198,42 @@ void BranchesWidget::populateStashes(const QList<QString> &stashes)
         QTreeWidgetItem *item = new QTreeWidgetItem(m_stashesRoot);
         item->setText(0, stash);
         item->setData(0, Qt::UserRole, "stash");
+    }
+}
+
+void BranchesWidget::onTreeItemDoubleClicked(QTreeWidgetItem *item, int column)
+{
+    Q_UNUSED(column);
+    if (!item || !m_git)
+        return;
+
+    QString type = item->data(0, Qt::UserRole).toString();
+    QString branchName;
+
+    // Определяем имя ветки в зависимости от типа элемента
+    if (type == "branch") {
+        // Локальная ветка: убираем маркер текущей ветки если есть
+        branchName = item->text(0);
+        if (branchName.startsWith("● ")) {
+            branchName = branchName.mid(2);
+        }
+    } else if (type == "remote_branch") {
+        // Remote ветка: нужно добавить префикс remote
+        // Находим родительский узел (remote name)
+        QTreeWidgetItem *parent = item->parent();
+        if (parent && parent->data(0, Qt::UserRole).toString() == "remote") {
+            QString remoteName = parent->text(0);
+            // Убираем счетчик в скобках если есть
+            int bracketPos = remoteName.indexOf(" (");
+            if (bracketPos != -1) {
+                remoteName = remoteName.left(bracketPos);
+            }
+            branchName = remoteName + "/" + item->text(0);
+        }
+    }
+
+    if (!branchName.isEmpty()) {
+        emit checkoutAttempted(branchName);
+        m_git->checkoutBranch(branchName);
     }
 }

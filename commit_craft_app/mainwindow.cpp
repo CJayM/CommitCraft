@@ -115,6 +115,38 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Подключаем BranchesWidget к Git
     ui->branchesWidget->setGit(git);
+
+    // Сохраняем имя ветки при попытке checkout
+    connect(ui->branchesWidget, &BranchesWidget::checkoutAttempted, this, [this](const QString &branch) {
+        m_lastCheckoutBranch = branch;
+    });
+
+    // Подключаем сигнал checkout для обновления интерфейса
+    connect(git, &Git::checkoutReady, this, [this](bool success, const QString &message) {
+        if (success) {
+            // Обновляем панель веток, filesTable и diff
+            ui->branchesWidget->refresh();
+            refreshGitStatus();
+        } else {
+            // Проверяем, можно ли заstashить изменения
+            if ((message.contains("would be overwritten by checkout") || 
+                 message.contains("Please commit your changes or stash them")) && !m_lastCheckoutBranch.isEmpty()) {
+                
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                    this,
+                    tr("Несохраненные изменения"),
+                    tr("У вас есть несохраненные изменения. Заstashить их и переключиться на ветку \"%1\"?").arg(m_lastCheckoutBranch),
+                    QMessageBox::Yes | QMessageBox::No
+                );
+
+                if (reply == QMessageBox::Yes) {
+                    git->checkoutBranch(m_lastCheckoutBranch, true);
+                }
+            } else {
+                QMessageBox::warning(this, tr("Ошибка Git"), message);
+            }
+        }
+    });
     
     // Если репозиторий загружен из настроек, обновляем панель веток
     if (!repositoryPath.isEmpty() && isGitRepository(repositoryPath)) {

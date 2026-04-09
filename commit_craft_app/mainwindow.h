@@ -105,6 +105,9 @@ private:
     enum class PendingNavigation { None, GoNext, GoPrev };
     PendingNavigation m_pendingNavigation = PendingNavigation::None;
     
+    // Для повторного checkout с stash
+    QString m_lastCheckoutBranch;
+    
     // Дополнительные действия контекстного меню
     void copyFilePath(const QString &fileName);
     void openFile(const QString &fileName);

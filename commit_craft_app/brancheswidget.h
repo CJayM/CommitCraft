@@ -21,6 +21,13 @@ public:
     /// Обновить все данные дерева
     void refresh();
 
+signals:
+    /// Сигнал о том, что ветка была изменена (checkout)
+    void branchChanged(const QString &branchName);
+    
+    /// Сигнал попытки checkout (для сохранения имени ветки в MainWindow)
+    void checkoutAttempted(const QString &branchName);
+
 public slots:
     void populateLocalBranches(const QList<QString> &branches, const QString &currentBranch);
     void populateRemotes(const QList<QString> &remotes);
@@ -32,6 +39,9 @@ private:
     void setupTree();
     void createRootItems();
     void clearChildren(QTreeWidgetItem *parent);
+    
+    /// Обработка двойного клика по элементу дерева
+    void onTreeItemDoubleClicked(QTreeWidgetItem *item, int column);
 
     QVBoxLayout *m_layout;
     QTreeWidget *m_treeWidget;
