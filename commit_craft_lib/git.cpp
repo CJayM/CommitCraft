@@ -20,6 +20,7 @@ Git::Git(QObject *parent)
     , m_remoteBranchesProcess(new QProcess(this))
     , m_tagsProcess(new QProcess(this))
     , m_stashesProcess(new QProcess(this))
+    , m_checkoutProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -75,6 +76,11 @@ Git::Git(QObject *parent)
     connect(m_stashesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onStashesFinished);
     connect(m_stashesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Branch modification
+    connect(m_checkoutProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCheckoutFinished);
+    connect(m_checkoutProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -507,4 +513,66 @@ void Git::onProcessError(QProcess::ProcessError err)
     }
 
     emit error(errorMessage);
+}
+
+// ==========================================
+// Branch Modification Implementation
+// ==========================================
+
+void Git::checkoutBranch(const QString &branch, bool stashBeforeCheckout)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    if (stashBeforeCheckout) {
+        // Сначала stash'им изменения, потом делаем checkout
+        QStringList stashArgs;
+        stashArgs << "stash" << "push" << "-u" << "-m" << "WIP before checkout to " + branch;
+        setupProcess(m_checkoutProcess, stashArgs);
+        
+        // Используем цепочку: stash -> checkout
+        // Для простоты делаем последовательные вызовы через сигнал finished
+        m_checkoutProcess->setProperty("checkoutBranch", branch);
+        m_checkoutProcess->setProperty("stashPhase", true);
+        m_checkoutProcess->start(getGitExecutable(), stashArgs);
+    } else {
+        QStringList args;
+        args << "checkout" << branch;
+        setupProcess(m_checkoutProcess, args);
+        m_checkoutProcess->setProperty("stashPhase", false);
+        m_checkoutProcess->start(getGitExecutable(), args);
+    }
+}
+
+void Git::onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    bool stashPhase = m_checkoutProcess->property("stashPhase").toBool();
+    
+    if (stashPhase) {
+        // Если это был stash, теперь делаем checkout
+        QString branch = m_checkoutProcess->property("checkoutBranch").toString();
+        
+        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+            // Stash успешен, теперь checkout
+            QStringList args;
+            args << "checkout" << branch;
+            m_checkoutProcess->setProperty("stashPhase", false);
+            m_checkoutProcess->start(getGitExecutable(), args);
+        } else {
+            QString errorMsg = m_checkoutProcess->readAllStandardError();
+            emit checkoutReady(false, QString("Failed to stash changes: %1").arg(errorMsg));
+            emit error(QString("Failed to stash changes: %1").arg(errorMsg));
+        }
+    } else {
+        // Это был checkout (или вторая фаза stash+checkout)
+        if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+            emit checkoutReady(true, "Checkout successful");
+        } else {
+            QString errorMsg = m_checkoutProcess->readAllStandardError();
+            emit checkoutReady(false, QString("Failed to checkout branch: %1").arg(errorMsg));
+            emit error(QString("Failed to checkout branch: %1").arg(errorMsg));
+        }
+    }
 }

@@ -40,6 +40,9 @@ public:
     void getTags();
     void getStashes();
     
+    // Branch modification
+    void checkoutBranch(const QString &branch, bool stashBeforeCheckout = false);
+    
 signals:
     // Git operation results
     void statusReady(const QString &output);
@@ -50,6 +53,9 @@ signals:
     void addFileReady(bool success, const QString &message);
     void unstageFileReady(bool success, const QString &message);
     void error(const QString &error);
+
+    // Branch modification results
+    void checkoutReady(bool success, const QString &message);
 
     // Branch operation results
     void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
@@ -75,6 +81,9 @@ private slots:
     void onRemoteBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onTagsFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onStashesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
+    // Branch modification slots
+    void onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
 private:
     QString m_repositoryPath;
@@ -96,6 +105,9 @@ private:
     QProcess *m_remoteBranchesProcess;
     QProcess *m_tagsProcess;
     QProcess *m_stashesProcess;
+
+    // Process for branch modification
+    QProcess *m_checkoutProcess;
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;
