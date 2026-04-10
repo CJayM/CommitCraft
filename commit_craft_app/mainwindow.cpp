@@ -179,6 +179,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::showAboutDialog);
     
+    // Connect hotkey actions
+    connect(ui->actionStageFile, &QAction::triggered, this, &MainWindow::stageSelectedFilesHotkey);
+    connect(ui->actionUnstageFile, &QAction::triggered, this, &MainWindow::unstageSelectedFilesHotkey);
+    connect(ui->actionClearSelection, &QAction::triggered, this, &MainWindow::clearSelection);
+    
+    // Добавляем actions в окно чтобы работали глобальные hotkeys
+    addAction(ui->actionStageFile);
+    addAction(ui->actionUnstageFile);
+    addAction(ui->actionClearSelection);
+    
     // Connect amend checkbox
     connect(ui->amend_chk, &QCheckBox::stateChanged, this, &MainWindow::onAmendCheckBoxChanged);
     
@@ -1103,7 +1113,7 @@ void MainWindow::updateNavigationButtonsState()
 void MainWindow::showAboutDialog()
 {
     QString appVersion = QCoreApplication::applicationVersion();
-    
+
     QMessageBox aboutBox(this);
     aboutBox.setWindowTitle(tr("О программе Commit Craft"));
     aboutBox.setIconPixmap(QPixmap(":/icons/icons/icon.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
@@ -1118,4 +1128,44 @@ void MainWindow::showAboutDialog()
 
     aboutBox.setText(aboutText);
     aboutBox.exec();
+}
+
+void MainWindow::stageSelectedFilesHotkey()
+{
+    // Если есть выделение в unstaged таблице — stage'им
+    QModelIndexList selected = ui->filesTable->selectionModel()->selectedRows();
+    if (!selected.isEmpty()) {
+        QStringList files;
+        for (const QModelIndex &idx : selected) {
+            files.append(unstagedFilesModel->getFileName(idx.row()));
+        }
+        stageSelectedFiles(files);  // Используем существующий метод
+    }
+}
+
+void MainWindow::unstageSelectedFilesHotkey()
+{
+    // Если есть выделение в staged таблице — unstage'им
+    QModelIndexList selected = ui->stagedFilesTable->selectionModel()->selectedRows();
+    if (!selected.isEmpty()) {
+        QStringList files;
+        for (const QModelIndex &idx : selected) {
+            files.append(stagedFilesModel->getFileName(idx.row()));
+        }
+        unstageSelectedFiles(files);  // Используем существующий метод
+    }
+}
+
+void MainWindow::clearSelection()
+{
+    // Очистить выделение в таблицах
+    ui->filesTable->clearSelection();
+    ui->stagedFilesTable->clearSelection();
+    
+    // Очистить diff editor
+    diffEditor->clear();
+    m_lastSelectedFileName.clear();
+    
+    // Обновить заголовок diff
+    ui->diffFileNameLabel->clear();
 }
