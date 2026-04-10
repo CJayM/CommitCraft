@@ -43,6 +43,9 @@ HEADERS += \
     $$PWD/../commit_craft_app/linenumberarea.h \
     $$PWD/../commit_craft_app/syntaxhighlighter.h
 
+FORMS += \
+    $$PWD/../commit_craft_app/diffeditor.ui
+
 INCLUDEPATH += $$PWD/../commit_craft_app
 
 

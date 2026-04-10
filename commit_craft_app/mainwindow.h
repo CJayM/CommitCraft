@@ -69,6 +69,9 @@ private slots:
     void navigateToNextHunk();
     void navigateToPrevHunk();
     void showAboutDialog();
+    void stageSelectedFilesHotkey();
+    void unstageSelectedFilesHotkey();
+    void clearSelection();
 
     /// Обновляет состояние кнопок навигации (Prev/Next Hunk)
     void updateNavigationButtonsState();

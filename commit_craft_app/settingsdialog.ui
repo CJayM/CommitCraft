@@ -113,6 +113,65 @@
     </layout>
    </item>
    <item>
+    <widget class="Line" name="line_3">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="fileTypesSectionLabel">
+     <property name="text">
+      <string>Типы файлов</string>
+     </property>
+     <property name="font">
+      <font>
+       <bold>true</bold>
+      </font>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="fileTypesLayout">
+     <item>
+      <layout class="QVBoxLayout" name="imageExtensionsLayout">
+       <item>
+        <widget class="QLabel" name="imageExtensionsLabel">
+         <property name="text">
+          <string>Графические файлы:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTextEdit" name="imageExtensionsTextEdit">
+         <property name="toolTip">
+          <string>Расширения графических файлов через пробел (png jpg gif bmp svg ico webp tiff)</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="syntaxExtensionsLayout">
+       <item>
+        <widget class="QLabel" name="syntaxExtensionsLabel">
+         <property name="text">
+          <string>Подсветка синтаксиса:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTextEdit" name="syntaxExtensionsTextEdit">
+         <property name="toolTip">
+          <string>Расширения для подсветки синтаксиса через пробел (cpp h hpp java py js ts html css xml json yaml md sh bat)</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
