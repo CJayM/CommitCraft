@@ -74,8 +74,8 @@ public:
 
 signals:
     void hunkNavigated(int hunkIndex);
-    void stageSelectedLines(const QStringList &selectedLines);
-    void revertSelectedLines(const QStringList &selectedLines);
+    void stageSelectedPatch(const QString &fileName, const QString &patch);
+    void revertSelectedPatch(const QString &fileName, const QString &patch);
 
 public slots:
     /// Навигация к следующему ханку. Возвращает false если достигнут конец списка.
@@ -102,7 +102,12 @@ private slots:
     void onRevertSelectedClicked();
 
 private:
-    QStringList getSelectedLines();
+    QStringList getSelectedLines() const;
+    QString buildPatchForHunks(const QString &fileName, const QList<int> &hunkIndexes) const;
+    QList<int> getSelectedHunkIndexes() const;
+    QList<Hunk> m_currentHunks;
+    QVector<SyncedLine> m_syncedLines;
+
     /// Построить синхронизированные строки из hunks и полного содержимого
     QVector<SyncedLine> buildSyncedLines(const QList<Hunk> &hunks,
                                          const QStringList &leftLines,

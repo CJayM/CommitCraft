@@ -35,6 +35,9 @@ public:
     void unstageFiles(const QStringList &fileNames);
     void commit(const QString &message, bool amend = false);
 
+    bool applyPatchToIndex(const QString &patchFilePath);
+    bool revertPatchInWorkingTree(const QString &patchFilePath);
+
     // Branch operations
     void getLocalBranches();
     void getRemotes();

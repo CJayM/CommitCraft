@@ -278,6 +278,32 @@ void Git::commit(const QString &message, bool amend)
     m_commitProcess->start();
 }
 
+bool Git::applyPatchToIndex(const QString &patchFilePath)
+{
+    QProcess process;
+    process.setProgram(getGitExecutable());
+    process.setArguments(QStringList() << "apply" << "--cached" << "--whitespace=nowarn" << patchFilePath);
+    process.setWorkingDirectory(m_repositoryPath);
+    process.start();
+    if (!process.waitForFinished(-1)) {
+        return false;
+    }
+    return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+}
+
+bool Git::revertPatchInWorkingTree(const QString &patchFilePath)
+{
+    QProcess process;
+    process.setProgram(getGitExecutable());
+    process.setArguments(QStringList() << "apply" << "-R" << "--whitespace=nowarn" << patchFilePath);
+    process.setWorkingDirectory(m_repositoryPath);
+    process.start();
+    if (!process.waitForFinished(-1)) {
+        return false;
+    }
+    return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+}
+
 void Git::onStatusFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {

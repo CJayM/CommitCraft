@@ -142,13 +142,17 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     if (hunks.isEmpty()) {
         ui->leftPanel->clearDiffData();
         ui->rightPanel->clearDiffData();
+        m_currentHunks.clear();
         return;
     }
+
+    m_currentHunks = hunks;
 
     QStringList leftLines = m_leftFullContent.split('\n');
     QStringList rightLines = m_rightFullContent.split('\n');
 
     QVector<SyncedLine> syncedLines = buildSyncedLines(hunks, leftLines, rightLines);
+    m_syncedLines = syncedLines;
 
     // Сохранить позиции ханков для навигации (индексы в syncedLines)
     m_hunkPositions.clear();
@@ -602,21 +606,27 @@ bool DiffEditor::checkFileType(const QString &fileName)
 
 void DiffEditor::onStageSelectedClicked()
 {
-    QStringList selectedLines = getSelectedLines();
-    if (!selectedLines.isEmpty()) {
-        emit stageSelectedLines(selectedLines);
+    QList<int> selectedHunks = getSelectedHunkIndexes();
+    if (!selectedHunks.isEmpty()) {
+        QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+        if (!patch.isEmpty()) {
+            emit stageSelectedPatch(m_fileName, patch);
+        }
     }
 }
 
 void DiffEditor::onRevertSelectedClicked()
 {
-    QStringList selectedLines = getSelectedLines();
-    if (!selectedLines.isEmpty()) {
-        emit revertSelectedLines(selectedLines);
+    QList<int> selectedHunks = getSelectedHunkIndexes();
+    if (!selectedHunks.isEmpty()) {
+        QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+        if (!patch.isEmpty()) {
+            emit revertSelectedPatch(m_fileName, patch);
+        }
     }
 }
 
-QStringList DiffEditor::getSelectedLines()
+QStringList DiffEditor::getSelectedLines() const
 {
     QStringList lines;
     QTextCursor cursor = ui->rightPanel->textCursor();  // Use right panel (working tree)
@@ -625,4 +635,81 @@ QStringList DiffEditor::getSelectedLines()
         lines = selectedText.split('\n', Qt::SkipEmptyParts);
     }
     return lines;
+}
+
+QList<int> DiffEditor::getSelectedHunkIndexes() const
+{
+    QList<int> selectedHunks;
+    QTextCursor cursor = ui->rightPanel->textCursor();
+    const DiffPanel *panel = ui->rightPanel;
+    if (!cursor.hasSelection()) {
+        cursor = ui->leftPanel->textCursor();
+        panel = ui->leftPanel;
+    }
+    if (!cursor.hasSelection()) {
+        return selectedHunks;
+    }
+
+    int startBlock = panel->document()->findBlock(cursor.selectionStart()).blockNumber();
+    int endBlock = panel->document()->findBlock(cursor.selectionEnd()).blockNumber();
+    if (endBlock < startBlock) {
+        qSwap(startBlock, endBlock);
+    }
+
+    for (int block = startBlock; block <= endBlock && block < m_syncedLines.size(); ++block) {
+        int hunkIndex = m_syncedLines[block].hunkIndex;
+        if (hunkIndex >= 0 && !selectedHunks.contains(hunkIndex)) {
+            selectedHunks.append(hunkIndex);
+        }
+    }
+    return selectedHunks;
+}
+
+QString DiffEditor::buildPatchForHunks(const QString &fileName, const QList<int> &hunkIndexes) const
+{
+    if (fileName.isEmpty() || hunkIndexes.isEmpty() || m_currentHunks.isEmpty()) {
+        return QString();
+    }
+
+    QString cleanFileName = fileName;
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    }
+    cleanFileName.replace('\\', '/');
+
+    QString patch;
+    patch += QStringLiteral("diff --git a/%1 b/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("--- a/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("+++ b/%1\n").arg(cleanFileName);
+
+    for (int idx : hunkIndexes) {
+        if (idx < 0 || idx >= m_currentHunks.size()) {
+            continue;
+        }
+
+        const Hunk &hunk = m_currentHunks[idx];
+        patch += QStringLiteral("@@ -%1,%2 +%3,%4 @@").arg(hunk.leftStart).arg(hunk.leftSize).arg(hunk.rightStart).arg(hunk.rightSize);
+        if (!hunk.caption.isEmpty()) {
+            patch += QStringLiteral(" ") + hunk.caption;
+        }
+        patch += QStringLiteral("\n");
+
+        for (const HunkLine &line : hunk.lines) {
+            QChar prefix = ' ';
+            switch (line.type) {
+            case HunkLine::Unchanged:
+                prefix = ' ';
+                break;
+            case HunkLine::Removed:
+                prefix = '-';
+                break;
+            case HunkLine::Added:
+                prefix = '+';
+                break;
+            }
+            patch += prefix + line.content + QStringLiteral("\n");
+        }
+    }
+
+    return patch;
 }

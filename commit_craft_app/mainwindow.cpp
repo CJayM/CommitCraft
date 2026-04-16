@@ -20,6 +20,7 @@
 #include <QUrl>
 #include <QFileInfo>
 #include <QPixmap>
+#include <QTemporaryFile>
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
 #include "diffeditor.h"
@@ -118,8 +119,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionNextHunk, &QAction::triggered, this, &MainWindow::navigateToNextHunk);
     
     // Connect partial staging signals
-    connect(diffEditor, &DiffEditor::stageSelectedLines, this, &MainWindow::onStageSelectedLines);
-    connect(diffEditor, &DiffEditor::revertSelectedLines, this, &MainWindow::onRevertSelectedLines);
+    connect(diffEditor, &DiffEditor::stageSelectedPatch, this, &MainWindow::onStageSelectedPatch);
+    connect(diffEditor, &DiffEditor::revertSelectedPatch, this, &MainWindow::onRevertSelectedPatch);
     
     // Connect create branch action
     connect(ui->actionCreateBranch, &QAction::triggered, this, &MainWindow::onCreateBranch);
@@ -1202,16 +1203,67 @@ void MainWindow::onCreateBranch()
     }
 }
 
-void MainWindow::onStageSelectedLines(const QStringList &lines)
+static bool writePatchToTempFile(const QString &patch, QString *outFilePath)
 {
-    // TODO: Implement partial staging
-    QMessageBox::information(this, "Partial Staging", 
-                           QString("Selected lines to stage:\n%1").arg(lines.join("\n")));
+    QTemporaryFile tempFile;
+    tempFile.setAutoRemove(false);
+    if (!tempFile.open()) {
+        return false;
+    }
+
+    QByteArray patchData = patch.toUtf8();
+    if (tempFile.write(patchData) != patchData.size()) {
+        tempFile.close();
+        return false;
+    }
+
+    tempFile.close();
+    *outFilePath = tempFile.fileName();
+    return true;
 }
 
-void MainWindow::onRevertSelectedLines(const QStringList &lines)
+void MainWindow::onStageSelectedPatch(const QString &fileName, const QString &patch)
 {
-    // TODO: Implement partial reverting
-    QMessageBox::information(this, "Partial Revert", 
-                           QString("Selected lines to revert:\n%1").arg(lines.join("\n")));
+    if (patch.isEmpty()) {
+        return;
+    }
+
+    QString patchFilePath;
+    if (!writePatchToTempFile(patch, &patchFilePath)) {
+        QMessageBox::warning(this, tr("Partial Staging"), tr("Failed to create temporary patch file."));
+        return;
+    }
+
+    bool success = git->applyPatchToIndex(patchFilePath);
+    QFile::remove(patchFilePath);
+
+    if (!success) {
+        QMessageBox::warning(this, tr("Partial Staging"), tr("Failed to stage selected changes."));
+        return;
+    }
+
+    refreshGitStatus();
+}
+
+void MainWindow::onRevertSelectedPatch(const QString &fileName, const QString &patch)
+{
+    if (patch.isEmpty()) {
+        return;
+    }
+
+    QString patchFilePath;
+    if (!writePatchToTempFile(patch, &patchFilePath)) {
+        QMessageBox::warning(this, tr("Partial Revert"), tr("Failed to create temporary patch file."));
+        return;
+    }
+
+    bool success = git->revertPatchInWorkingTree(patchFilePath);
+    QFile::remove(patchFilePath);
+
+    if (!success) {
+        QMessageBox::warning(this, tr("Partial Revert"), tr("Failed to revert selected changes."));
+        return;
+    }
+
+    refreshGitStatus();
 }
