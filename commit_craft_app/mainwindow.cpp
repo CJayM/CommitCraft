@@ -90,6 +90,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
     ui->stagedFilesTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
 
+    // Set row height for table views
+    ui->filesTable->verticalHeader()->setDefaultSectionSize(8);
+    ui->stagedFilesTable->verticalHeader()->setDefaultSectionSize(8);
+
     // Connect git process signals to DiffEditor
     connect(git, &Git::diffReady, this, [this](const QString &diffOutput) {
         GitParser parser;
