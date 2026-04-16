@@ -572,6 +572,11 @@
     </property>
     <addaction name="actionRefresh"/>
     <addaction name="actionCommit"/>
+    <addaction name="separator"/>
+    <addaction name="actionCreateBranch"/>
+    <addaction name="separator"/>
+    <addaction name="actionToggleLeftPanel"/>
+    <addaction name="actionToggleTopPanel"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -720,6 +725,14 @@
    </property>
    <property name="toolTip">
     <string>Toggle Top Panel</string>
+   </property>
+  </action>
+  <action name="actionCreateBranch">
+   <property name="text">
+    <string>Создать ветку</string>
+   </property>
+   <property name="toolTip">
+    <string>Создать новую ветку</string>
    </property>
   </action>
   <action name="actionAbout">

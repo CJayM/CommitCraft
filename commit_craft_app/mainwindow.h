@@ -48,6 +48,7 @@ private slots:
     void onGitStatusFinished(const QString &output);
     void onGitDiffReady(const QString &output);
     void onGitCommitHistoryReady(const QList<QList<QString>> &commits);
+    void onCreateBranch();
     void onGitCommitFinished(bool success, const QString &message);
     void onGitError(const QString &error);
     void showFileContextMenu(const QPoint &pos);

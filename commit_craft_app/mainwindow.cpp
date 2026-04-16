@@ -117,6 +117,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionPrevHunk, &QAction::triggered, this, &MainWindow::navigateToPrevHunk);
     connect(ui->actionNextHunk, &QAction::triggered, this, &MainWindow::navigateToNextHunk);
     
+    // Connect create branch action
+    connect(ui->actionCreateBranch, &QAction::triggered, this, &MainWindow::onCreateBranch);
+    
     // Set default actions for hunk navigation buttons
     ui->prevHunkButton->setDefaultAction(ui->actionPrevHunk);
     ui->nextHunkButton->setDefaultAction(ui->actionNextHunk);
@@ -153,6 +156,16 @@ MainWindow::MainWindow(QWidget *parent)
             } else {
                 QMessageBox::warning(this, tr("Ошибка Git"), message);
             }
+        }
+    });
+
+    // Подключаем сигнал создания ветки
+    connect(git, &Git::branchCreated, this, [this](bool success, const QString &message) {
+        if (success) {
+            ui->branchesWidget->refresh();
+            refreshGitStatus();
+        } else {
+            QMessageBox::warning(this, tr("Ошибка Git"), message);
         }
     });
 
@@ -1172,4 +1185,15 @@ void MainWindow::clearSelection()
     
     // Обновить заголовок diff
     ui->diffFileNameLabel->clear();
+}
+
+void MainWindow::onCreateBranch()
+{
+    bool ok;
+    QString newBranchName = QInputDialog::getText(this, tr("Create New Branch"),
+                                                  tr("New branch name:"),
+                                                  QLineEdit::Normal, "", &ok);
+    if (ok && !newBranchName.isEmpty()) {
+        git->createBranch(newBranchName);
+    }
 }
