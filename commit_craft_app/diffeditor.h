@@ -74,6 +74,8 @@ public:
 
 signals:
     void hunkNavigated(int hunkIndex);
+    void stageSelectedLines(const QStringList &selectedLines);
+    void revertSelectedLines(const QStringList &selectedLines);
 
 public slots:
     /// Навигация к следующему ханку. Возвращает false если достигнут конец списка.
@@ -96,8 +98,11 @@ private slots:
     void synchronizeScrollLeftToRight(int value);
     void synchronizeScrollRightToLeft(int value);
     void synchronizeZoom(int zoom);
+    void onStageSelectedClicked();
+    void onRevertSelectedClicked();
 
 private:
+    QStringList getSelectedLines();
     /// Построить синхронизированные строки из hunks и полного содержимого
     QVector<SyncedLine> buildSyncedLines(const QList<Hunk> &hunks,
                                          const QStringList &leftLines,

@@ -117,6 +117,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionPrevHunk, &QAction::triggered, this, &MainWindow::navigateToPrevHunk);
     connect(ui->actionNextHunk, &QAction::triggered, this, &MainWindow::navigateToNextHunk);
     
+    // Connect partial staging signals
+    connect(diffEditor, &DiffEditor::stageSelectedLines, this, &MainWindow::onStageSelectedLines);
+    connect(diffEditor, &DiffEditor::revertSelectedLines, this, &MainWindow::onRevertSelectedLines);
+    
     // Connect create branch action
     connect(ui->actionCreateBranch, &QAction::triggered, this, &MainWindow::onCreateBranch);
     
@@ -1196,4 +1200,18 @@ void MainWindow::onCreateBranch()
     if (ok && !newBranchName.isEmpty()) {
         git->createBranch(newBranchName);
     }
+}
+
+void MainWindow::onStageSelectedLines(const QStringList &lines)
+{
+    // TODO: Implement partial staging
+    QMessageBox::information(this, "Partial Staging", 
+                           QString("Selected lines to stage:\n%1").arg(lines.join("\n")));
+}
+
+void MainWindow::onRevertSelectedLines(const QStringList &lines)
+{
+    // TODO: Implement partial reverting
+    QMessageBox::information(this, "Partial Revert", 
+                           QString("Selected lines to revert:\n%1").arg(lines.join("\n")));
 }

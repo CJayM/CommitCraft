@@ -49,6 +49,8 @@ private slots:
     void onGitDiffReady(const QString &output);
     void onGitCommitHistoryReady(const QList<QList<QString>> &commits);
     void onCreateBranch();
+    void onStageSelectedLines(const QStringList &lines);
+    void onRevertSelectedLines(const QStringList &lines);
     void onGitCommitFinished(bool success, const QString &message);
     void onGitError(const QString &error);
     void showFileContextMenu(const QPoint &pos);

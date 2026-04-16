@@ -44,6 +44,10 @@ DiffEditor::DiffEditor(QWidget *parent)
     connect(ui->rightPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
         ui->leftPanel->setCursorToLine(blockNum);
     });
+
+    // Connect partial staging buttons
+    connect(ui->stageSelectedButton, &QPushButton::clicked, this, &DiffEditor::onStageSelectedClicked);
+    connect(ui->revertSelectedButton, &QPushButton::clicked, this, &DiffEditor::onRevertSelectedClicked);
 }
 
 DiffEditor::~DiffEditor()
@@ -594,4 +598,31 @@ bool DiffEditor::checkFileType(const QString &fileName)
     
     m_isImageFile = m_imageExtensions.contains(ext);
     return m_isImageFile;
+}
+
+void DiffEditor::onStageSelectedClicked()
+{
+    QStringList selectedLines = getSelectedLines();
+    if (!selectedLines.isEmpty()) {
+        emit stageSelectedLines(selectedLines);
+    }
+}
+
+void DiffEditor::onRevertSelectedClicked()
+{
+    QStringList selectedLines = getSelectedLines();
+    if (!selectedLines.isEmpty()) {
+        emit revertSelectedLines(selectedLines);
+    }
+}
+
+QStringList DiffEditor::getSelectedLines()
+{
+    QStringList lines;
+    QTextCursor cursor = ui->rightPanel->textCursor();  // Use right panel (working tree)
+    if (cursor.hasSelection()) {
+        QString selectedText = cursor.selectedText();
+        lines = selectedText.split('\n', Qt::SkipEmptyParts);
+    }
+    return lines;
 }
