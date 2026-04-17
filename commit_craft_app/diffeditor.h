@@ -94,6 +94,9 @@ public slots:
     bool isAtFirstHunk() const { return m_currentHunkIndex <= 0; }
     bool isAtLastHunk() const { return m_hunkPositions.isEmpty() || m_currentHunkIndex >= m_hunkPositions.size() - 1; }
 
+protected:
+    void contextMenuEvent(QContextMenuEvent *event);
+
 private slots:
     void synchronizeScrollLeftToRight(int value);
     void synchronizeScrollRightToLeft(int value);

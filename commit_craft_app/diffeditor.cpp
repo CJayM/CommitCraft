@@ -9,6 +9,9 @@
 #include <QSettings>
 #include <QPixmap>
 #include <QDir>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
@@ -604,28 +607,6 @@ bool DiffEditor::checkFileType(const QString &fileName)
     return m_isImageFile;
 }
 
-void DiffEditor::onStageSelectedClicked()
-{
-    QList<int> selectedHunks = getSelectedHunkIndexes();
-    if (!selectedHunks.isEmpty()) {
-        QString patch = buildPatchForHunks(m_fileName, selectedHunks);
-        if (!patch.isEmpty()) {
-            emit stageSelectedPatch(m_fileName, patch);
-        }
-    }
-}
-
-void DiffEditor::onRevertSelectedClicked()
-{
-    QList<int> selectedHunks = getSelectedHunkIndexes();
-    if (!selectedHunks.isEmpty()) {
-        QString patch = buildPatchForHunks(m_fileName, selectedHunks);
-        if (!patch.isEmpty()) {
-            emit revertSelectedPatch(m_fileName, patch);
-        }
-    }
-}
-
 QStringList DiffEditor::getSelectedLines() const
 {
     QStringList lines;
@@ -712,4 +693,46 @@ QString DiffEditor::buildPatchForHunks(const QString &fileName, const QList<int>
     }
 
     return patch;
+}
+
+void DiffEditor::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+
+    QAction *stageAction = menu.addAction("Stage Selected Lines");
+    QAction *revertAction = menu.addAction("Revert Selected Lines");
+
+    // Подключить сигналы к существующим слотам
+    connect(stageAction, &QAction::triggered, this, &DiffEditor::onStageSelectedClicked);
+    connect(revertAction, &QAction::triggered, this, &DiffEditor::onRevertSelectedClicked);
+
+    menu.exec(event->globalPos());
+}
+
+void DiffEditor::onStageSelectedClicked()
+{
+    QList<int> selectedHunks = getSelectedHunkIndexes();
+    if (selectedHunks.isEmpty()) {
+        // No selected hunks, do nothing
+        return;
+    }
+
+    QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+    if (!patch.isEmpty()) {
+        emit stageSelectedPatch(m_fileName, patch);
+    }
+}
+
+void DiffEditor::onRevertSelectedClicked()
+{
+    QList<int> selectedHunks = getSelectedHunkIndexes();
+    if (selectedHunks.isEmpty()) {
+        // No selected hunks, do nothing
+        return;
+    }
+
+    QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+    if (!patch.isEmpty()) {
+        emit revertSelectedPatch(m_fileName, patch);
+    }
 }
