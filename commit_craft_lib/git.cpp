@@ -779,6 +779,50 @@ void Git::getRemoteUrl(const QString &remote)
     m_remoteProcess->start(getGitExecutable(), args);
 }
 
+void Git::pushRemote(const QString &remote, const QString &branch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "push";
+    if (!remote.isEmpty()) {
+        args << remote;
+    }
+    if (!branch.isEmpty()) {
+        args << branch;
+    }
+    
+    m_remoteProcess->setProperty("operation", "push");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->setProperty("branchName", branch);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::pullRemote(const QString &remote, const QString &branch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "pull";
+    if (!remote.isEmpty()) {
+        args << remote;
+    }
+    if (!branch.isEmpty()) {
+        args << branch;
+    }
+    
+    m_remoteProcess->setProperty("operation", "pull");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->setProperty("branchName", branch);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
 void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     QString operation = m_remoteProcess->property("operation").toString();
@@ -792,6 +836,10 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
         } else if (operation == "url") {
             QString url = m_remoteProcess->readAllStandardOutput().trimmed();
             emit remoteUrlReady(remote, url);
+        } else if (operation == "push") {
+            emit pushReady(true, QString("Push to %1 successful").arg(remote.isEmpty() ? "origin" : remote));
+        } else if (operation == "pull") {
+            emit pullReady(true, QString("Pull from %1 successful").arg(remote.isEmpty() ? "origin" : remote));
         }
     } else {
         QString errorMsg = m_remoteProcess->readAllStandardError();
@@ -803,6 +851,12 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
             emit error(QString("Prune failed: %1").arg(errorMsg));
         } else if (operation == "url") {
             emit remoteUrlReady(remote, "");
+        } else if (operation == "push") {
+            emit pushReady(false, QString("Push failed: %1").arg(errorMsg));
+            emit error(QString("Push failed: %1").arg(errorMsg));
+        } else if (operation == "pull") {
+            emit pullReady(false, QString("Pull failed: %1").arg(errorMsg));
+            emit error(QString("Pull failed: %1").arg(errorMsg));
         }
     }
 }
