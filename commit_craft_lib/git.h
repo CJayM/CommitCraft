@@ -52,12 +52,21 @@ public:
     void fetchRemote(const QString &remote);
     void pruneRemote(const QString &remote);
     void getRemoteUrl(const QString &remote);
+    void pushRemote(const QString &remote = "", const QString &branch = "");
+    void pullRemote(const QString &remote = "", const QString &branch = "");
 
     // Stash operations
     void createStash(const QStringList &files, const QString &message);
     void applyStash(const QString &stashRef, bool drop = false);
     void dropStash(const QString &stashRef);
     void showStash(const QString &stashRef);
+    
+    // Submodule operations
+    void getSubmodules();
+    void initSubmodule(const QString &path);
+    void updateSubmodule(const QString &path, bool fetch = false);
+    void syncSubmodule(const QString &path);
+    void forEachSubmodule(const QString &command);
     
 signals:
     // Git operation results
@@ -80,12 +89,21 @@ signals:
     void fetchReady(bool success, const QString &message);
     void pruneReady(bool success, const QString &message);
     void remoteUrlReady(const QString &remote, const QString &url);
+    void pushReady(bool success, const QString &message);
+    void pullReady(bool success, const QString &message);
 
     // Stash signals
     void stashCreated(bool success, const QString &message);
     void stashApplied(bool success, const QString &message);
     void stashDropped(bool success, const QString &message);
     void stashShown(const QString &diff);
+    
+    // Submodule signals
+    void submodulesReady(const QList<QStringList> &submodules); // name, path, url, branch, commit, head, dirty, uninitialized, missing
+    void submoduleInitReady(bool success, const QString &message);
+    void submoduleUpdateReady(bool success, const QString &message);
+    void submoduleSyncReady(bool success, const QString &message);
+    void submoduleForeachReady(bool success, const QString &output);
 
     // Branch operation results
     void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
@@ -129,6 +147,13 @@ private slots:
     void onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
+    // Submodule slots
+    void onSubmodulesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleInitFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleSyncFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleForeachFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    
 private:
     QString m_repositoryPath;
     QString m_gitPath;
@@ -156,6 +181,7 @@ private:
     QProcess *m_remoteProcess;       // Для fetch/prune/url
     QProcess *m_stashProcess;        // Для stash операций (apply/drop/show)
     QProcess *m_createStashProcess;  // Для создания stash
+    QProcess *m_submoduleProcess;    // Для submodule операций
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;

@@ -454,17 +454,34 @@
               <number>2</number>
              </property>
              <item>
-              <widget class="QLabel" name="diffInfoLabel">
-               <property name="text">
-                <string/>
+              <layout class="QHBoxLayout" name="diffInfoLayout">
+               <property name="spacing">
+                <number>6</number>
                </property>
-               <property name="alignment">
-                <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-               </property>
-               <property name="margin">
-                <number>4</number>
-               </property>
-              </widget>
+               <item>
+                <widget class="QLabel" name="diffFileNameLabel">
+                 <property name="text">
+                  <string/>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+                 </property>
+                 <property name="margin">
+                  <number>4</number>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="diffFilePathLabel">
+                 <property name="text">
+                  <string/>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+                 </property>
+                </widget>
+               </item>
+              </layout>
              </item>
              <item>
               <spacer name="horizontalSpacer">
@@ -635,7 +652,7 @@
     <string>Go to Previous Hunk</string>
    </property>
    <property name="shortcut">
-    <string>Alt+Up</string>
+    <string>Alt+Up; Shift+F6</string>
    </property>
   </action>
   <action name="actionNextHunk">
@@ -650,7 +667,31 @@
     <string>Go to Next Hunk</string>
    </property>
    <property name="shortcut">
-    <string>Alt+Down</string>
+    <string>Alt+Down; F6</string>
+   </property>
+  </action>
+  <action name="actionStageFile">
+   <property name="text">
+    <string>Stage File</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+T</string>
+   </property>
+  </action>
+  <action name="actionUnstageFile">
+   <property name="text">
+    <string>Unstage File</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+T</string>
+   </property>
+  </action>
+  <action name="actionClearSelection">
+   <property name="text">
+    <string>Clear Selection</string>
+   </property>
+   <property name="shortcut">
+    <string>Esc</string>
    </property>
   </action>
   <action name="actionToggleLeftPanel">
@@ -687,6 +728,28 @@
    </property>
    <property name="toolTip">
     <string>О программе Commit Craft</string>
+   </property>
+  </action>
+  <action name="actionPush">
+   <property name="text">
+    <string>Push</string>
+   </property>
+   <property name="toolTip">
+    <string>Push changes to remote</string>
+   </property>
+   <property name="shortcut">
+    <string>F7</string>
+   </property>
+  </action>
+  <action name="actionPull">
+   <property name="text">
+    <string>Pull</string>
+   </property>
+   <property name="toolTip">
+    <string>Pull changes from remote</string>
+   </property>
+   <property name="shortcut">
+    <string>F8</string>
    </property>
   </action>
  </widget>

@@ -39,6 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     , diffEditor(nullptr)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
+    , submoduleModel(new SubmoduleModel(this))
     , commitHistoryModel(new CommitHistoryModel(this))
     , commitItemDelegate(new CommitItemDelegate(this))
     , git(new Git(this))
@@ -179,6 +180,20 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::showAboutDialog);
     
+    // Connect hotkey actions
+    connect(ui->actionStageFile, &QAction::triggered, this, &MainWindow::stageSelectedFilesHotkey);
+    connect(ui->actionUnstageFile, &QAction::triggered, this, &MainWindow::unstageSelectedFilesHotkey);
+    connect(ui->actionClearSelection, &QAction::triggered, this, &MainWindow::clearSelection);
+    connect(ui->actionPush, &QAction::triggered, this, [this]() { git->pushRemote(); });
+    connect(ui->actionPull, &QAction::triggered, this, [this]() { git->pullRemote(); });
+    
+    // Добавляем actions в окно чтобы работали глобальные hotkeys
+    addAction(ui->actionStageFile);
+    addAction(ui->actionUnstageFile);
+    addAction(ui->actionClearSelection);
+    addAction(ui->actionPush);
+    addAction(ui->actionPull);
+    
     // Connect amend checkbox
     connect(ui->amend_chk, &QCheckBox::stateChanged, this, &MainWindow::onAmendCheckBoxChanged);
     
@@ -223,6 +238,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
+    
+    // Connect submodule signals
+    connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
+    connect(git, &Git::submoduleInitReady, this, &MainWindow::onSubmoduleInitReady);
+    connect(git, &Git::submoduleUpdateReady, this, &MainWindow::onSubmoduleUpdateReady);
+    connect(git, &Git::submoduleSyncReady, this, &MainWindow::onSubmoduleSyncReady);
     
     // Set up context menus
     ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -295,6 +316,14 @@ void MainWindow::openSettingsDialog()
     if (settingsDialog->exec() == QDialog::Accepted) {
         // Применяем новые настройки шрифта к DiffEditor
         diffEditor->applyFontSettings(settingsDialog->getFontFamily(), settingsDialog->getFontSize());
+        
+        // Обновляем настройки расширений файлов
+        diffEditor->updateFileTypeSettings();
+        
+        // Перезагружаем diff если открыт файл
+        if (!m_lastSelectedFileName.isEmpty()) {
+            updateDiffPanel(m_lastSelectedFileName);
+        }
     }
 }
 
@@ -729,10 +758,22 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     }
 
     // Обновляем информацию о файле и версиях
-    QString infoText = QString("%1\t%2 vs %3").arg(fileName, leftVersion, rightVersion);
-    ui->diffInfoLabel->setText(infoText);
+    QFileInfo fileInfo(fileName);
+    QString fileNameOnly = fileInfo.fileName();
+    QString filePath = fileInfo.path();
+    
+    // Убираем "./" в начале пути и делаем его серым
+    if (filePath.startsWith("./")) {
+        filePath = filePath.mid(2);
+    }
+    
+    QString versionText = QString("%1 vs %2").arg(leftVersion, rightVersion);
+    
+    ui->diffFileNameLabel->setText(QString("<b>%1</b>  <span style='color: gray;'>%2</span>  <span style='color: gray;'>— %3</span>")
+                                    .arg(fileNameOnly, filePath, versionText));
+    ui->diffFileNameLabel->setTextFormat(Qt::RichText);
 
-    diffEditor->setContents(leftContent, rightContent, fileName);
+    diffEditor->setContents(leftContent, rightContent, fileName, repositoryPath);
 }
 
 void MainWindow::synchronizeZoom(int zoom)
@@ -1083,7 +1124,7 @@ void MainWindow::updateNavigationButtonsState()
 void MainWindow::showAboutDialog()
 {
     QString appVersion = QCoreApplication::applicationVersion();
-    
+
     QMessageBox aboutBox(this);
     aboutBox.setWindowTitle(tr("О программе Commit Craft"));
     aboutBox.setIconPixmap(QPixmap(":/icons/icons/icon.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
@@ -1098,4 +1139,44 @@ void MainWindow::showAboutDialog()
 
     aboutBox.setText(aboutText);
     aboutBox.exec();
+}
+
+void MainWindow::stageSelectedFilesHotkey()
+{
+    // Если есть выделение в unstaged таблице — stage'им
+    QModelIndexList selected = ui->filesTable->selectionModel()->selectedRows();
+    if (!selected.isEmpty()) {
+        QStringList files;
+        for (const QModelIndex &idx : selected) {
+            files.append(unstagedFilesModel->getFileName(idx.row()));
+        }
+        stageSelectedFiles(files);  // Используем существующий метод
+    }
+}
+
+void MainWindow::unstageSelectedFilesHotkey()
+{
+    // Если есть выделение в staged таблице — unstage'им
+    QModelIndexList selected = ui->stagedFilesTable->selectionModel()->selectedRows();
+    if (!selected.isEmpty()) {
+        QStringList files;
+        for (const QModelIndex &idx : selected) {
+            files.append(stagedFilesModel->getFileName(idx.row()));
+        }
+        unstageSelectedFiles(files);  // Используем существующий метод
+    }
+}
+
+void MainWindow::clearSelection()
+{
+    // Очистить выделение в таблицах
+    ui->filesTable->clearSelection();
+    ui->stagedFilesTable->clearSelection();
+    
+    // Очистить diff editor
+    diffEditor->clear();
+    m_lastSelectedFileName.clear();
+    
+    // Обновить заголовок diff
+    ui->diffFileNameLabel->clear();
 }

@@ -28,6 +28,12 @@ public:
     void setFontFamily(const QString &fontFamily);
     void setFontSize(int fontSize);
 
+    // File type settings
+    QStringList getImageExtensions() const;
+    QStringList getSyntaxExtensions() const;
+    void setImageExtensions(const QStringList &extensions);
+    void setSyntaxExtensions(const QStringList &extensions);
+
 private slots:
     void onGitPathButtonClicked();
 

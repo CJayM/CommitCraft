@@ -14,6 +14,12 @@ private slots:
     void cleanupTestCase();
     void testCommitHistoryModelCreation();
     void testCommitHistoryModelWithCommits();
+    void testCommitHistoryModelEmpty();
+    void testCommitHistoryModelDataDisplayRole();
+    void testCommitHistoryModelDataUserRole();
+    void testCommitHistoryModelDataToolTipRole();
+    void testCommitHistoryModelInvalidIndex();
+    void testCommitHistoryModelPartialCommitData();
 };
 
 #endif // TESTCOMMITHISTORYMODEL_H

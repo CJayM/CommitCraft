@@ -25,6 +25,7 @@ Git::Git(QObject *parent)
     , m_remoteProcess(new QProcess(this))
     , m_stashProcess(new QProcess(this))
     , m_createStashProcess(new QProcess(this))
+    , m_submoduleProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -103,6 +104,11 @@ Git::Git(QObject *parent)
     connect(m_createStashProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCreateStashFinished);
     connect(m_createStashProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+    
+    // Submodule operations
+    connect(m_submoduleProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onSubmodulesFinished); // По умолчанию getSubmodules
+    connect(m_submoduleProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -110,6 +116,18 @@ Git::Git(QObject *parent)
 void Git::setRepositoryPath(const QString &path)
 {
     m_repositoryPath = path;
+    
+    // Настраиваем Git на использование UTF-8 и отключение quotePath
+    QProcess configProcess;
+    configProcess.setProgram(gitPath());
+    configProcess.setArguments(QStringList() << "config" << "core.quotePath" << "false");
+    configProcess.setWorkingDirectory(m_repositoryPath);
+    configProcess.start();
+    configProcess.waitForFinished(2000);
+    
+    configProcess.setArguments(QStringList() << "config" << "i18n.commitencoding" << "utf-8");
+    configProcess.start();
+    configProcess.waitForFinished(2000);
 }
 
 QString Git::repositoryPath() const
@@ -767,6 +785,50 @@ void Git::getRemoteUrl(const QString &remote)
     m_remoteProcess->start(getGitExecutable(), args);
 }
 
+void Git::pushRemote(const QString &remote, const QString &branch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "push";
+    if (!remote.isEmpty()) {
+        args << remote;
+    }
+    if (!branch.isEmpty()) {
+        args << branch;
+    }
+    
+    m_remoteProcess->setProperty("operation", "push");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->setProperty("branchName", branch);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::pullRemote(const QString &remote, const QString &branch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "pull";
+    if (!remote.isEmpty()) {
+        args << remote;
+    }
+    if (!branch.isEmpty()) {
+        args << branch;
+    }
+    
+    m_remoteProcess->setProperty("operation", "pull");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->setProperty("branchName", branch);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
 void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     QString operation = m_remoteProcess->property("operation").toString();
@@ -780,6 +842,10 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
         } else if (operation == "url") {
             QString url = m_remoteProcess->readAllStandardOutput().trimmed();
             emit remoteUrlReady(remote, url);
+        } else if (operation == "push") {
+            emit pushReady(true, QString("Push to %1 successful").arg(remote.isEmpty() ? "origin" : remote));
+        } else if (operation == "pull") {
+            emit pullReady(true, QString("Pull from %1 successful").arg(remote.isEmpty() ? "origin" : remote));
         }
     } else {
         QString errorMsg = m_remoteProcess->readAllStandardError();
@@ -791,6 +857,12 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
             emit error(QString("Prune failed: %1").arg(errorMsg));
         } else if (operation == "url") {
             emit remoteUrlReady(remote, "");
+        } else if (operation == "push") {
+            emit pushReady(false, QString("Push failed: %1").arg(errorMsg));
+            emit error(QString("Push failed: %1").arg(errorMsg));
+        } else if (operation == "pull") {
+            emit pullReady(false, QString("Pull failed: %1").arg(errorMsg));
+            emit error(QString("Pull failed: %1").arg(errorMsg));
         }
     }
 }
@@ -940,4 +1012,180 @@ void Git::onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     onApplyStashFinished(exitCode, exitStatus);
+}
+
+// Submodule operations implementation
+void Git::getSubmodules()
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "status" << "--recursive";
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::initSubmodule(const QString &path)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "init" << path;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::updateSubmodule(const QString &path, bool fetch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "update" << "--init";
+    if (fetch)
+        args << "--remote";
+    if (!path.isEmpty())
+        args << path;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::syncSubmodule(const QString &path)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "sync";
+    if (!path.isEmpty())
+        args << path;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::forEachSubmodule(const QString &command)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "foreach" << "--recursive" << command;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::onSubmodulesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        QString output = QString::fromUtf8(m_submoduleProcess->readAllStandardOutput());
+        QList<QStringList> submodules;
+        
+        // Parse submodule status output
+        // Format: [status] commit path (url)
+        // Status can be: ' ' (clean), '-' (not initialized), '+' (modified), 'U' (merge conflicts)
+        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        for (const QString &line : lines) {
+            if (line.trimmed().isEmpty())
+                continue;
+            
+            QStringList parts;
+            QString statusChar;
+            QString commit;
+            QString path;
+            QString url;
+            QString branch;
+            bool isDirty = false;
+            bool isUninitialized = false;
+            bool isMissing = false;
+            
+            // Parse line format: " status commit path (url)"
+            QRegularExpression re(R"(^\s*([ \-\+U])([0-9a-f]+)?\s+(\S+)(?:\s+\(([^)]+)\))?");
+            QRegularExpressionMatch match = re.match(line);
+            
+            if (match.hasMatch()) {
+                statusChar = match.captured(1);
+                commit = match.captured(2).isEmpty() ? QString() : match.captured(2);
+                path = match.captured(3);
+                url = match.captured(4);
+                
+                // Determine status
+                if (statusChar == '-') {
+                    isUninitialized = true;
+                } else if (statusChar == '+') {
+                    isDirty = true;
+                } else if (statusChar == 'U') {
+                    isDirty = true; // Merge conflicts
+                }
+                
+                parts << path << path << url << branch << commit << commit 
+                      << (isDirty ? "true" : "false") 
+                      << (isUninitialized ? "true" : "false")
+                      << (isMissing ? "true" : "false");
+                submodules << parts;
+            }
+        }
+        
+        emit submodulesReady(submodules);
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submodulesReady(QList<QStringList>());
+        emit error(QString("Failed to get submodules: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleInitFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        emit submoduleInitReady(true, "Submodule initialized successfully");
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleInitReady(false, QString("Failed to initialize submodule: %1").arg(errorMsg));
+        emit error(QString("Failed to initialize submodule: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        emit submoduleUpdateReady(true, "Submodule updated successfully");
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleUpdateReady(false, QString("Failed to update submodule: %1").arg(errorMsg));
+        emit error(QString("Failed to update submodule: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleSyncFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        emit submoduleSyncReady(true, "Submodule synced successfully");
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleSyncReady(false, QString("Failed to sync submodule: %1").arg(errorMsg));
+        emit error(QString("Failed to sync submodule: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleForeachFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        QString output = QString::fromUtf8(m_submoduleProcess->readAllStandardOutput());
+        emit submoduleForeachReady(true, output);
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleForeachReady(false, QString("Failed to execute command in submodules: %1").arg(errorMsg));
+        emit error(QString("Failed to execute command in submodules: %1").arg(errorMsg));
+    }
 }

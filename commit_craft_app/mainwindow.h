@@ -26,6 +26,7 @@ class CommitItemDelegate;
 class Git;
 class GitParser;
 class DiffEditor;
+class SubmoduleModel;
 
 // Forward declare FileModel from the library
 class FileModel;
@@ -69,6 +70,15 @@ private slots:
     void navigateToNextHunk();
     void navigateToPrevHunk();
     void showAboutDialog();
+    void stageSelectedFilesHotkey();
+    void unstageSelectedFilesHotkey();
+    void clearSelection();
+
+    // Submodule slots
+    void onSubmodulesReady(const QList<QStringList> &submodules);
+    void onSubmoduleInitReady(bool success, const QString &message);
+    void onSubmoduleUpdateReady(bool success, const QString &message);
+    void onSubmoduleSyncReady(bool success, const QString &message);
 
     /// Обновляет состояние кнопок навигации (Prev/Next Hunk)
     void updateNavigationButtonsState();
@@ -87,6 +97,7 @@ private:
     DiffEditor *diffEditor;
     FileModel *unstagedFilesModel;
     FileModel *stagedFilesModel;
+    SubmoduleModel *submoduleModel;
     CommitHistoryModel *commitHistoryModel;
     CommitItemDelegate *commitItemDelegate;
     Git *git;
