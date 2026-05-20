@@ -17,6 +17,10 @@ private slots:
     void testParseComplexDiff();
     void testParseFromFile();
     void testParseEmptyDiff();
+    void testHunkLineTypes();
+    void testParseDiffWithCaption();
+    void testGetTypeString();
+    void testParseDiffWithNoNewlineIndicator();
 };
 
 #endif // TESTGITPARSER_H
