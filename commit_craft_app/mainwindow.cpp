@@ -39,6 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     , diffEditor(nullptr)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
+    , submoduleModel(new SubmoduleModel(this))
     , commitHistoryModel(new CommitHistoryModel(this))
     , commitItemDelegate(new CommitItemDelegate(this))
     , git(new Git(this))
@@ -237,6 +238,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
+    
+    // Connect submodule signals
+    connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
+    connect(git, &Git::submoduleInitReady, this, &MainWindow::onSubmoduleInitReady);
+    connect(git, &Git::submoduleUpdateReady, this, &MainWindow::onSubmoduleUpdateReady);
+    connect(git, &Git::submoduleSyncReady, this, &MainWindow::onSubmoduleSyncReady);
     
     // Set up context menus
     ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);
