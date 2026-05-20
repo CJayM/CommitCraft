@@ -179,6 +179,74 @@ void TestGitParser::testParseEmptyDiff()
     QCOMPARE(hunks.size(), 0);
 }
 
+void TestGitParser::testHunkLineTypes()
+{
+    GitParser parser;
+
+    QString diffOutput = "@@ -1,3 +1,3 @@\n"
+                         " unchanged line\n"
+                         "-removed line\n"
+                         "+added line\n";
+
+    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
+
+    QCOMPARE(hunks.size(), 1);
+    const Hunk &hunk = hunks.first();
+
+    QCOMPARE(hunk.lines.size(), 3);
+    QCOMPARE(hunk.lines[0].type, HunkLine::Unchanged);
+    QCOMPARE(hunk.lines[1].type, HunkLine::Removed);
+    QCOMPARE(hunk.lines[2].type, HunkLine::Added);
+}
+
+void TestGitParser::testParseDiffWithCaption()
+{
+    GitParser parser;
+
+    QString diffOutput = "@@ -1,3 +1,4 @@ function_name()\n"
+                         " line1\n"
+                         "+new line\n"
+                         " line2\n"
+                         " line3\n";
+
+    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
+
+    QCOMPARE(hunks.size(), 1);
+    const Hunk &hunk = hunks.first();
+
+    QCOMPARE(hunk.caption, QString("function_name()"));
+}
+
+void TestGitParser::testGetTypeString()
+{
+    // Test static method getTypeString
+    QCOMPARE(GitParser::getTypeString(HunkLine::Unchanged), QString(" "));
+    QCOMPARE(GitParser::getTypeString(HunkLine::Removed), QString("-"));
+    QCOMPARE(GitParser::getTypeString(HunkLine::Added), QString("+"));
+}
+
+void TestGitParser::testParseDiffWithNoNewlineIndicator()
+{
+    GitParser parser;
+
+    QString diffOutput = "@@ -1,2 +1,2 @@\n"
+                         " line1\n"
+                         "-old line\n"
+                         "\\ No newline at end of file\n"
+                         "+new line\n";
+
+    QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
+
+    QCOMPARE(hunks.size(), 1);
+    const Hunk &hunk = hunks.first();
+
+    // The "\ No newline" line should be skipped
+    QCOMPARE(hunk.lines.size(), 3);
+    QCOMPARE(hunk.lines[0].type, HunkLine::Unchanged);
+    QCOMPARE(hunk.lines[1].type, HunkLine::Removed);
+    QCOMPARE(hunk.lines[2].type, HunkLine::Added);
+}
+
 int this_method_make_TestGitParser_visible_in_QT_tests_panel()
 {
     return QTest::qExec(new TestGitParser());

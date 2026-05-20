@@ -12,6 +12,13 @@ private slots:
     void cleanupTestCase();
     void testFileModelCreation();
     void testFileModelWithFiles();
+    void testFileModelEmpty();
+    void testFileModelWithPaths();
+    void testFileModelStatusColors();
+    void testFileModelHeaderData();
+    void testFileModelTextAlignment();
+    void testFileModelDirectoryColor();
+    void testFileModelInvalidIndex();
 };
 
 #endif // TESTFILEMODEL_H

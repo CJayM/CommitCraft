@@ -1,6 +1,51 @@
-# Specify filepatterns you want git to ignore.
+```
+# Qt/MOC generated files
+*.moc
+*.moc.cpp
+ moc_*
 
-/build/
-/commit_craft/build/
-/commit_craft_app/build/
-*.pro.user*
+# Build artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Qt build directories
+build/
+release/
+debug/
+*_autogen/
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.egg-info/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db
+```
