@@ -130,7 +130,6 @@ void CommitHistoryModel::calculateGraphLayout()
     // Алгоритм для вычисления позиции веток в графе
     // Отслеживаем активные ветки и их позиции
     QMap<QString, int> activeBranches; // hash -> column
-    int nextColumn = 1; // Следующая свободная колонка для новых веток
     
     for (int i = 0; i < m_commits.size(); ++i) {
         auto &commit = m_commits[i];

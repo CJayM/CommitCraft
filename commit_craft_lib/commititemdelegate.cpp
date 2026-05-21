@@ -105,6 +105,7 @@ void CommitItemDelegate::paintMessageColumn(QPainter *painter, const QStyleOptio
     QFontMetrics fm(font);
     
     int topY = rect.top();
+    int maxRefHeight = 0;
     
     // Рисуем refs (ветки, теги) вверху справа
     if (!commit.refs.isEmpty()) {
@@ -118,6 +119,7 @@ void CommitItemDelegate::paintMessageColumn(QPainter *painter, const QStyleOptio
             QString refText = ref;
             int refWidth = fm.horizontalAdvance(refText) + 12;
             int refHeight = fm.height() + 6;
+            maxRefHeight = qMax(maxRefHeight, refHeight);
             QRect refRect(refsX - refWidth, topY, refWidth, refHeight);
             
             painter->setPen(refColor);
@@ -130,7 +132,7 @@ void CommitItemDelegate::paintMessageColumn(QPainter *painter, const QStyleOptio
             
             refsX -= refWidth + 4;
         }
-        topY += refHeight + 4;
+        topY += maxRefHeight + 4;
     }
     
     // Рисуем сообщение коммита
