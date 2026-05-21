@@ -2,48 +2,51 @@
 # Build artifacts
 *.o
 *.obj
-*.exe
+*.a
+*.lib
 *.dll
 *.so
-*.a
+*.dylib
+*.exe
 *.out
 
+# Qt/C++ specific
+*.moc
+*.qrc
+*.ui
+*.pro.user
+Makefile
+Makefile.Debug
+Makefile.Release
+
 # Dependencies
-node_modules/
 venv/
 .venv/
 __pycache__/
-.mypy_cache/
-.pytest_cache/
-target/
-.gradle/
+*.egg-info/
 
-# Editor/IDE files
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
 
-# Logs
-*.log
+# OS
+.DS_Store
+Thumbs.db
 
 # Coverage
 coverage/
 htmlcov/
 .coverage
-
-# Qt/C++ specific build files
-*.pro.user
-*.qm
-*.qrc
-*.moc
-Debug/
-Release/
-*.ilk
-*.pdb
-*.lib
-*.exp
-*.iobj
-*.ipdb
 ```
