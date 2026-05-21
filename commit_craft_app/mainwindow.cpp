@@ -207,8 +207,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionStageFile, &QAction::triggered, this, &MainWindow::stageSelectedFilesHotkey);
     connect(ui->actionUnstageFile, &QAction::triggered, this, &MainWindow::unstageSelectedFilesHotkey);
     connect(ui->actionClearSelection, &QAction::triggered, this, &MainWindow::clearSelection);
-    connect(ui->actionPush, &QAction::triggered, this, [this]() { git->pushRemote(); });
-    connect(ui->actionPull, &QAction::triggered, this, [this]() { git->pullRemote(); });
+    connect(ui->actionPush, &QAction::triggered, this, [this]() { 
+        // Store the current selection to restore after push
+        m_pushPullSource = m_lastSelectionSource;
+        git->pushRemote(); 
+    });
+    connect(ui->actionPull, &QAction::triggered, this, [this]() { 
+        // Store the current selection to restore after pull
+        m_pushPullSource = m_lastSelectionSource;
+        git->pullRemote(); 
+    });
     
     // Добавляем actions в окно чтобы работали глобальные hotkeys
     addAction(ui->actionStageFile);
@@ -261,6 +269,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
+    connect(git, &Git::pushReady, this, &MainWindow::onPushReady);
+    connect(git, &Git::pullReady, this, &MainWindow::onPullReady);
     
     // Connect submodule signals
     connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
@@ -1316,5 +1326,25 @@ void MainWindow::onSubmoduleSyncReady(bool success, const QString &message)
     qDebug() << "Submodule sync ready:" << success << message;
     if (!success) {
         QMessageBox::warning(this, tr("Submodule Error"), message);
+    }
+}
+
+void MainWindow::onPushReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Push Successful"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Push Failed"), message);
+    }
+}
+
+void MainWindow::onPullReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Pull Successful"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Pull Failed"), message);
     }
 }
