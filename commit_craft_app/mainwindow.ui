@@ -573,6 +573,16 @@
     <addaction name="actionRefresh"/>
     <addaction name="actionCommit"/>
     <addaction name="separator"/>
+    <addaction name="actionStageFile"/>
+    <addaction name="actionUnstageFile"/>
+    <addaction name="separator"/>
+    <addaction name="actionPrevHunk"/>
+    <addaction name="actionNextHunk"/>
+    <addaction name="actionClearSelection"/>
+    <addaction name="separator"/>
+    <addaction name="actionPush"/>
+    <addaction name="actionPull"/>
+    <addaction name="separator"/>
     <addaction name="actionCreateBranch"/>
     <addaction name="separator"/>
     <addaction name="actionToggleLeftPanel"/>

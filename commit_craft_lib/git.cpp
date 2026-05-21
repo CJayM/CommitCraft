@@ -13,6 +13,7 @@ Git::Git(QObject *parent)
     , m_fileContentProcess(new QProcess(this))
     , m_addFileProcess(new QProcess(this))
     , m_unstageFileProcess(new QProcess(this))
+    , m_deleteFilesProcess(new QProcess(this))
     , m_commitProcess(new QProcess(this))
     , m_branchesProcess(new QProcess(this))
     , m_currentBranchProcess(new QProcess(this))
@@ -52,6 +53,10 @@ Git::Git(QObject *parent)
     connect(m_unstageFileProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onUnstageFileFinished);
     connect(m_unstageFileProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_deleteFilesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onDeleteFilesFinished);
+    connect(m_deleteFilesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
     
     connect(m_commitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCommitFinished);
@@ -272,6 +277,49 @@ void Git::unstageFiles(const QStringList &fileNames)
     m_unstageFileProcess->start();
 }
 
+bool Git::isFileTracked(const QString &fileName)
+{
+    QStringList args;
+    args << "ls-files" << "--error-unmatch";
+    
+    // Используем относительный путь
+    QFileInfo fileInfo(QDir(m_repositoryPath).absoluteFilePath(fileName));
+    QString relativePath = QDir(m_repositoryPath).relativeFilePath(fileInfo.absoluteFilePath());
+    args << relativePath;
+    
+    QProcess process;
+    process.setProgram(getGitExecutable());
+    process.setArguments(args);
+    process.setWorkingDirectory(m_repositoryPath);
+    process.start();
+    process.waitForFinished();
+    
+    return process.exitCode() == 0;
+}
+
+void Git::deleteFiles(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty()) return;
+
+    QStringList absoluteFilePaths;
+    for (const QString &file : fileNames) {
+        absoluteFilePaths << QDir(m_repositoryPath).absoluteFilePath(file);
+    }
+
+    QStringList args;
+    args << "rm" << "-f"; // -f для игнорирования несуществующих файлов
+    
+    // Добавляем относительные пути к файлам (без кавычек)
+    for (const QString &absolutePath : absoluteFilePaths) {
+        QFileInfo fileInfo(absolutePath);
+        QString relativePath = QDir(m_repositoryPath).relativeFilePath(fileInfo.absoluteFilePath());
+        args << relativePath;
+    }
+
+    setupProcess(m_deleteFilesProcess, args);
+    m_deleteFilesProcess->start();
+}
+
 void Git::commit(const QString &message, bool amend)
 {
     QStringList args;
@@ -391,6 +439,17 @@ void Git::onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus)
         QString msg = m_unstageFileProcess->readAllStandardError();
         emit unstageFileReady(false, QString("Failed to execute git reset: %1").arg(msg));
         emit error(QString("Failed to execute git reset: %1").arg(msg));
+    }
+}
+
+void Git::onDeleteFilesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        emit deleteFilesReady(true, "Files deleted successfully");
+    } else {
+        QString msg = m_deleteFilesProcess->readAllStandardError();
+        emit deleteFilesReady(false, QString("Failed to execute git rm: %1").arg(msg));
+        emit error(QString("Failed to execute git rm: %1").arg(msg));
     }
 }
 

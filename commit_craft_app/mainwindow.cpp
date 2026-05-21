@@ -207,8 +207,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionStageFile, &QAction::triggered, this, &MainWindow::stageSelectedFilesHotkey);
     connect(ui->actionUnstageFile, &QAction::triggered, this, &MainWindow::unstageSelectedFilesHotkey);
     connect(ui->actionClearSelection, &QAction::triggered, this, &MainWindow::clearSelection);
-    connect(ui->actionPush, &QAction::triggered, this, [this]() { git->pushRemote(); });
-    connect(ui->actionPull, &QAction::triggered, this, [this]() { git->pullRemote(); });
+    connect(ui->actionPush, &QAction::triggered, this, [this]() { 
+        // Store the current selection to restore after push
+        m_pushPullSource = m_lastSelectionSource;
+        git->pushRemote(); 
+    });
+    connect(ui->actionPull, &QAction::triggered, this, [this]() { 
+        // Store the current selection to restore after pull
+        m_pushPullSource = m_lastSelectionSource;
+        git->pullRemote(); 
+    });
     
     // Добавляем actions в окно чтобы работали глобальные hotkeys
     addAction(ui->actionStageFile);
@@ -260,7 +268,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::commitReady, this, &MainWindow::onGitCommitFinished);
     connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
+    connect(git, &Git::deleteFilesReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
+    connect(git, &Git::pushReady, this, &MainWindow::onPushReady);
+    connect(git, &Git::pullReady, this, &MainWindow::onPullReady);
     
     // Connect submodule signals
     connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
@@ -367,6 +378,23 @@ void MainWindow::onGitStatusFinished(const QString &output)
         auto indexedStatus = line.left(1);
         auto workStatus = line.mid(1, 1);
         QString file = line.mid(3);
+
+        // Убираем кавычки из имени файла, если они есть
+        if (file.startsWith("\"") && file.endsWith("\"")) {
+            file = file.mid(1, file.length() - 2);
+        }
+
+        // Если это директория с untracked файлами, добавляем все файлы внутри
+        if (workStatus == "?" && file.endsWith("/")) {
+            QDir dir(git->repositoryPath() + "/" + file);
+            QStringList subFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
+            for (const QString &subFile : subFiles) {
+                QString fullFilePath = file + subFile;
+                qDebug() << "Adding untracked file from directory:" << fullFilePath;
+                unstagedFiles.append(qMakePair("?", fullFilePath));
+            }
+        }
+        
         if (indexedStatus != " " && indexedStatus != "?") {
             stagedFiles.append(qMakePair(indexedStatus, file));
         }
@@ -463,7 +491,7 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
 
     QStringList selectedFiles;
     for (const QModelIndex &index : selectedIndexes) {
-        selectedFiles << model->getFileName(index.row());
+        selectedFiles << model->getRelativePath(index.row());
     }
 
     QMenu contextMenu(this);
@@ -542,7 +570,7 @@ void MainWindow::deleteSelectedFiles(const QStringList &files)
 {
     if (files.isEmpty()) return;
 
-    QString message = files.size() > 1 
+    QString message = files.size() > 1
         ? tr("Вы уверены, что хотите удалить %1 выделенных файлов?").arg(files.size())
         : tr("Вы уверены, что хотите удалить файл \"%1\"?").arg(files.first());
 
@@ -553,9 +581,30 @@ void MainWindow::deleteSelectedFiles(const QStringList &files)
     );
 
     if (reply == QMessageBox::Yes) {
+        QStringList trackedFiles;
+        QStringList untrackedFiles;
+        
+        // Разделяем файлы на отслеживаемые и неотслеживаемые
         for (const QString &file : files) {
-            QFile::remove(file);
+            if (git->isFileTracked(file)) {
+                trackedFiles.append(file);
+            } else {
+                untrackedFiles.append(file);
+            }
         }
+        
+        // Удаляем неотслеживаемые файлы через QFile::remove() (кроссплатформенное решение)
+        for (const QString &file : untrackedFiles) {
+            QString absolutePath = QDir(git->repositoryPath()).absoluteFilePath(file);
+            bool removed = QFile::remove(absolutePath);
+        }
+        
+        // Удаляем отслеживаемые файлы через git (это удалит их и из индекса, и из файловой системы)
+        if (!trackedFiles.isEmpty()) {
+            git->deleteFiles(trackedFiles);
+        }
+        
+        // Обновляем статус
         refreshGitStatus();
     }
 }
@@ -602,7 +651,7 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
 
     QStringList selectedFiles;
     for (const QModelIndex &index : selectedIndexes) {
-        selectedFiles << model->getFileName(index.row());
+        selectedFiles << model->getRelativePath(index.row());
     }
 
     QMenu contextMenu(this);
@@ -1316,5 +1365,25 @@ void MainWindow::onSubmoduleSyncReady(bool success, const QString &message)
     qDebug() << "Submodule sync ready:" << success << message;
     if (!success) {
         QMessageBox::warning(this, tr("Submodule Error"), message);
+    }
+}
+
+void MainWindow::onPushReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Push Successful"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Push Failed"), message);
+    }
+}
+
+void MainWindow::onPullReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Pull Successful"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Pull Failed"), message);
     }
 }

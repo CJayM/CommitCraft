@@ -76,6 +76,8 @@ private slots:
     void stageSelectedFilesHotkey();
     void unstageSelectedFilesHotkey();
     void clearSelection();
+    void onPushReady(bool success, const QString &message);
+    void onPullReady(bool success, const QString &message);
 
     // Submodule slots
     void onSubmodulesReady(const QList<QStringList> &submodules);
@@ -109,6 +111,7 @@ private:
     QString m_lastSelectedFileName;
     enum class SelectionSource { Unstaged, Staged };
     SelectionSource m_lastSelectionSource = SelectionSource::Unstaged;
+    SelectionSource m_pushPullSource = SelectionSource::Unstaged;
 
     // Настройки шрифта DiffEditor
     void saveFontSettings(const QString &fontFamily, int fontSize);
