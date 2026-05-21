@@ -20,8 +20,8 @@ public:
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 
 private:
-    void paintGraph(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const;
-    void paintCommitItem(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const;
+    void paintGraphColumn(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const;
+    void paintMessageColumn(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const;
 };
 
 #endif // COMMITITEMDELEGATE_H

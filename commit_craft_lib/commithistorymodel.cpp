@@ -53,12 +53,9 @@ QVariant CommitHistoryModel::data(const QModelIndex &index, int role) const
 
     switch (role) {
     case Qt::DisplayRole:
-        if (index.column() == 0) {
-            return commit.shortHash;
-        } else if (index.column() == 1) {
-            return commit.message;
-        }
-        break;
+        // Для QTreeView с делегатом DisplayRole не используется напрямую
+        // но возвращаем пустую строку чтобы избежать проблем
+        return QString();
         
     case Qt::UserRole:
         // Возвращаем все данные коммита для делегата
@@ -133,6 +130,7 @@ void CommitHistoryModel::calculateGraphLayout()
     // Алгоритм для вычисления позиции веток в графе
     // Отслеживаем активные ветки и их позиции
     QMap<QString, int> activeBranches; // hash -> column
+    int nextColumn = 1; // Следующая свободная колонка для новых веток
     
     for (int i = 0; i < m_commits.size(); ++i) {
         auto &commit = m_commits[i];
@@ -149,22 +147,16 @@ void CommitHistoryModel::calculateGraphLayout()
             // Ищем родителя в активных ветках
             if (activeBranches.contains(primaryParent)) {
                 parentColumn = activeBranches[primaryParent];
-            } else if (m_hashToRow.contains(primaryParent)) {
-                // Родитель уже был обработан (ниже в списке)
-                int parentRow = m_hashToRow[primaryParent];
-                if (parentRow > i) {
-                    parentColumn = m_commits[parentRow].graphColumn;
-                }
             }
             
             // Проверяем, есть ли другие родители (merge)
             bool isMerge = commit.parents.size() > 1;
             
             if (isMerge) {
-                // Для merge-коммита пытаемся найти свободную колонку или использовать существующую
+                // Для merge-коммита используем колонку первого родителя
                 commit.graphColumn = parentColumn;
                 
-                // Объединяем ветки от всех родителей
+                // Удаляем все родительские ветки из активных (они объединяются)
                 for (const QString &parentHash : commit.parents) {
                     if (activeBranches.contains(parentHash)) {
                         activeBranches.remove(parentHash);
@@ -174,7 +166,7 @@ void CommitHistoryModel::calculateGraphLayout()
                 // Обычный коммит - продолжаем ветку родителя
                 commit.graphColumn = parentColumn;
                 
-                // Удаляем родителя из активных и добавляем текущий коммит
+                // Удаляем родителя из активных веток
                 if (activeBranches.contains(primaryParent)) {
                     activeBranches.remove(primaryParent);
                 }

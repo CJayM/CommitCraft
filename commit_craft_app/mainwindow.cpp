@@ -82,6 +82,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stagedFilesTable->setModel(stagedFilesModel);
     ui->commitHistoryList->setModel(commitHistoryModel);
     ui->commitHistoryList->setItemDelegate(commitItemDelegate);
+    
+    // Настройка колонок для commitHistoryList (QTreeView)
+    ui->commitHistoryList->header()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->commitHistoryList->setColumnWidth(0, 120); // Колонка с графом и хэшем
+    ui->commitHistoryList->header()->setSectionResizeMode(1, QHeaderView::Stretch); // Колонка с сообщением
 
     // Фиксированная ширина колонки статуса (только для символа)
     ui->filesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
