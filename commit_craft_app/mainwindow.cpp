@@ -40,6 +40,7 @@ MainWindow::MainWindow(QWidget *parent)
     , diffEditor(nullptr)
     , unstagedFilesModel(new FileModel(this))
     , stagedFilesModel(new FileModel(this))
+    , submoduleModel(new SubmoduleModel(this))
     , commitHistoryModel(new CommitHistoryModel(this))
     , commitItemDelegate(new CommitItemDelegate(this))
     , git(new Git(this))
@@ -205,11 +206,15 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionStageFile, &QAction::triggered, this, &MainWindow::stageSelectedFilesHotkey);
     connect(ui->actionUnstageFile, &QAction::triggered, this, &MainWindow::unstageSelectedFilesHotkey);
     connect(ui->actionClearSelection, &QAction::triggered, this, &MainWindow::clearSelection);
+    connect(ui->actionPush, &QAction::triggered, this, [this]() { git->pushRemote(); });
+    connect(ui->actionPull, &QAction::triggered, this, [this]() { git->pullRemote(); });
     
     // Добавляем actions в окно чтобы работали глобальные hotkeys
     addAction(ui->actionStageFile);
     addAction(ui->actionUnstageFile);
     addAction(ui->actionClearSelection);
+    addAction(ui->actionPush);
+    addAction(ui->actionPull);
     
     // Connect amend checkbox
     connect(ui->amend_chk, &QCheckBox::stateChanged, this, &MainWindow::onAmendCheckBoxChanged);
@@ -255,6 +260,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
+    
+    // Connect submodule signals
+    connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
+    connect(git, &Git::submoduleInitReady, this, &MainWindow::onSubmoduleInitReady);
+    connect(git, &Git::submoduleUpdateReady, this, &MainWindow::onSubmoduleUpdateReady);
+    connect(git, &Git::submoduleSyncReady, this, &MainWindow::onSubmoduleSyncReady);
     
     // Set up context menus
     ui->filesTable->setContextMenuPolicy(Qt::CustomContextMenu);

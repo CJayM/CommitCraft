@@ -16,14 +16,16 @@ SOURCES += \
     tst_filemodel.cpp \
     tst_git.cpp \
     tst_gitparser.cpp \
-    tst_intralinediff.cpp
+    tst_intralinediff.cpp \
+    tst_commititemdelegate.cpp
 
 HEADERS += \
     tst_commithistorymodel.h \
     tst_filemodel.h \
     tst_git.h \
     tst_gitparser.h \
-    tst_intralinediff.h
+    tst_intralinediff.h \
+    tst_commititemdelegate.h
 
 # Include diff editor sources from the app directory
 SOURCES += \

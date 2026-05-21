@@ -743,6 +743,28 @@
     <string>О программе Commit Craft</string>
    </property>
   </action>
+  <action name="actionPush">
+   <property name="text">
+    <string>Push</string>
+   </property>
+   <property name="toolTip">
+    <string>Push changes to remote</string>
+   </property>
+   <property name="shortcut">
+    <string>F7</string>
+   </property>
+  </action>
+  <action name="actionPull">
+   <property name="text">
+    <string>Pull</string>
+   </property>
+   <property name="toolTip">
+    <string>Pull changes from remote</string>
+   </property>
+   <property name="shortcut">
+    <string>F8</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>

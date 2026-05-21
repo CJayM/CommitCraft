@@ -23,11 +23,13 @@ HEADERS += \
     commititemdelegate.h \
     filemodel.h \
     git.h \
-    gitparser.h
+    gitparser.h \
+    submodulemodel.h
 
 SOURCES += \
     commithistorymodel.cpp \
     commititemdelegate.cpp \
     filemodel.cpp \
     git.cpp \
-    gitparser.cpp
+    gitparser.cpp \
+    submodulemodel.cpp
