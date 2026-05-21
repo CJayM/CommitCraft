@@ -377,6 +377,17 @@ void MainWindow::onGitStatusFinished(const QString &output)
         auto indexedStatus = line.left(1);
         auto workStatus = line.mid(1, 1);
         QString file = line.mid(3);
+        // Если это директория с untracked файлами, добавляем все файлы внутри
+        if (workStatus == "?" && file.endsWith("/")) {
+            QDir dir(git->repositoryPath() + "/" + file);
+            QStringList subFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
+            for (const QString &subFile : subFiles) {
+                QString fullFilePath = file + subFile;
+                qDebug() << "Adding untracked file from directory:" << fullFilePath;
+                unstagedFiles.append(qMakePair("?", fullFilePath));
+            }
+        }
+        
         if (indexedStatus != " " && indexedStatus != "?") {
             stagedFiles.append(qMakePair(indexedStatus, file));
         }
@@ -552,7 +563,7 @@ void MainWindow::deleteSelectedFiles(const QStringList &files)
 {
     if (files.isEmpty()) return;
 
-    QString message = files.size() > 1 
+    QString message = files.size() > 1
         ? tr("Вы уверены, что хотите удалить %1 выделенных файлов?").arg(files.size())
         : tr("Вы уверены, что хотите удалить файл \"%1\"?").arg(files.first());
 
@@ -563,9 +574,30 @@ void MainWindow::deleteSelectedFiles(const QStringList &files)
     );
 
     if (reply == QMessageBox::Yes) {
+        QStringList trackedFiles;
+        QStringList untrackedFiles;
+        
+        // Разделяем файлы на отслеживаемые и неотслеживаемые
         for (const QString &file : files) {
-            QFile::remove(file);
+            if (git->isFileTracked(file)) {
+                trackedFiles.append(file);
+            } else {
+                untrackedFiles.append(file);
+            }
         }
+        
+        // Удаляем неотслеживаемые файлы только из файловой системы
+        for (const QString &file : untrackedFiles) {
+            QString absolutePath = QDir(git->repositoryPath()).absoluteFilePath(file);
+            QFile::remove(absolutePath);
+        }
+        
+        // Удаляем отслеживаемые файлы через git (это удалит их и из индекса, и из файловой системы)
+        if (!trackedFiles.isEmpty()) {
+            git->deleteFiles(trackedFiles);
+        }
+        
+        // Обновляем статус
         refreshGitStatus();
     }
 }
