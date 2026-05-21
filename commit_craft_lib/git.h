@@ -33,6 +33,8 @@ public:
     void addFiles(const QStringList &fileNames);
     void unstageFile(const QString &fileName);
     void unstageFiles(const QStringList &fileNames);
+    bool isFileTracked(const QString &fileName);
+    void deleteFiles(const QStringList &fileNames);
     void commit(const QString &message, bool amend = false);
 
     bool applyPatchToIndex(const QString &patchFilePath);
@@ -80,6 +82,7 @@ signals:
     void commitReady(bool success, const QString &message);
     void addFileReady(bool success, const QString &message);
     void unstageFileReady(bool success, const QString &message);
+    void deleteFilesReady(bool success, const QString &message);
     void error(const QString &error);
 
     // Branch modification results
@@ -122,6 +125,7 @@ private slots:
     void onFileContentFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onAddFileFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onDeleteFilesFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onCommitFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProcessError(QProcess::ProcessError error);
 
@@ -168,6 +172,7 @@ private:
     QProcess *m_fileContentProcess;
     QProcess *m_addFileProcess;
     QProcess *m_unstageFileProcess;
+    QProcess *m_deleteFilesProcess;
     QProcess *m_commitProcess;
 
     // Processes for branch operations

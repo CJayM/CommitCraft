@@ -268,6 +268,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::commitReady, this, &MainWindow::onGitCommitFinished);
     connect(git, &Git::addFileReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::unstageFileReady, this, &MainWindow::refreshGitStatus);
+    connect(git, &Git::deleteFilesReady, this, &MainWindow::refreshGitStatus);
     connect(git, &Git::error, this, &MainWindow::onGitError);
     connect(git, &Git::pushReady, this, &MainWindow::onPushReady);
     connect(git, &Git::pullReady, this, &MainWindow::onPullReady);
@@ -377,6 +378,12 @@ void MainWindow::onGitStatusFinished(const QString &output)
         auto indexedStatus = line.left(1);
         auto workStatus = line.mid(1, 1);
         QString file = line.mid(3);
+
+        // Убираем кавычки из имени файла, если они есть
+        if (file.startsWith("\"") && file.endsWith("\"")) {
+            file = file.mid(1, file.length() - 2);
+        }
+
         // Если это директория с untracked файлами, добавляем все файлы внутри
         if (workStatus == "?" && file.endsWith("/")) {
             QDir dir(git->repositoryPath() + "/" + file);
@@ -484,7 +491,7 @@ void MainWindow::showFileContextMenu(const QPoint &pos)
 
     QStringList selectedFiles;
     for (const QModelIndex &index : selectedIndexes) {
-        selectedFiles << model->getFileName(index.row());
+        selectedFiles << model->getRelativePath(index.row());
     }
 
     QMenu contextMenu(this);
@@ -586,10 +593,10 @@ void MainWindow::deleteSelectedFiles(const QStringList &files)
             }
         }
         
-        // Удаляем неотслеживаемые файлы только из файловой системы
+        // Удаляем неотслеживаемые файлы через QFile::remove() (кроссплатформенное решение)
         for (const QString &file : untrackedFiles) {
             QString absolutePath = QDir(git->repositoryPath()).absoluteFilePath(file);
-            QFile::remove(absolutePath);
+            bool removed = QFile::remove(absolutePath);
         }
         
         // Удаляем отслеживаемые файлы через git (это удалит их и из индекса, и из файловой системы)
@@ -644,7 +651,7 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
 
     QStringList selectedFiles;
     for (const QModelIndex &index : selectedIndexes) {
-        selectedFiles << model->getFileName(index.row());
+        selectedFiles << model->getRelativePath(index.row());
     }
 
     QMenu contextMenu(this);
