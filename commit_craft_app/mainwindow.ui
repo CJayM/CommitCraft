@@ -136,7 +136,9 @@
              </widget>
             </item>
             <item>
-             <widget class="QListView" name="commitHistoryList">
+             <widget class="QTreeView" name="commitHistoryList">
+              <property name="headerHidden">true</property>
+              <property name="allColumnsShowFocus">true</property>
               <property name="selectionMode">
                <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
               </property>

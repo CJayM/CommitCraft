@@ -210,7 +210,8 @@ void Git::getDiffWorkingTree(const QString &fileName)
 void Git::getCommitHistory()
 {
     setupProcess(m_commitHistoryProcess,
-                 QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s" << "--date=short");
+                 QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s|%P|%d" 
+                               << "--date=short" << "--all");
     m_commitHistoryProcess->start();
 }
 
@@ -395,10 +396,21 @@ void Git::onCommitHistoryFinished(int exitCode, QProcess::ExitStatus exitStatus)
         for (const QString &line : lines) {
             QStringList parts = line.split('|');
             if (parts.size() >= 4) {
-                // Format the hash to show only first 8 characters
-                if (!parts[0].isEmpty()) {
-                    parts[0] = parts[0].left(8);
+                // Оставляем полный хэш для модели (она сама обрежет для отображения)
+                // parts[0] - hash
+                // parts[1] - author
+                // parts[2] - date
+                // parts[3] - message
+                // parts[4] - parents (может быть пустым)
+                // parts[5] - refs (ветки, теги - может быть пустым)
+                
+                // Очищаем refs от лишних скобок и пробелов
+                if (parts.size() > 5 && !parts[5].isEmpty()) {
+                    QString refs = parts[5].trimmed();
+                    refs = refs.replace("(", "").replace(")", "").trimmed();
+                    parts[5] = refs;
                 }
+                
                 commits.append(parts);
             }
         }

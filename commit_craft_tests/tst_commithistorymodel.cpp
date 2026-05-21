@@ -124,7 +124,7 @@ void TestCommitHistoryModel::testCommitHistoryModelInvalidIndex()
     
     // Test with out-of-bounds index
     QVERIFY(model.data(model.index(100, 0)).isNull());
-    QVERIFY(model.data(model.index(0, 1)).isNull()); // Only 1 column
+    QVERIFY(model.data(model.index(0, 2)).isNull()); // Only 2 columns
     
     // Test with parent index (should return 0 rows)
     QModelIndex parent = model.index(0, 0);

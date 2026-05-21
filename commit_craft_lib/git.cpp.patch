@@ -1,0 +1,12 @@
+--- git.cpp.orig2024-01-01 00:00:00.000000000 +0000
++++ git.cpp2024-01-01 00:00:00.000000000 +0000
+@@ -210,7 +210,8 @@
+ void Git::getCommitHistory()
+ {
+     setupProcess(m_commitHistoryProcess,
+-                 QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s" << "--date=short");
++                 QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s|%P|%d" 
++                               << "--date=short" << "--all");
+     m_commitHistoryProcess->start();
+ }
+ 

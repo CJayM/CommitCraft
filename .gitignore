@@ -1,5 +1,5 @@
 ```
-# Compiled and build artifacts
+# Build artifacts
 *.o
 *.obj
 *.exe
@@ -18,49 +18,32 @@ __pycache__/
 target/
 .gradle/
 
-# Build directories (Qt-specific)
-build/
-dist/
-
-# Editors
+# Editor/IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Logs and temp files
-*.log
 *.tmp
 
-# System files
-.DS_Store
-Thumbs.db
-.env
-.env.local
-*.env.*
+# Logs
+*.log
 
 # Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
+# Qt/C++ specific build files
+*.pro.user
+*.qm
+*.qrc
+*.moc
+Debug/
+Release/
+*.ilk
+*.pdb
+*.lib
+*.exp
+*.iobj
+*.ipdb
 ```
