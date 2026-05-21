@@ -29,6 +29,7 @@
 #include <filemodel.h>
 #include <git.h>
 #include <gitparser.h>
+#include <submodulemodel.h>
 #include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -1284,5 +1285,36 @@ void MainWindow::onRevertSelectedPatch(const QString &fileName, const QString &p
     // Обновляем diff для текущего файла после частичного revert
     if (!m_lastSelectedFileName.isEmpty()) {
         updateDiffPanel(m_lastSelectedFileName);
+    }
+}
+
+void MainWindow::onSubmodulesReady(const QList<QStringList> &submodules)
+{
+    // TODO: Implement submodules display
+    // This method should populate the submodule UI with the data
+    qDebug() << "Submodules ready:" << submodules.size() << "submodules";
+}
+
+void MainWindow::onSubmoduleInitReady(bool success, const QString &message)
+{
+    qDebug() << "Submodule init ready:" << success << message;
+    if (!success) {
+        QMessageBox::warning(this, tr("Submodule Error"), message);
+    }
+}
+
+void MainWindow::onSubmoduleUpdateReady(bool success, const QString &message)
+{
+    qDebug() << "Submodule update ready:" << success << message;
+    if (!success) {
+        QMessageBox::warning(this, tr("Submodule Error"), message);
+    }
+}
+
+void MainWindow::onSubmoduleSyncReady(bool success, const QString &message)
+{
+    qDebug() << "Submodule sync ready:" << success << message;
+    if (!success) {
+        QMessageBox::warning(this, tr("Submodule Error"), message);
     }
 }

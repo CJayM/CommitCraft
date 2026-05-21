@@ -1135,9 +1135,10 @@ void Git::onSubmodulesFinished(int exitCode, QProcess::ExitStatus exitStatus)
             bool isDirty = false;
             bool isUninitialized = false;
             bool isMissing = false;
-            
+
             // Parse line format: " status commit path (url)"
-            QRegularExpression re(R"(^\s*([ \-\+U])([0-9a-f]+)?\s+(\S+)(?:\s+\(([^)]+)\))?");
+            QRegularExpression re(
+                R"REGEX(^\s*([ \-\+U])([0-9a-f]+)?\s+(\S+)(?:\s+\(([^)]+)\))?;)REGEX");
             QRegularExpressionMatch match = re.match(line);
             
             if (match.hasMatch()) {
