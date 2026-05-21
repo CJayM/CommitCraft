@@ -4,9 +4,10 @@
 #include <QList>
 #include <QMetaType>
 #include <QStyledItemDelegate>
+#include "commithistorymodel.h"
 
-// Register QList<QString> for use with QVariant
-Q_DECLARE_METATYPE(QList<QString>)
+// Register CommitData for use with QVariant
+Q_DECLARE_METATYPE(CommitData)
 
 class CommitItemDelegate : public QStyledItemDelegate
 {
@@ -19,7 +20,8 @@ public:
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 
 private:
-    void paintCommitItem(QPainter *painter, const QStyleOptionViewItem &option, const QList<QString> &commitData) const;
+    void paintGraph(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const;
+    void paintCommitItem(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const;
 };
 
 #endif // COMMITITEMDELEGATE_H
