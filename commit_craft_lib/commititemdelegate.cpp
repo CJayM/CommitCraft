@@ -126,8 +126,22 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     int msgMaxWidth = rect.right() - 5 - msgX - refsTotalWidth - 4;
 
     painter->setFont(normFont);
+
+    // Определяем цвет текста: HEAD → Accent, иначе обычный
     QColor textColor = option.palette.color(QPalette::Text);
-    if (option.state & QStyle::State_Selected) {
+    bool isHead = false;
+    for (const QString &ref : commit.refs) {
+        if (ref.contains("HEAD", Qt::CaseInsensitive)) {
+            isHead = true;
+            break;
+        }
+    }
+    if (isHead) {
+        textColor = option.palette.color(QPalette::Accent);
+    }
+
+    // Выделенная строка — перебиваем цвет на HighlightedText
+    if ((option.state & QStyle::State_Selected) | (isHead)) {
         painter->setFont(boldFont);
     }
 
