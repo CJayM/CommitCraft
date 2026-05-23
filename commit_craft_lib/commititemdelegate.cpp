@@ -145,51 +145,61 @@ void CommitItemDelegate::paintMessageColumn(QPainter *painter, const QStyleOptio
     // Шрифты
     QFont font = painter->font();
     QFontMetrics fm(font);
-    
-    int topY = rect.top();
-    int maxRefHeight = 0;
-    
-    // Рисуем refs (ветки, теги) вверху справа
+
+    int baseY = rect.top();
+
+    // --- Строка 1: сообщение + refs (inline) ---
+    int messageWidth = rect.width();
+    int refsTotalWidth = 0;
+
+    // Сначала вычисляем ширину всех refs
+    if (!commit.refs.isEmpty()) {
+        for (const QString &ref : commit.refs) {
+            int refWidth = fm.horizontalAdvance(ref) + 12;
+            refsTotalWidth += refWidth + 4; // +4 для промежутка между бейджами
+        }
+        if (refsTotalWidth > 0)
+            refsTotalWidth -= 4; // убираем последний промежуток
+        messageWidth = rect.width() - refsTotalWidth - 8;
+    }
+
+    // Рисуем сообщение коммита (слева, elided с учётом места под refs)
+    painter->setFont(font);
+    painter->setPen(textColor);
+    QString elidedMessage = fm.elidedText(commit.message, Qt::ElideRight,
+                                          qMax(messageWidth, 20));
+    painter->drawText(rect.left(), baseY + fm.ascent(), elidedMessage);
+
+    // Рисуем refs (ветки, теги) справа на той же строке
     if (!commit.refs.isEmpty()) {
         int refsX = rect.right();
         for (const QString &ref : commit.refs) {
-            // Определяем тип ref
             bool isBranch = ref.contains("HEAD") || !ref.contains("tag");
             QColor refColor = isBranch ? QColor(230, 57, 70) : QColor(155, 89, 182);
-            
-            // Рисуем прямоугольник с текстом
-            QString refText = ref;
-            int refWidth = fm.horizontalAdvance(refText) + 12;
+
+            int refWidth = fm.horizontalAdvance(ref) + 12;
             int refHeight = fm.height() + 6;
-            maxRefHeight = qMax(maxRefHeight, refHeight);
-            QRect refRect(refsX - refWidth, topY, refWidth, refHeight);
-            
+            int refY = baseY - 1; // чуть выше базовой линии для центрирования
+            QRect refRect(refsX - refWidth, refY, refWidth, refHeight);
+
             painter->setPen(refColor);
             painter->setBrush(QColor(refColor.red(), refColor.green(), refColor.blue(), 30));
             painter->drawRoundedRect(refRect, 3, 3);
-            
+
             painter->setPen(refColor);
             painter->setFont(font);
-            painter->drawText(refRect.adjusted(6, 0, -6, 0), Qt::AlignVCenter, refText);
-            
+            painter->drawText(refRect.adjusted(6, 0, -6, 0), Qt::AlignVCenter, ref);
+
             refsX -= refWidth + 4;
         }
-        topY += maxRefHeight + 4;
     }
-    
-    // Рисуем сообщение коммита
-    painter->setFont(font);
-    painter->setPen(textColor);
-    QString messageText = commit.message;
-    QString elidedMessage = fm.elidedText(messageText, Qt::ElideRight, rect.width());
-    painter->drawText(rect.left(), topY + fm.ascent(), elidedMessage);
-    
-    // Рисуем дату и автора (серым цветом, ниже сообщения)
+
+    // --- Строка 2: дата и автор ---
     int messageHeight = fm.height() + 4;
     painter->setPen(Qt::gray);
     QString dateAuthor = commit.author + ", " + commit.date;
     QString elidedDateAuthor = fm.elidedText(dateAuthor, Qt::ElideRight, rect.width());
-    painter->drawText(rect.left(), topY + messageHeight + fm.ascent(), elidedDateAuthor);
+    painter->drawText(rect.left(), baseY + messageHeight + fm.ascent(), elidedDateAuthor);
 
     painter->restore();
 }
