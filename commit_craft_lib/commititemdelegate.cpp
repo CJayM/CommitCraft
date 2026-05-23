@@ -116,11 +116,16 @@ void CommitItemDelegate::paintGraphColumn(QPainter *painter, const QStyleOptionV
     painter->setPen(commit.branchColor);
     painter->drawEllipse(QPoint(dotX, dotY), dotRadius, dotRadius);
 
-    // 5. Хэш коммита
+    // 5. Хэш коммита — сразу после последней активной колонки
+    int maxActiveCol = commit.graphColumn;
+    for (int col : commit.activeColumns) {
+        if (col > maxActiveCol) maxActiveCol = col;
+    }
+    int hashX = leftMargin + (maxActiveCol + 1) * columnSpacing + dotRadius + 8;
+
     QFont boldFont = painter->font();
     boldFont.setBold(true);
     QFontMetrics fmBold(boldFont);
-    int hashX = leftMargin + 100;
     painter->setFont(boldFont);
     painter->setPen(commit.branchColor);
     painter->drawText(hashX, rect.top() + fmBold.ascent(), commit.shortHash);
