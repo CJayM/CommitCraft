@@ -1,6 +1,7 @@
 #include "commithistorymodel.h"
 #include <QColor>
 #include <QDebug>
+#include <QSet>
 
 CommitHistoryModel::CommitHistoryModel(QObject *parent)
     : QAbstractItemModel(parent)
@@ -128,54 +129,47 @@ QString CommitHistoryModel::getCommitHash(int row) const
 void CommitHistoryModel::calculateGraphLayout()
 {
     // Алгоритм для вычисления позиции веток в графе
-    // Отслеживаем активные ветки и их позиции
-    QMap<QString, int> activeBranches; // hash -> column
-    
-    for (int i = 0; i < m_commits.size(); ++i) {
+    // Идём от старых коммитов к новым, чтобы родители уже были обработаны
+    QMap<QString, int> hashToColumn; // hash → назначенная колонка
+
+    for (int i = m_commits.size() - 1; i >= 0; --i) {
         auto &commit = m_commits[i];
-        
-        if (commit.parents.isEmpty()) {
-            // Initial commit - всегда в колонке 0
-            commit.graphColumn = 0;
-            activeBranches[commit.hash] = 0;
-        } else {
-            // Находим позицию первого родителя
-            QString primaryParent = commit.parents.first();
-            int parentColumn = 0;
-            
-            // Ищем родителя в активных ветках
-            if (activeBranches.contains(primaryParent)) {
-                parentColumn = activeBranches[primaryParent];
-            }
-            
-            // Проверяем, есть ли другие родители (merge)
-            bool isMerge = commit.parents.size() > 1;
-            
-            if (isMerge) {
-                // Для merge-коммита используем колонку первого родителя
-                commit.graphColumn = parentColumn;
-                
-                // Удаляем все родительские ветки из активных (они объединяются)
-                for (const QString &parentHash : commit.parents) {
-                    if (activeBranches.contains(parentHash)) {
-                        activeBranches.remove(parentHash);
-                    }
-                }
-            } else {
-                // Обычный коммит - продолжаем ветку родителя
-                commit.graphColumn = parentColumn;
-                
-                // Удаляем родителя из активных веток
-                if (activeBranches.contains(primaryParent)) {
-                    activeBranches.remove(primaryParent);
+
+        int column = 0;
+
+        if (!commit.parents.isEmpty()) {
+            // Пытаемся найти колонку любого из родителей
+            bool foundParent = false;
+            for (const QString &parent : commit.parents) {
+                if (hashToColumn.contains(parent)) {
+                    column = hashToColumn[parent];
+                    foundParent = true;
+                    break;
                 }
             }
-            
-            // Добавляем текущий коммит в активные ветки
-            activeBranches[commit.hash] = commit.graphColumn;
+
+            if (!foundParent) {
+                // Все родители уже заняты другими ветками (разветвление)
+                // Назначаем минимальную свободную колонку
+                QSet<int> occupiedColumns;
+                for (auto it = hashToColumn.constBegin(); it != hashToColumn.constEnd(); ++it)
+                    occupiedColumns.insert(it.value());
+                column = 0;
+                while (occupiedColumns.contains(column))
+                    column++;
+            }
         }
-        
-        commit.branchColor = generateBranchColor(commit.graphColumn);
+        // Корневой коммит → колонка 0 (по умолчанию)
+
+        // Удаляем родителей из отслеживания (они больше не активны)
+        for (const QString &parent : commit.parents) {
+            hashToColumn.remove(parent);
+        }
+
+        // Регистрируем текущий коммит
+        hashToColumn[commit.hash] = column;
+        commit.graphColumn = column;
+        commit.branchColor = generateBranchColor(column);
     }
 }
 
