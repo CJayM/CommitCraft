@@ -168,6 +168,54 @@
         </item>
        </layout>
       </widget>
+      <widget class="QFrame" name="fileDirectoriesFrame">
+       <property name="minimumSize">
+        <size>
+         <width>80</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::Shape::Panel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Shadow::Raised</enum>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_files">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="fileDirsLabel">
+          <property name="text">
+           <string>Files</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTreeView" name="fileDirectoriesTree">
+          <property name="headerHidden">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
       <widget class="QFrame" name="topFrame">
        <property name="minimumSize">
         <size>
@@ -598,7 +646,9 @@
     <addaction name="actionCreateBranch"/>
     <addaction name="separator"/>
     <addaction name="actionToggleLeftPanel"/>
+    <addaction name="actionToggleFilesPanel"/>
     <addaction name="actionToggleTopPanel"/>
+    <addaction name="actionToggleRightPanel"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -628,7 +678,9 @@
     <bool>false</bool>
    </attribute>
    <addaction name="actionToggleLeftPanel"/>
+   <addaction name="actionToggleFilesPanel"/>
    <addaction name="actionToggleTopPanel"/>
+   <addaction name="actionToggleRightPanel"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpenRepository">
@@ -747,6 +799,34 @@
    </property>
    <property name="toolTip">
     <string>Toggle Top Panel</string>
+   </property>
+  </action>
+  <action name="actionToggleFilesPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Files Panel</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle Files Panel</string>
+   </property>
+  </action>
+  <action name="actionToggleRightPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Diff Panel</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle Diff Panel</string>
    </property>
   </action>
   <action name="actionCreateBranch">

@@ -11,6 +11,7 @@
 #include <QPair>
 #include <QRegularExpression>
 #include <QScrollBar>
+#include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
@@ -18,6 +19,7 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QFileIconProvider>
 #include <QFileInfo>
 #include <QPixmap>
 #include <QTemporaryFile>
@@ -137,6 +139,14 @@ MainWindow::MainWindow(QWidget *parent)
     // Подключаем BranchesWidget к Git
     ui->branchesWidget->setGit(git);
 
+    // --- Дерево директорий проекта ---
+    m_dirTreeView = ui->fileDirectoriesTree;
+    m_dirTreeModel = new QStandardItemModel(this);
+    m_dirTreeView->setModel(m_dirTreeModel);
+
+    connect(m_dirTreeView->selectionModel(), &QItemSelectionModel::currentChanged,
+            this, &MainWindow::onDirTreeSelectionChanged);
+
     // Сохраняем имя ветки при попытке checkout
     connect(ui->branchesWidget, &BranchesWidget::checkoutAttempted, this, [this](const QString &branch) {
         m_lastCheckoutBranch = branch;
@@ -203,7 +213,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect panel toggle actions
     connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
+    connect(ui->actionToggleFilesPanel, &QAction::toggled, this, &MainWindow::toggleFilesPanel);
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
+    connect(ui->actionToggleRightPanel, &QAction::toggled, this, &MainWindow::toggleRightPanel);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::showAboutDialog);
     
     // Connect hotkey actions
@@ -410,6 +422,12 @@ void MainWindow::onGitStatusFinished(const QString &output)
     stagedFilesModel->setFiles(stagedFiles);
     updateCommitButtonState();
 
+    // Сохраняем полные списки для фильтрации по директории
+    m_allUnstagedFiles = unstagedFiles;
+    m_allStagedFiles = stagedFiles;
+    rebuildDirectoryTree();
+    applyDirectoryFilter();
+
     // Включаем watcher обратно после обновления
     m_fsWatcher->blockSignals(false);
 
@@ -468,7 +486,10 @@ void MainWindow::openRepository()
             m_fsWatcher->addPath(repositoryPath);
 
             refreshGitStatus();
-            
+
+            // Очищаем фильтр директорий
+            m_selectedDirectory.clear();
+
             // Обновляем панель веток
             ui->branchesWidget->refresh();
         } else {
@@ -940,9 +961,19 @@ void MainWindow::toggleLeftPanel(bool visible)
     ui->leftFrame->setVisible(visible);
 }
 
+void MainWindow::toggleFilesPanel(bool visible)
+{
+    ui->fileDirectoriesFrame->setVisible(visible);
+}
+
 void MainWindow::toggleTopPanel(bool visible)
 {
     ui->topFrame->setVisible(visible);
+}
+
+void MainWindow::toggleRightPanel(bool visible)
+{
+    ui->rightWidget->setVisible(visible);
 }
 
 void MainWindow::onAmendCheckBoxChanged(int state)
@@ -1194,6 +1225,116 @@ void MainWindow::updateNavigationButtonsState()
 
     ui->actionPrevHunk->setEnabled(hasPrev);
     ui->actionNextHunk->setEnabled(hasNext);
+}
+
+void MainWindow::onDirTreeSelectionChanged(const QModelIndex &current, const QModelIndex &previous)
+{
+    Q_UNUSED(previous);
+    if (!current.isValid() || current == m_dirTreeModel->invisibleRootItem()->index()) {
+        // Корень или ничего — показываем все файлы
+        m_selectedDirectory.clear();
+    } else {
+        // Получаем путь из данных элемента
+        m_selectedDirectory = current.data(Qt::UserRole).toString();
+        if (!m_selectedDirectory.isEmpty())
+            m_selectedDirectory += '/';
+    }
+    applyDirectoryFilter();
+}
+
+void MainWindow::rebuildDirectoryTree()
+{
+    // Блокируем сигналы, чтобы не вызвать onDirTreeSelectionChanged
+    m_dirTreeView->selectionModel()->blockSignals(true);
+
+    m_dirTreeModel->clear();
+
+    // Корневой элемент — название репозитория
+    QString repoName = QDir(repositoryPath).dirName();
+    if (repoName.isEmpty()) repoName = tr("All files");
+    auto *rootItem = new QStandardItem(repoName);
+    rootItem->setData(QString(), Qt::UserRole); // пустой путь = все файлы
+    QFont rootFont = rootItem->font();
+    rootFont.setBold(true);
+    rootItem->setFont(rootFont);
+    QFileIconProvider iconProvider;
+    rootItem->setIcon(iconProvider.icon(QFileIconProvider::Folder));
+    m_dirTreeModel->appendRow(rootItem);
+
+    // Собираем уникальные директории из всех файлов
+    QSet<QString> dirs;
+    auto collectDirs = [&dirs](const QList<QPair<QString, QString>> &files) {
+        for (const auto &pair : files) {
+            QString path = pair.second;
+            int lastSlash = path.lastIndexOf('/');
+            if (lastSlash >= 0) {
+                QString dirPath = path.left(lastSlash);
+                // Добавляем все родительские директории
+                QStringList parts = dirPath.split('/', Qt::SkipEmptyParts);
+                QString accum;
+                for (const QString &part : parts) {
+                    if (!accum.isEmpty()) accum += '/';
+                    accum += part;
+                    dirs.insert(accum);
+                }
+            }
+        }
+    };
+    collectDirs(m_allUnstagedFiles);
+    collectDirs(m_allStagedFiles);
+
+    // Строим дерево: (путь → QStandardItem)
+    QMap<QString, QStandardItem *> itemMap;
+    itemMap[""] = rootItem;
+
+    // Сортируем по длине пути (сначала короткие = родители)
+    QStringList sortedDirs = dirs.values();
+    std::sort(sortedDirs.begin(), sortedDirs.end(),
+              [](const QString &a, const QString &b) { return a.count('/') < b.count('/'); });
+
+    for (const QString &dirPath : sortedDirs) {
+        int lastSlash = dirPath.lastIndexOf('/');
+        QString parentPath = (lastSlash >= 0) ? dirPath.left(lastSlash) : QString();
+        QString dirName = (lastSlash >= 0) ? dirPath.mid(lastSlash + 1) : dirPath;
+
+        QStandardItem *parent = itemMap.value(parentPath, rootItem);
+        auto *item = new QStandardItem(dirName);
+        item->setData(dirPath, Qt::UserRole);
+        item->setEditable(false);
+        item->setIcon(iconProvider.icon(QFileIconProvider::Folder));
+        parent->appendRow(item);
+        itemMap[dirPath] = item;
+    }
+
+    // Раскрываем корень
+    m_dirTreeView->expand(rootItem->index());
+
+    m_dirTreeView->selectionModel()->blockSignals(false);
+}
+
+void MainWindow::applyDirectoryFilter()
+{
+    if (m_selectedDirectory.isEmpty()) {
+        // Без фильтра — показываем все файлы
+        unstagedFilesModel->setFiles(m_allUnstagedFiles);
+        stagedFilesModel->setFiles(m_allStagedFiles);
+        return;
+    }
+
+    QList<QPair<QString, QString>> filteredUnstaged;
+    QList<QPair<QString, QString>> filteredStaged;
+
+    for (const auto &pair : m_allUnstagedFiles) {
+        if (pair.second.startsWith(m_selectedDirectory))
+            filteredUnstaged.append(pair);
+    }
+    for (const auto &pair : m_allStagedFiles) {
+        if (pair.second.startsWith(m_selectedDirectory))
+            filteredStaged.append(pair);
+    }
+
+    unstagedFilesModel->setFiles(filteredUnstaged);
+    stagedFilesModel->setFiles(filteredStaged);
 }
 
 void MainWindow::showAboutDialog()

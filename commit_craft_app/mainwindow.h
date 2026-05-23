@@ -12,6 +12,10 @@
 #include <QRegularExpression>
 #include <QFileSystemWatcher>
 #include <QTimer>
+#include <QFileSystemModel>
+#include <QStandardItemModel>
+
+class QTreeView;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -66,7 +70,9 @@ private slots:
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
     void toggleLeftPanel(bool visible);
+    void toggleFilesPanel(bool visible);
     void toggleTopPanel(bool visible);
+    void toggleRightPanel(bool visible);
     void onAmendCheckBoxChanged(int state);
     void updateCommitButtonState();
     void synchronizeZoom(int zoom);
@@ -87,6 +93,9 @@ private slots:
 
     /// Обновляет состояние кнопок навигации (Prev/Next Hunk)
     void updateNavigationButtonsState();
+
+    // Фильтрация по директории
+    void onDirTreeSelectionChanged(const QModelIndex &current, const QModelIndex &previous);
 
 private:
     void saveSplitterState();
@@ -138,5 +147,14 @@ private:
     void discardFileChanges(const QString &fileName);
     void showBlameStub();
     void runGitCommand(const QString &command, const QStringList &args, const QString &workingDir);
+
+    // Данные для фильтрации по директории
+    QList<QPair<QString, QString>> m_allUnstagedFiles;
+    QList<QPair<QString, QString>> m_allStagedFiles;
+    QString m_selectedDirectory;
+    QStandardItemModel *m_dirTreeModel;
+    QTreeView *m_dirTreeView;
+    void rebuildDirectoryTree();
+    void applyDirectoryFilter();
 };
 #endif // MAINWINDOW_H
