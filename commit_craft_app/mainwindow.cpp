@@ -141,6 +141,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     // --- Дерево директорий проекта ---
     m_dirTreeView = ui->fileDirectoriesTree;
+    m_dirTreeView->setIndentation(12); // компактный отступ
+    m_dirTreeView->setExpandsOnDoubleClick(false);
+    m_dirTreeView->setStyleSheet("QTreeView::branch { image: none; }");
     m_dirTreeModel = new QStandardItemModel(this);
     m_dirTreeView->setModel(m_dirTreeModel);
 
@@ -1306,9 +1309,7 @@ void MainWindow::rebuildDirectoryTree()
         itemMap[dirPath] = item;
     }
 
-    // Раскрываем корень
-    m_dirTreeView->expand(rootItem->index());
-
+    m_dirTreeView->expandAll();
     m_dirTreeView->selectionModel()->blockSignals(false);
 }
 
