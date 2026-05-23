@@ -31,16 +31,14 @@ int CommitHistoryModel::rowCount(const QModelIndex &parent) const
 int CommitHistoryModel::columnCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    return 2; // Колонка 0: граф + хэш, Колонка 1: сообщение
+    return 1; // Единая колонка: граф + хэш + сообщение + refs + дата
 }
 
 QVariant CommitHistoryModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
         if (section == 0)
-            return tr("Commit");
-        else if (section == 1)
-            return tr("Message");
+            return tr("Commits");
     }
     return QVariant();
 }
