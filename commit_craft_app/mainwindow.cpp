@@ -202,7 +202,27 @@ MainWindow::MainWindow(QWidget *parent)
             QMessageBox::warning(this, tr("Ошибка Git"), message);
         }
     });
-    
+
+    // Branch delete/rename, stash apply/drop, fetch/prune → тоже обновляем историю
+    connect(git, &Git::branchDeleted, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::branchRenamed, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::stashApplied, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::stashDropped, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::fetchReady, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::pruneReady, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+
     // Если репозиторий загружен из настроек, обновляем панель веток
     if (!repositoryPath.isEmpty() && isGitRepository(repositoryPath)) {
         ui->branchesWidget->refresh();
@@ -966,7 +986,7 @@ void MainWindow::toggleLeftPanel(bool visible)
 
 void MainWindow::toggleFilesPanel(bool visible)
 {
-    ui->fileDirectoriesFrame->setVisible(visible);
+    ui->widget_2->setVisible(visible);
 }
 
 void MainWindow::toggleTopPanel(bool visible)
