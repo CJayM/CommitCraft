@@ -209,8 +209,11 @@ void Git::getDiffWorkingTree(const QString &fileName)
 
 void Git::getCommitHistory()
 {
+    // --graph добавляет префикс графа (с *, |, /, \),
+    // %x1F — разделитель между префиксом графа и данными коммита
     setupProcess(m_commitHistoryProcess,
-                 QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s|%P|%d" 
+                 QStringList() << "log" << "--graph"
+                               << "--pretty=format:%x1F%H|%an|%ad|%s|%P|%d"
                                << "--date=short" << "--all");
     m_commitHistoryProcess->start();
 }
@@ -394,23 +397,39 @@ void Git::onCommitHistoryFinished(int exitCode, QProcess::ExitStatus exitStatus)
 
         QList<QList<QString>> commits;
         for (const QString &line : lines) {
-            QStringList parts = line.split('|');
+            // Ищем разделитель \x1F между префиксом графа и данными
+            int sepIdx = line.indexOf(QChar(0x1F));
+            if (sepIdx < 0)
+                continue; // строка только с графом (|\ /), без коммита
+
+            QString graphPrefix = line.left(sepIdx);
+            QString dataPart = line.mid(sepIdx + 1);
+
+            // Определяем колонку коммита по позиции '*' в префиксе графа
+            int starPos = graphPrefix.indexOf('*');
+            int graphColumn = (starPos >= 0) ? starPos / 2 : 0;
+
+            // Парсим данные коммита
+            QStringList parts = dataPart.split('|');
             if (parts.size() >= 4) {
-                // Оставляем полный хэш для модели (она сама обрежет для отображения)
                 // parts[0] - hash
                 // parts[1] - author
                 // parts[2] - date
                 // parts[3] - message
                 // parts[4] - parents (может быть пустым)
                 // parts[5] - refs (ветки, теги - может быть пустым)
-                
+
                 // Очищаем refs от лишних скобок и пробелов
                 if (parts.size() > 5 && !parts[5].isEmpty()) {
                     QString refs = parts[5].trimmed();
                     refs = refs.replace("(", "").replace(")", "").trimmed();
                     parts[5] = refs;
                 }
-                
+
+                // Добавляем graphColumn как 7-й элемент и graphPrefix как 8-й
+                parts.append(QString::number(graphColumn));
+                parts.append(graphPrefix);
+
                 commits.append(parts);
             }
         }

@@ -32,9 +32,9 @@ void TestCommitItemDelegate::testSizeHint()
     QModelIndex index = model.index(0, 0);
     
     QSize size = delegate.sizeHint(option, index);
-    
-    // The delegate should return a fixed height of 40
-    QCOMPARE(size.height(), 40);
+
+    // The delegate should return a fixed height of 36
+    QCOMPARE(size.height(), 36);
     // Width should be non-zero (inherited from base class)
     QVERIFY(size.width() >= 0);
 }

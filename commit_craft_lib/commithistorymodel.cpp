@@ -108,13 +108,48 @@ void CommitHistoryModel::setCommits(const QList<QList<QString>> &commits)
         if (commitData.size() > 5)
             commit.refs = commitData.at(5).split(',', Qt::SkipEmptyParts);
             
+        // Используем graphColumn из --graph, если он передан (элемент 6)
+        if (commitData.size() > 6) {
+            commit.graphColumn = commitData.at(6).toInt();
+        } else {
+            commit.graphColumn = 0;
+        }
+
+        // Парсим активные колонки из префикса графа (элемент 7)
+        if (commitData.size() > 7) {
+            QString graphPrefix = commitData.at(7);
+            for (int pos = 0; pos < graphPrefix.length(); pos += 2) {
+                QChar c0 = graphPrefix.at(pos);
+                QChar c1 = (pos + 1 < graphPrefix.length())
+                    ? graphPrefix.at(pos + 1) : ' ';
+                if (c0 != ' ' || c1 != ' ')
+                    commit.activeColumns.append(pos / 2);
+            }
+            if (!commit.activeColumns.contains(commit.graphColumn))
+                commit.activeColumns.append(commit.graphColumn);
+        } else {
+            commit.activeColumns.append(commit.graphColumn);
+        }
+
         m_commits.append(commit);
         m_hashToRow[commit.hash] = m_commits.size() - 1;
     }
-    
-    // Вычисляем расположение графа
-    calculateGraphLayout();
-    
+
+    // Второй проход: вычисляем parentColumns для merge-соединений
+    // и branchColor для каждого коммита
+    for (auto &commit : m_commits) {
+        commit.parentColumns.clear();
+        for (const QString &parentHash : commit.parents) {
+            int row = m_hashToRow.value(parentHash, -1);
+            if (row >= 0 && row < m_commits.size()) {
+                commit.parentColumns.append(m_commits[row].graphColumn);
+            } else {
+                commit.parentColumns.append(-1);
+            }
+        }
+
+        commit.branchColor = generateBranchColor(commit.graphColumn);
+    }
     endResetModel();
 }
 
@@ -170,6 +205,19 @@ void CommitHistoryModel::calculateGraphLayout()
         hashToColumn[commit.hash] = column;
         commit.graphColumn = column;
         commit.branchColor = generateBranchColor(column);
+    }
+
+    // Второй проход: вычисляем parentColumns для каждого коммита
+    for (auto &commit : m_commits) {
+        commit.parentColumns.clear();
+        for (const QString &parentHash : commit.parents) {
+            int row = m_hashToRow.value(parentHash, -1);
+            if (row >= 0 && row < m_commits.size()) {
+                commit.parentColumns.append(m_commits[row].graphColumn);
+            } else {
+                commit.parentColumns.append(-1); // родитель вне списка
+            }
+        }
     }
 }
 

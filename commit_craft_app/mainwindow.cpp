@@ -84,7 +84,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->commitHistoryList->setItemDelegate(commitItemDelegate);
     
     // Настройка колонок для commitHistoryList (QTreeView)
-    ui->commitHistoryList->header()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->commitHistoryList->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     ui->commitHistoryList->setColumnWidth(0, 120); // Колонка с графом и хэшем
     ui->commitHistoryList->header()->setSectionResizeMode(1, QHeaderView::Stretch); // Колонка с сообщением
 

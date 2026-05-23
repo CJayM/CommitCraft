@@ -14,8 +14,10 @@ struct CommitData {
     QString date;
     QString message;
     QStringList parents;
+    QList<int> parentColumns;  // graphColumn каждого родителя
     QStringList refs;  // Ветки, теги
     int graphColumn;   // Позиция в графе
+    QList<int> activeColumns;  // Все активные колонки в этой строке графа
     QColor branchColor;
 };
 

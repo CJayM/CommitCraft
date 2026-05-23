@@ -137,10 +137,17 @@
             </item>
             <item>
              <widget class="QTreeView" name="commitHistoryList">
-              <property name="headerHidden">true</property>
-              <property name="allColumnsShowFocus">true</property>
               <property name="selectionMode">
                <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+              </property>
+              <property name="indentation">
+               <number>0</number>
+              </property>
+              <property name="allColumnsShowFocus">
+               <bool>false</bool>
+              </property>
+              <property name="headerHidden">
+               <bool>false</bool>
               </property>
              </widget>
             </item>

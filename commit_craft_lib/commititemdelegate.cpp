@@ -4,6 +4,21 @@
 #include <QStyleOptionViewItem>
 #include <QFontMetrics>
 
+// Цвет ветки по индексу колонки (должен совпадать с моделью)
+static QColor branchColorForColumn(int col)
+{
+    static const QVector<QColor> colors = {
+        QColor(230, 57, 70),    // красный
+        QColor(46, 204, 113),   // зеленый
+        QColor(52, 152, 219),   // синий
+        QColor(155, 89, 182),   // фиолетовый
+        QColor(241, 196, 15),   // желтый
+        QColor(230, 126, 34),   // оранжевый
+        QColor(26, 188, 156),   // бирюзовый
+        QColor(241, 128, 23),   // темно-оранжевый
+    };
+    return colors[col % colors.size()];
+}
 CommitItemDelegate::CommitItemDelegate(QObject *parent)
     : QStyledItemDelegate(parent)
 {
@@ -43,43 +58,69 @@ QSize CommitItemDelegate::sizeHint(const QStyleOptionViewItem &option, const QMo
 void CommitItemDelegate::paintGraphColumn(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const
 {
     QRect rect = option.rect;
-    
+
     // Параметры графа
     const int dotRadius = 6;
     const int lineHeight = 3;
     const int columnSpacing = 20;
     const int leftMargin = 8;
-    
-    // Центр коммита по вертикали
+
     int centerY = rect.center().y();
-    
-    // Позиция точки коммита на основе graphColumn
     int dotX = leftMargin + commit.graphColumn * columnSpacing + dotRadius;
     int dotY = centerY;
-    
+
     painter->setRenderHint(QPainter::Antialiasing, true);
-    
-    // Рисуем вертикальную линию вниз (к следующему коммиту в этой ветке)
-    painter->setPen(QPen(commit.branchColor, lineHeight));
-    painter->drawLine(dotX, dotY + dotRadius, dotX, rect.bottom());
-    
-    // Рисуем точку коммита
+
+    // Определяем, является ли этот коммит созданием новой ветки
+    int firstParentCol = commit.parentColumns.isEmpty() ? -1 : commit.parentColumns[0];
+    bool isBranchCreation = (!commit.parents.isEmpty()
+                             && firstParentCol >= 0
+                             && firstParentCol != commit.graphColumn);
+
+    // 1. Вертикальные линии для ВСЕХ активных колонок
+    for (int col : commit.activeColumns) {
+        int colX = leftMargin + col * columnSpacing + dotRadius;
+        painter->setPen(QPen(branchColorForColumn(col), lineHeight));
+
+        if (col == commit.graphColumn && isBranchCreation) {
+            // Новая ветка — линия только ВВЕРХ (ниже ничего нет)
+            painter->drawLine(colX, rect.top(), colX, dotY - dotRadius);
+        } else {
+            // Остальные колонки и обычные коммиты — полная вертикаль
+            painter->drawLine(colX, rect.top(), colX, rect.bottom());
+        }
+    }
+
+    // 2. Диагональ ответвления (родитель в другой колонке — создание ветки)
+    if (isBranchCreation) {
+        int parentDotX = leftMargin + firstParentCol * columnSpacing + dotRadius;
+        // От нашей точки ВНИЗ-ВЛЕВО к колонке родителя
+        painter->setPen(QPen(branchColorForColumn(firstParentCol), lineHeight));
+        painter->drawLine(dotX, dotY, parentDotX, rect.bottom());
+    }
+
+    // 3. Диагонали слияния (второй и последующие родители)
+    for (int p = 1; p < commit.parents.size(); ++p) {
+        int parentCol = (p < commit.parentColumns.size())
+            ? commit.parentColumns[p] : -1;
+        if (parentCol < 0)
+            continue;
+        int parentDotX = leftMargin + parentCol * columnSpacing + dotRadius;
+        // От точки merge ВНИЗ к колонке второго родителя
+        painter->setPen(QPen(branchColorForColumn(parentCol), lineHeight));
+        painter->drawLine(dotX, dotY, parentDotX, rect.bottom());
+    }
+
+    // 4. Точка коммита
     painter->setBrush(commit.branchColor);
     painter->setPen(commit.branchColor);
     painter->drawEllipse(QPoint(dotX, dotY), dotRadius, dotRadius);
-    
-    // Рисуем хэш коммита справа от графа
-    QColor textColor = option.palette.color(QPalette::Text);
-    if (option.state & QStyle::State_Selected) {
-        textColor = option.palette.color(QPalette::HighlightedText);
-    }
-    
-    QFont font = painter->font();
-    QFont boldFont = font;
+
+    // 5. Хэш коммита
+    QFont boldFont = painter->font();
     boldFont.setBold(true);
     QFontMetrics fmBold(boldFont);
-    
-    int hashX = leftMargin + 100; // Отступ от графа
+    int hashX = leftMargin + 100;
     painter->setFont(boldFont);
     painter->setPen(commit.branchColor);
     painter->drawText(hashX, rect.top() + fmBold.ascent(), commit.shortHash);
@@ -87,14 +128,15 @@ void CommitItemDelegate::paintGraphColumn(QPainter *painter, const QStyleOptionV
 
 void CommitItemDelegate::paintMessageColumn(QPainter *painter, const QStyleOptionViewItem &option, const CommitData &commit) const
 {
-    // Устанавливаем цвета
+    painter->save();
+    painter->setClipRect(option.rect);
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    // Устанавливаем цвета текста
     QColor textColor = option.palette.color(QPalette::Text);
     if (option.state & QStyle::State_Selected) {
         textColor = option.palette.color(QPalette::HighlightedText);
     }
-
-    painter->save();
-    painter->setRenderHint(QPainter::Antialiasing, true);
 
     // Получаем rect для рисования
     QRect rect = option.rect;
