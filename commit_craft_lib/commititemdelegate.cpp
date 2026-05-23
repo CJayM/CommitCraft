@@ -125,15 +125,18 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     int msgX = hashX + hashWidth + 8;
     int msgMaxWidth = rect.right() - 5 - msgX - refsTotalWidth - 4;
 
-    QColor textColor = option.palette.color(QPalette::Text);
-    if (option.state & QStyle::State_Selected)
-        textColor = option.palette.color(QPalette::HighlightedText);
-
     painter->setFont(normFont);
+    QColor textColor = option.palette.color(QPalette::Text);
+    if (option.state & QStyle::State_Selected) {
+        painter->setFont(boldFont);
+    }
+
     painter->setPen(textColor);
     QString elidedMsg = fmNorm.elidedText(commit.message, Qt::ElideRight,
                                           qMax(msgMaxWidth, 10));
     painter->drawText(msgX, baseY + fmBold.ascent(), elidedMsg);
+
+    painter->setFont(normFont);
 
     // Рисуем refs справа на той же строке
     int refsX = rect.right() - 5;

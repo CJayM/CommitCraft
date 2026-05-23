@@ -147,8 +147,11 @@
                <bool>false</bool>
               </property>
               <property name="headerHidden">
-               <bool>false</bool>
+               <bool>true</bool>
               </property>
+              <attribute name="headerVisible">
+               <bool>false</bool>
+              </attribute>
              </widget>
             </item>
            </layout>
@@ -676,7 +679,7 @@
     <string>Go to Previous Hunk</string>
    </property>
    <property name="shortcut">
-    <string>Alt+Up; Shift+F6</string>
+    <string/>
    </property>
   </action>
   <action name="actionNextHunk">
@@ -691,7 +694,7 @@
     <string>Go to Next Hunk</string>
    </property>
    <property name="shortcut">
-    <string>Alt+Down; F6</string>
+    <string/>
    </property>
   </action>
   <action name="actionStageFile">
