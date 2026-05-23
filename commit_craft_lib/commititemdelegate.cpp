@@ -152,15 +152,14 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
 
     painter->setFont(normFont);
 
-    // Рисуем refs справа на той же строке
+    // Рисуем refs справа на той же строке — цветом ветки коммита
+    QColor refColor = branchColorForColumn(commit.graphColumn);
     int refsX = rect.right() - 5;
     for (int i = 0; i < commit.refs.size(); ++i) {
         const QString &ref = commit.refs[i];
         int rw = refWidths[i];
         refsX -= rw;
 
-        bool isBranch = ref.contains("HEAD") || !ref.contains("tag");
-        QColor refColor = isBranch ? QColor(230, 57, 70) : QColor(155, 89, 182);
         int refHeight = fmNorm.height() + 6;
         int refY = baseY - 2;
         QRect refRect(refsX, refY, rw, refHeight);
