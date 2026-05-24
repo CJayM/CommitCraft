@@ -15,6 +15,8 @@
 #include <QFileSystemModel>
 #include <QStandardItemModel>
 #include <QAction>
+#include <QListView>
+#include <QStandardItemModel>
 
 class QTreeView;
 
@@ -31,6 +33,7 @@ class CommitItemDelegate;
 class Git;
 class GitParser;
 class DiffEditor;
+class RepositoryDelegate;
 class SubmoduleModel;
 
 // Forward declare FileModel from the library
@@ -72,6 +75,7 @@ private slots:
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
     void toggleLeftPanel(bool visible);
+    void toggleRepositoryPanel(bool visible);
     void toggleBranchesPanel(bool visible);
     void toggleFilesPanel(bool visible);
     void toggleTopPanel(bool visible);
@@ -163,6 +167,8 @@ private:
     QList<QPair<QString, QString>> m_allStagedFiles;
     QStringList m_remoteList;
     QString m_selectedDirectory;
+    QStandardItemModel *m_repositoryModel;
+    RepositoryDelegate *m_repositoryDelegate;
     QStandardItemModel *m_dirTreeModel;
     QTreeView *m_dirTreeView;
     void rebuildDirectoryTree();
@@ -176,5 +182,6 @@ private:
     QStringList m_recentRepositories;
     QAction *m_recentSeparator = nullptr;
     QMenu *m_recentReposMenu = nullptr;
+    void updateRepositoryList();
 };
 #endif // MAINWINDOW_H

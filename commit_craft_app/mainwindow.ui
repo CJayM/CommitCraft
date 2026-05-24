@@ -686,6 +686,7 @@
      <string>Вид</string>
     </property>
     <addaction name="actionToggleLeftPanel"/>
+    <addaction name="actionToggleRepositoryPanel"/>
     <addaction name="actionToggleBranchesPanel"/>
     <addaction name="actionToggleFilesPanel"/>
     <addaction name="actionToggleTopPanel"/>
@@ -877,6 +878,20 @@
    </property>
    <property name="toolTip">
     <string>Toggle Branches Panel</string>
+   </property>
+  </action>
+  <action name="actionToggleRepositoryPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Repository Panel</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle Repository Panel</string>
    </property>
   </action>
   <action name="actionToggleTopPanel">

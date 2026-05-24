@@ -32,6 +32,7 @@
 #include <git.h>
 #include <gitparser.h>
 #include <submodulemodel.h>
+#include "repositorydelegate.h"
 #include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -74,6 +75,23 @@ MainWindow::MainWindow(QWidget *parent)
     // Load recent repositories from settings
     m_recentRepositories = settings->value("recentRepositories").toStringList();
     updateRecentRepositoriesMenu();
+
+    // Initialize repository list panel
+    m_repositoryModel = new QStandardItemModel(this);
+    m_repositoryDelegate = new RepositoryDelegate(this);
+    ui->repositoryList->setModel(m_repositoryModel);
+    ui->repositoryList->setItemDelegate(m_repositoryDelegate);
+    ui->repositoryList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    updateRepositoryList();
+
+    // Connect repository list click
+    connect(ui->repositoryList, &QListView::clicked, this, [this](const QModelIndex &index) {
+        if (index.isValid()) {
+            QString path = index.data(Qt::DisplayRole).toString();
+            if (!path.isEmpty())
+                openRepositoryPath(path);
+        }
+    });
 
     // DiffEditor создан через promoted widget в mainwindow.ui
     // Получаем ссылатель на него
@@ -245,6 +263,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect panel toggle actions
     connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
+    connect(ui->actionToggleRepositoryPanel, &QAction::toggled, this, &MainWindow::toggleRepositoryPanel);
     connect(ui->actionToggleBranchesPanel, &QAction::toggled, this, &MainWindow::toggleBranchesPanel);
     connect(ui->actionToggleFilesPanel, &QAction::toggled, this, &MainWindow::toggleFilesPanel);
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
@@ -480,15 +499,12 @@ void MainWindow::addRecentRepository(const QString &path)
     // Add to the beginning
     m_recentRepositories.prepend(path);
 
-    // Keep max 12
-    while (m_recentRepositories.size() > 12)
-        m_recentRepositories.removeLast();
-
-    // Save to QSettings
+    // Save to QSettings (full list, no cap)
     settings->setValue("recentRepositories", m_recentRepositories);
 
-    // Rebuild the menu
+    // Rebuild the menu (capped at 12) and the repository list panel
     updateRecentRepositoriesMenu();
+    updateRepositoryList();
 }
 
 void MainWindow::updateRecentRepositoriesMenu()
@@ -516,8 +532,10 @@ void MainWindow::updateRecentRepositoriesMenu()
     m_recentReposMenu = new QMenu(tr("Открыть предыдущие"), this);
     ui->menuFile->addAction(m_recentReposMenu->menuAction());
 
-    // Add recent repos (newest first)
+    // Add recent repos (newest first, capped at 12)
+    int count = 0;
     for (const QString &path : m_recentRepositories) {
+        if (++count > 12) break;
         QAction *action = m_recentReposMenu->addAction(path);
         connect(action, &QAction::triggered, this, [this, path]() {
             openRepositoryPath(path);
@@ -1197,6 +1215,11 @@ void MainWindow::toggleLeftPanel(bool visible)
     ui->leftFrame->setVisible(visible);
 }
 
+void MainWindow::toggleRepositoryPanel(bool visible)
+{
+    ui->repositoryFrame->setVisible(visible);
+}
+
 void MainWindow::toggleBranchesPanel(bool visible)
 {
     ui->branchesWidget->setVisible(visible);
@@ -1793,4 +1816,13 @@ void MainWindow::onRenameRemoteReady(bool success, const QString &message)
 void MainWindow::onRemotesReady(const QList<QString> &remotes)
 {
     m_remoteList = remotes;
+}
+
+void MainWindow::updateRepositoryList()
+{
+    m_repositoryModel->clear();
+    for (const QString &path : m_recentRepositories) {
+        QStandardItem *item = new QStandardItem(path);
+        m_repositoryModel->appendRow(item);
+    }
 }
