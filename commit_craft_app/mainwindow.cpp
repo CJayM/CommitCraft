@@ -432,11 +432,15 @@ void MainWindow::onGitStatusFinished(const QString &output)
             QStringList subFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
             for (const QString &subFile : subFiles) {
                 QString fullFilePath = file + subFile;
-                qDebug() << "Adding untracked file from directory:" << fullFilePath;
                 unstagedFiles.append(qMakePair("?", fullFilePath));
             }
+            continue; // саму директорию не добавляем
         }
-        
+
+        // Пропускаем записи, которые являются директориями
+        if (file.endsWith("/"))
+            continue;
+
         if (indexedStatus != " " && indexedStatus != "?") {
             stagedFiles.append(qMakePair(indexedStatus, file));
         }
