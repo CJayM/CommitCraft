@@ -259,7 +259,7 @@ inline QString globalStylesheet()
             font-size: 13px;
         }
         QLabel#filesLabel, QLabel#unstagedLabel, QLabel#stagedLabel,
-        QLabel#commitLabel, QLabel#repoLabel {
+        QLabel#commitLabel, QLabel#repoLabel, QLabel#repositoryLabel {
             font-weight: 600;
             font-size: 12px;
             color: #656d76;
