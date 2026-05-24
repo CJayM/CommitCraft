@@ -12,6 +12,12 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+
+    void setActivePath(const QString &path);
+    QString activePath() const;
+
+private:
+    QString m_activePath;
 };
 
 #endif // REPOSITORYDELEGATE_H

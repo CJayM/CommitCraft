@@ -18,9 +18,12 @@ void RepositoryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     if (repoName.isEmpty())
         repoName = fullPath;
 
+    bool isActive = (fullPath == m_activePath);
+
     QFont normFont = option.widget ? option.widget->font() : painter->font();
-    QFont boldFont = normFont;
-    boldFont.setBold(true);
+    QFont nameFont = normFont;
+    if (isActive)
+        nameFont.setBold(true);
 
     // Размеры для smallFont — на 1px/1pt меньше
     QFont smallFont = normFont;
@@ -34,11 +37,11 @@ void RepositoryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         }
     }
 
-    QFontMetrics fmBold(boldFont);
+    QFontMetrics fmName(nameFont);
     QFontMetrics fmSmall(smallFont);
 
     int padding = 6;
-    int baseY = rect.top() + padding + fmBold.ascent();
+    int baseY = rect.top() + padding + fmName.ascent();
 
     // --- Фон ---
     if (option.state & QStyle::State_Selected) {
@@ -47,18 +50,28 @@ void RepositoryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         painter->fillRect(rect, QColor(243, 244, 246));
     }
 
-    // --- Название репозитория (жирный) ---
-    painter->setFont(boldFont);
+    // --- Название репозитория (жирный для активного, нормальный для остальных) ---
+    painter->setFont(nameFont);
     painter->setPen(QColor(31, 35, 40));
-    QString elidedName = fmBold.elidedText(repoName, Qt::ElideRight, rect.width() - padding * 2);
+    QString elidedName = fmName.elidedText(repoName, Qt::ElideRight, rect.width() - padding * 2);
     painter->drawText(padding + rect.left(), baseY, elidedName);
 
     // --- Путь (мелкий, серый) ---
     painter->setFont(smallFont);
     painter->setPen(QColor(101, 109, 118));
     QString elidedPath = fmSmall.elidedText(fullPath, Qt::ElideRight, rect.width() - padding * 2);
-    int pathY = rect.top() + padding + fmBold.height() + 4 + fmSmall.ascent();
+    int pathY = rect.top() + padding + fmName.height() + 4 + fmSmall.ascent();
     painter->drawText(padding + rect.left(), pathY, elidedPath);
+}
+
+void RepositoryDelegate::setActivePath(const QString &path)
+{
+    m_activePath = path;
+}
+
+QString RepositoryDelegate::activePath() const
+{
+    return m_activePath;
 }
 
 QSize RepositoryDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -66,5 +79,5 @@ QSize RepositoryDelegate::sizeHint(const QStyleOptionViewItem &option, const QMo
     Q_UNUSED(index);
     QFont f = option.widget ? option.widget->font() : QApplication::font();
     QFontMetrics fm(f);
-    return QSize(200, fm.height() + fm.height() + 12); // две строки + отступы
+    return QSize(200, fm.height() + fm.height() + 12);
 }

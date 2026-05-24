@@ -79,6 +79,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Initialize repository list panel
     m_repositoryModel = new QStandardItemModel(this);
     m_repositoryDelegate = new RepositoryDelegate(this);
+    m_repositoryDelegate->setActivePath(repositoryPath);
     ui->repositoryList->setModel(m_repositoryModel);
     ui->repositoryList->setItemDelegate(m_repositoryDelegate);
     ui->repositoryList->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -699,6 +700,8 @@ void MainWindow::openRepositoryPath(const QString &path)
     addRecentRepository(path);
 
     // Выделить открытый репозиторий в списке
+    m_repositoryDelegate->setActivePath(repositoryPath);
+    ui->repositoryList->viewport()->update();
     for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
         QModelIndex idx = m_repositoryModel->index(i, 0);
         if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
