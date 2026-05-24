@@ -655,10 +655,21 @@
     <addaction name="actionNextHunk"/>
     <addaction name="actionClearSelection"/>
     <addaction name="separator"/>
-    <addaction name="actionPush"/>
-    <addaction name="actionPull"/>
-    <addaction name="separator"/>
     <addaction name="actionCreateBranch"/>
+   </widget>
+   <widget class="QMenu" name="menuRemote">
+    <property name="title">
+     <string>Remote</string>
+    </property>
+    <addaction name="actionFetch"/>
+    <addaction name="actionPull"/>
+    <addaction name="actionPush"/>
+    <addaction name="separator"/>
+    <addaction name="actionAddRemote"/>
+    <addaction name="actionRemoveRemote"/>
+    <addaction name="actionRenameRemote"/>
+    <addaction name="separator"/>
+    <addaction name="actionPruneRemote"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -669,6 +680,7 @@
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
+   <addaction name="menuRemote"/>
    <addaction name="menu"/>
    <addaction name="menuHelp"/>
   </widget>
@@ -895,6 +907,46 @@
    </property>
    <property name="shortcut">
     <string>F8</string>
+   </property>
+  </action>
+  <action name="actionFetch">
+   <property name="text">
+    <string>Fetch</string>
+   </property>
+   <property name="toolTip">
+    <string>Fetch from remote</string>
+   </property>
+  </action>
+  <action name="actionAddRemote">
+   <property name="text">
+    <string>Add Remote…</string>
+   </property>
+   <property name="toolTip">
+    <string>Add a new remote repository</string>
+   </property>
+  </action>
+  <action name="actionRemoveRemote">
+   <property name="text">
+    <string>Remove Remote…</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove a remote repository</string>
+   </property>
+  </action>
+  <action name="actionRenameRemote">
+   <property name="text">
+    <string>Rename Remote…</string>
+   </property>
+   <property name="toolTip">
+    <string>Rename a remote repository</string>
+   </property>
+  </action>
+  <action name="actionPruneRemote">
+   <property name="text">
+    <string>Prune Remote</string>
+   </property>
+   <property name="toolTip">
+    <string>Prune stale remote tracking branches</string>
    </property>
   </action>
  </widget>
