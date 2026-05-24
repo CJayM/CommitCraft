@@ -628,6 +628,7 @@
     <property name="title">
      <string>Редактировать</string>
     </property>
+    <addaction name="actionEditGitignore"/>
     <addaction name="actionSettings"/>
    </widget>
    <widget class="QMenu" name="menu">
@@ -698,6 +699,11 @@
   <action name="actionSettings">
    <property name="text">
     <string>Настройки</string>
+   </property>
+  </action>
+  <action name="actionEditGitignore">
+   <property name="text">
+    <string>Edit .gitignore</string>
    </property>
   </action>
   <action name="actionCommit">

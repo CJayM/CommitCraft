@@ -235,6 +235,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    connect(ui->actionEditGitignore, &QAction::triggered, this, &MainWindow::editGitignore);
     connect(ui->actionCommit, &QAction::triggered, this, &MainWindow::commitChanges);
     connect(ui->actionRefresh, &QAction::triggered, this, &MainWindow::refreshGitStatus);
     
@@ -401,6 +402,23 @@ void MainWindow::openSettingsDialog()
             updateDiffPanel(m_lastSelectedFileName);
         }
     }
+}
+
+void MainWindow::editGitignore()
+{
+    if (repositoryPath.isEmpty())
+        return;
+
+    QString gitignorePath = QDir(repositoryPath).filePath(".gitignore");
+
+    // Create the file if it doesn't exist
+    if (!QFile::exists(gitignorePath)) {
+        QFile file(gitignorePath);
+        file.open(QIODevice::WriteOnly);
+        file.close();
+    }
+
+    QDesktopServices::openUrl(QUrl::fromLocalFile(gitignorePath));
 }
 
 void MainWindow::refreshGitStatus()

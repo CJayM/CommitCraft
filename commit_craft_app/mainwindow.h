@@ -48,6 +48,7 @@ protected:
 
 private slots:
     void openSettingsDialog();
+    void editGitignore();
     void openRepository();
     void refreshGitStatus();
     void onGitStatusFinished(const QString &output);
