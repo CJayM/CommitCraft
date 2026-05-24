@@ -71,6 +71,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Setup file system watcher for auto-refresh
     setupFileSystemWatcher();
 
+    // Load recent repositories from settings
+    m_recentRepositories = settings->value("recentRepositories").toStringList();
+    updateRecentRepositoriesMenu();
+
     // DiffEditor создан через promoted widget в mainwindow.ui
     // Получаем ссылатель на него
     diffEditor = ui->diffEditor;
@@ -421,6 +425,59 @@ void MainWindow::editGitignore()
     QDesktopServices::openUrl(QUrl::fromLocalFile(gitignorePath));
 }
 
+void MainWindow::addRecentRepository(const QString &path)
+{
+    // Remove if already present (to move it to top)
+    m_recentRepositories.removeAll(path);
+
+    // Add to the beginning
+    m_recentRepositories.prepend(path);
+
+    // Keep max 12
+    while (m_recentRepositories.size() > 12)
+        m_recentRepositories.removeLast();
+
+    // Save to QSettings
+    settings->setValue("recentRepositories", m_recentRepositories);
+
+    // Rebuild the menu
+    updateRecentRepositoriesMenu();
+}
+
+void MainWindow::updateRecentRepositoriesMenu()
+{
+    // Remove old recent repo submenu and separator
+    if (m_recentReposMenu) {
+        ui->menuFile->removeAction(m_recentReposMenu->menuAction());
+        delete m_recentReposMenu;
+        m_recentReposMenu = nullptr;
+    }
+
+    if (m_recentSeparator) {
+        ui->menuFile->removeAction(m_recentSeparator);
+        delete m_recentSeparator;
+        m_recentSeparator = nullptr;
+    }
+
+    if (m_recentRepositories.isEmpty())
+        return;
+
+    // Add separator
+    m_recentSeparator = ui->menuFile->addSeparator();
+
+    // Create submenu
+    m_recentReposMenu = new QMenu(tr("Открыть предыдущие"), this);
+    ui->menuFile->addAction(m_recentReposMenu->menuAction());
+
+    // Add recent repos (newest first)
+    for (const QString &path : m_recentRepositories) {
+        QAction *action = m_recentReposMenu->addAction(path);
+        connect(action, &QAction::triggered, this, [this, path]() {
+            openRepositoryPath(path);
+        });
+    }
+}
+
 void MainWindow::refreshGitStatus()
 {
     git->getStatus();
@@ -521,31 +578,38 @@ void MainWindow::openRepository()
                                                     repositoryPath,
                                                     QFileDialog::ShowDirsOnly
                                                     | QFileDialog::DontResolveSymlinks);
-    
+
     if (!dir.isEmpty()) {
-        // Check if the selected directory is a Git repository
-        if (isGitRepository(dir)) {
-            repositoryPath = dir;
-            // Save the repository path to settings
-            settings->setValue("repositoryPath", repositoryPath);
-            setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
-            
-            // Обновляем watcher для нового репозитория
-            m_fsWatcher->removePaths(m_fsWatcher->directories());
-            m_fsWatcher->addPath(repositoryPath);
-
-            refreshGitStatus();
-
-            // Очищаем фильтр директорий
-            m_selectedDirectory.clear();
-
-            // Обновляем панель веток
-            ui->branchesWidget->refresh();
-        } else {
-            QMessageBox::warning(this, tr("Ошибка"), 
-                                tr("Выбранная директория не является Git репозиторием."));
-        }
+        openRepositoryPath(dir);
     }
+}
+
+void MainWindow::openRepositoryPath(const QString &path)
+{
+    if (!isGitRepository(path)) {
+        QMessageBox::warning(this, tr("Ошибка"),
+                            tr("Выбранная директория не является Git репозиторием."));
+        return;
+    }
+
+    repositoryPath = path;
+    settings->setValue("repositoryPath", repositoryPath);
+    setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
+
+    // Обновляем watcher для нового репозитория
+    m_fsWatcher->removePaths(m_fsWatcher->directories());
+    m_fsWatcher->addPath(repositoryPath);
+
+    refreshGitStatus();
+
+    // Очищаем фильтр директорий
+    m_selectedDirectory.clear();
+
+    // Обновляем панель веток
+    ui->branchesWidget->refresh();
+
+    // Добавляем в список недавних
+    addRecentRepository(path);
 }
 
 bool MainWindow::isGitRepository(const QString &path)

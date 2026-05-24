@@ -14,6 +14,7 @@
 #include <QTimer>
 #include <QFileSystemModel>
 #include <QStandardItemModel>
+#include <QAction>
 
 class QTreeView;
 
@@ -159,5 +160,14 @@ private:
     QTreeView *m_dirTreeView;
     void rebuildDirectoryTree();
     void applyDirectoryFilter();
+
+    // Недавние репозитории
+    void openRepositoryPath(const QString &path);
+    void addRecentRepository(const QString &path);
+    void updateRecentRepositoriesMenu();
+
+    QStringList m_recentRepositories;
+    QAction *m_recentSeparator = nullptr;
+    QMenu *m_recentReposMenu = nullptr;
 };
 #endif // MAINWINDOW_H
