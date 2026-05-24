@@ -234,32 +234,30 @@
             <property name="bottomMargin">
              <number>0</number>
             </property>
-
             <item>
-                 <layout class="QHBoxLayout" name="FilesPanelCaptionLayout">
-                  <item>
-                   <widget class="QLabel" name="filesLabel">
-                    <property name="text">
-                     <string>Files Panel</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QToolButton" name="refreshButton">
-                    <property name="text">
-                     <string>Обновить</string>
-                    </property>
-                    <property name="toolButtonStyle">
-                     <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-            
+             <layout class="QHBoxLayout" name="FilesPanelCaptionLayout">
+              <item>
+               <widget class="QLabel" name="filesLabel">
+                <property name="text">
+                 <string>Files Panel</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="refreshButton">
+                <property name="text">
+                 <string>Обновить</string>
+                </property>
+                <property name="toolButtonStyle">
+                 <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
             <item>
              <widget class="QSplitter" name="splitter_2">
               <property name="orientation">
@@ -308,7 +306,6 @@
                 <property name="bottomMargin">
                  <number>0</number>
                 </property>
-                
                 <item>
                  <widget class="QLabel" name="unstagedLabel">
                   <property name="text">

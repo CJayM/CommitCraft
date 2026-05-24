@@ -14,7 +14,6 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QAction>
-#include <QDebug>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
@@ -69,28 +68,13 @@ DiffEditor::DiffEditor(QWidget *parent)
     m_hunkActionPanel->winId(); // принудительно создать HWND
     m_hunkActionPanel->show();
 
-    qDebug() << "[DiffEditor] After HunkActionPanel creation."
-             << "splitter size:" << ui->diffSplitter->size()
-             << "leftPanel pos:" << ui->leftPanel->pos() << "size:" << ui->leftPanel->size()
-             << "rightPanel pos:" << ui->rightPanel->pos() << "size:" << ui->rightPanel->size()
-             << "stacked index:" << ui->stackedWidget->currentIndex();
-
     // Позиционировать панель между leftPanel и rightPanel при изменении splitter
     auto positionActionPanel = [this]() {
-        // Координаты относительно textDiffPage (родитель HunkActionPanel)
         int splitterX = ui->diffSplitter->x();
         int splitterY = ui->diffSplitter->y();
         int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
-        int panelH = ui->diffSplitter->height();
-        qDebug() << "[DiffEditor] positionActionPanel. splitter:" << QPoint(splitterX, splitterY)
-                 << "leftPanel.x:" << ui->leftPanel->x() << "leftPanel.width:" << ui->leftPanel->width()
-                 << "leftEdge:" << leftEdge
-                 << "splitterH:" << panelH
-                 << "hunkPanel geo before:" << m_hunkActionPanel->geometry();
-        m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), panelH);
+        m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
         m_hunkActionPanel->raise();
-        qDebug() << "[DiffEditor] positionActionPanel after. hunkPanel geo:" << m_hunkActionPanel->geometry()
-                 << "isVisible:" << m_hunkActionPanel->isVisible();
     };
     positionActionPanel();
     connect(ui->diffSplitter, &QSplitter::splitterMoved, this, positionActionPanel);
@@ -106,17 +90,9 @@ DiffEditor::DiffEditor(QWidget *parent)
         int splitterX = ui->diffSplitter->x();
         int splitterY = ui->diffSplitter->y();
         int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
-        qDebug() << "[DiffEditor] Timer singleShot(0). splitter:" << QPoint(splitterX, splitterY)
-                 << "leftEdge:" << leftEdge
-                 << "splitter size:" << ui->diffSplitter->size()
-                 << "hunkPanel:" << m_hunkActionPanel->geometry()
-                 << "hunkPanel isVisible:" << m_hunkActionPanel->isVisible();
         if (leftEdge > 0) {
             m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
             m_hunkActionPanel->raise();
-            qDebug() << "[DiffEditor] Timer - repositioned to:" << m_hunkActionPanel->geometry();
-        } else {
-            qDebug() << "[DiffEditor] Timer - leftEdge == 0, skipping reposition";
         }
     });
 }
@@ -227,6 +203,7 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         // Новый (untracked) файл — показываем одну Stage-кнопку в начале
         if (m_fileIsNew && !m_fileName.isEmpty()) {
             m_currentHunks.clear();
+            m_currentHunkIndex = 0;
             m_hunkPositions = {0};
             m_hunkActionPanel->setHunkPositions(m_hunkPositions);
             m_hunkActionPanel->show();
@@ -237,6 +214,8 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         ui->leftPanel->clearDiffData();
         ui->rightPanel->clearDiffData();
         m_currentHunks.clear();
+        m_currentHunkIndex = -1;
+        m_hunkPositions.clear();
         m_hunkActionPanel->clear();
         m_hunkActionPanel->hide();
         updateButtonsVisibility();
@@ -293,9 +272,6 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
             }
         }
     }
-
-    qDebug() << "[DiffEditor] applyDiffData. syncedLines:" << syncedLines.size()
-             << "hunkPositions:" << m_hunkPositions;
 
     // Передать позиции ханков в HunkActionPanel
     m_hunkActionPanel->setHunkPositions(m_hunkPositions);

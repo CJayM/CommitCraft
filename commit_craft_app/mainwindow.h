@@ -78,6 +78,8 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
+    void selectNextFile();
+    void selectPrevFile();
     void showAboutDialog();
     void stageSelectedFilesHotkey();
     void unstageSelectedFilesHotkey();

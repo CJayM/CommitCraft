@@ -980,21 +980,69 @@ void MainWindow::navigateToNextHunk()
     if (diffEditor->navigateToNextHunk())
         return;
 
-    // 2. Если конец файла достигнут, переключаемся на следующий файл в списке unstaged
+    // 2. Если конец файла достигнут, переключаемся на следующий файл
+    selectNextFile();
+}
+
+void MainWindow::navigateToPrevHunk()
+{
+    // 1. Пробуем перейти к предыдущему ханку в текущем файле
+    if (diffEditor->navigateToPrevHunk())
+        return;
+
+    // 2. Если начало файла достигнуто, переключаемся на предыдущий файл
+    selectPrevFile();
+}
+
+void MainWindow::selectNextFile()
+{
     if (m_lastSelectionSource == SelectionSource::Unstaged) {
-        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
-        QModelIndex next = current.sibling(current.row() + 1, 0);
+        QModelIndexList sel = ui->filesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex next = sel.first().sibling(row + 1, 0);
         if (next.isValid()) {
-            // Устанавливаем флаг отложенной навигации
             m_pendingNavigation = PendingNavigation::GoNext;
-            
-            // Выбираем следующий файл (это вызовет асинхронную загрузку diff)
-            ui->filesTable->selectionModel()->select(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->selectionModel()->setCurrentIndex(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
             ui->filesTable->scrollTo(next);
         }
+    } else if (m_lastSelectionSource == SelectionSource::Staged) {
+        QModelIndexList sel = ui->stagedFilesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex next = sel.first().sibling(row + 1, 0);
+        if (next.isValid()) {
+            m_pendingNavigation = PendingNavigation::GoNext;
+            ui->stagedFilesTable->selectionModel()->setCurrentIndex(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->stagedFilesTable->scrollTo(next);
+        }
     }
-    
-    // Обновляем состояние кнопок
+    updateNavigationButtonsState();
+}
+
+void MainWindow::selectPrevFile()
+{
+    if (m_lastSelectionSource == SelectionSource::Unstaged) {
+        QModelIndexList sel = ui->filesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex prev = sel.first().sibling(row - 1, 0);
+        if (prev.isValid()) {
+            m_pendingNavigation = PendingNavigation::GoPrev;
+            ui->filesTable->selectionModel()->setCurrentIndex(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->scrollTo(prev);
+        }
+    } else if (m_lastSelectionSource == SelectionSource::Staged) {
+        QModelIndexList sel = ui->stagedFilesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex prev = sel.first().sibling(row - 1, 0);
+        if (prev.isValid()) {
+            m_pendingNavigation = PendingNavigation::GoPrev;
+            ui->stagedFilesTable->selectionModel()->setCurrentIndex(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->stagedFilesTable->scrollTo(prev);
+        }
+    }
     updateNavigationButtonsState();
 }
 
@@ -1043,30 +1091,6 @@ void MainWindow::onAmendCheckBoxChanged(int state)
             }
         }
     }
-}
-
-void MainWindow::navigateToPrevHunk()
-{
-    // 1. Пробуем перейти к предыдущему ханку в текущем файле
-    if (diffEditor->navigateToPrevHunk())
-        return;
-
-    // 2. Если начало файла достигнуто, переключаемся на предыдущий файл в списке unstaged
-    if (m_lastSelectionSource == SelectionSource::Unstaged) {
-        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
-        QModelIndex prev = current.sibling(current.row() - 1, 0);
-        if (prev.isValid()) {
-            // Устанавливаем флаг отложенной навигации
-            m_pendingNavigation = PendingNavigation::GoPrev;
-            
-            // Выбираем предыдущий файл (это вызовет асинхронную загрузку diff)
-            ui->filesTable->selectionModel()->select(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
-            ui->filesTable->scrollTo(prev);
-        }
-    }
-    
-    // Обновляем состояние кнопок
-    updateNavigationButtonsState();
 }
 
 void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)
@@ -1241,9 +1265,16 @@ void MainWindow::updateNavigationButtonsState()
     bool hasNext = false;
     bool hasPrev = false;
 
-    // Получаем информацию о текущем файле
-    QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
-    int totalFiles = ui->filesTable->model()->rowCount();
+    QModelIndex current;
+    int totalFiles = 0;
+
+    if (m_lastSelectionSource == SelectionSource::Staged) {
+        current = ui->stagedFilesTable->selectionModel()->currentIndex();
+        totalFiles = ui->stagedFilesTable->model()->rowCount();
+    } else {
+        current = ui->filesTable->selectionModel()->currentIndex();
+        totalFiles = ui->filesTable->model()->rowCount();
+    }
 
     if (totalFiles > 0 && current.isValid()) {
         bool isFirstFile = (current.row() == 0);
@@ -1255,13 +1286,9 @@ void MainWindow::updateNavigationButtonsState()
         bool atHunkEnd = diffEditor->isAtLastHunk();
 
         // Логика для кнопки Next:
-        // Можно идти дальше, если мы не в конце списка ханков текущего файла
-        // ИЛИ если мы в конце ханков, но есть еще файлы в списке
         hasNext = (!atHunkEnd && !isHunkEmpty) || !isLastFile;
 
         // Логика для кнопки Prev:
-        // Можно идти назад, если мы не в начале списка ханков
-        // ИЛИ если мы в начале ханков, но есть предыдущие файлы
         hasPrev = (!atHunkStart && !isHunkEmpty) || !isFirstFile;
     }
 

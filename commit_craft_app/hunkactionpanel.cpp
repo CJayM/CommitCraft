@@ -4,7 +4,6 @@
 #include <QScrollBar>
 #include <QWheelEvent>
 #include <QApplication>
-#include <QDebug>
 
 HunkActionPanel::HunkActionPanel(QWidget *parent)
     : QWidget(parent)
@@ -15,9 +14,6 @@ HunkActionPanel::HunkActionPanel(QWidget *parent)
     // Явно запрашиваем paint-события
     setAttribute(Qt::WA_OpaquePaintEvent, false);
     setAttribute(Qt::WA_NoSystemBackground, false);
-
-    qDebug() << "[HunkActionPanel] Created. parent:" << parent
-             << "fixedWidth:" << kPanelWidth;
 }
 
 HunkActionPanel::~HunkActionPanel() = default;
@@ -39,9 +35,6 @@ void HunkActionPanel::setSourcePanel(DiffPanel *panel)
 
 void HunkActionPanel::setHunkPositions(const QVector<int> &positions)
 {
-    qDebug() << "[HunkActionPanel] setHunkPositions. count:" << positions.size()
-             << "positions:" << positions << "mode:" << (m_diffMode == StagedDiff ? "Staged" : "Unstaged");
-
     m_hunkPositions = positions;
     updateButtonPositions();
 }
@@ -49,20 +42,17 @@ void HunkActionPanel::setHunkPositions(const QVector<int> &positions)
 void HunkActionPanel::setDiffMode(DiffMode mode)
 {
     m_diffMode = mode;
-    qDebug() << "[HunkActionPanel] setDiffMode:" << (mode == StagedDiff ? "Staged" : "Unstaged");
     updateButtonPositions();
 }
 
 void HunkActionPanel::setFileIsNew(bool isNew)
 {
     m_fileIsNew = isNew;
-    qDebug() << "[HunkActionPanel] setFileIsNew:" << isNew;
     updateButtonPositions();
 }
 
 void HunkActionPanel::clear()
 {
-    qDebug() << "[HunkActionPanel] clear(). buttons before:" << m_buttonRects.size();
     m_hunkPositions.clear();
     m_buttonRects.clear();
     update();
@@ -118,11 +108,6 @@ void HunkActionPanel::updateButtonPositions()
         m_buttonRects.append(br);
     }
 
-    qDebug() << "[HunkActionPanel] updateButtonPositions. buttons:" << m_buttonRects.size()
-             << "panel size:" << size()
-             << "isVisible:" << isVisible()
-             << "pos:" << pos();
-
     update();
 }
 
@@ -173,12 +158,10 @@ void HunkActionPanel::mousePressEvent(QMouseEvent *event)
     QPoint pos = event->pos();
     for (const auto &br : m_buttonRects) {
         if (br.stageRect.contains(pos)) {
-            qDebug() << "[HunkActionPanel] Stage button clicked. hunk:" << br.hunkIndex;
             emit stageHunkRequested(br.hunkIndex);
             return;
         }
         if (br.revertRect.contains(pos)) {
-            qDebug() << "[HunkActionPanel] Revert button clicked. hunk:" << br.hunkIndex;
             emit revertHunkRequested(br.hunkIndex);
             return;
         }
