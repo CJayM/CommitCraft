@@ -84,8 +84,17 @@ MainWindow::MainWindow(QWidget *parent)
     ui->repositoryList->setEditTriggers(QAbstractItemView::NoEditTriggers);
     updateRepositoryList();
 
-    // Connect repository list click
-    connect(ui->repositoryList, &QListView::clicked, this, [this](const QModelIndex &index) {
+    // Выделить текущий репозиторий в списке
+    for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
+        QModelIndex idx = m_repositoryModel->index(i, 0);
+        if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
+            ui->repositoryList->setCurrentIndex(idx);
+            break;
+        }
+    }
+
+    // Connect repository list double-click
+    connect(ui->repositoryList, &QListView::doubleClicked, this, [this](const QModelIndex &index) {
         if (index.isValid()) {
             QString path = index.data(Qt::DisplayRole).toString();
             if (!path.isEmpty())
@@ -688,6 +697,16 @@ void MainWindow::openRepositoryPath(const QString &path)
 
     // Добавляем в список недавних
     addRecentRepository(path);
+
+    // Выделить открытый репозиторий в списке
+    for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
+        QModelIndex idx = m_repositoryModel->index(i, 0);
+        if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
+            ui->repositoryList->setCurrentIndex(idx);
+            ui->repositoryList->scrollTo(idx, QAbstractItemView::EnsureVisible);
+            break;
+        }
+    }
 }
 
 bool MainWindow::isGitRepository(const QString &path)
