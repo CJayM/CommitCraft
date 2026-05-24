@@ -128,6 +128,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect partial staging signals
     connect(diffEditor, &DiffEditor::stageSelectedPatch, this, &MainWindow::onStageSelectedPatch);
     connect(diffEditor, &DiffEditor::revertSelectedPatch, this, &MainWindow::onRevertSelectedPatch);
+    connect(diffEditor, &DiffEditor::stageNewFileRequested, this, [this](const QString &fileName) {
+        git->addFile(fileName);
+        refreshGitStatus();
+    });
     
     // Connect create branch action
     connect(ui->actionCreateBranch, &QAction::triggered, this, &MainWindow::onCreateBranch);
@@ -847,12 +851,27 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     QString leftVersion, rightVersion;
 
     if (m_lastSelectionSource == SelectionSource::Staged) {
+        diffEditor->setDiffMode(HunkActionPanel::StagedDiff);
+
         leftContent = getFileContent(fileName, false);   // HEAD
         rightContent = getFileContent(fileName, true);   // staged
         leftVersion = "HEAD";
         rightVersion = "Staged";
         git->getDiffStaged(fileName);
     } else {
+        diffEditor->setDiffMode(HunkActionPanel::UnstagedDiff);
+
+        // Проверить, является ли файл новым (untracked) — статус "?"
+        bool isUntracked = false;
+        for (int i = 0; i < unstagedFilesModel->rowCount(); ++i) {
+            if (unstagedFilesModel->getFileName(i) == fileName
+                && unstagedFilesModel->getFileStatus(i) == "?") {
+                isUntracked = true;
+                break;
+            }
+        }
+        diffEditor->setFileIsNew(isUntracked);
+
         bool isStaged = false;
         for (int i = 0; i < stagedFilesModel->rowCount(); ++i) {
             if (stagedFilesModel->getFileName(i) == fileName) {

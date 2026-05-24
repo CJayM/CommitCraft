@@ -195,3 +195,11 @@ bool CodeEditor::syntaxHighlighting() const
 {
     return m_syntaxHighlighting;
 }
+
+QRectF CodeEditor::blockViewportRect(int blockNumber) const
+{
+    QTextBlock block = document()->findBlockByNumber(blockNumber);
+    if (!block.isValid())
+        return QRectF();
+    return blockBoundingGeometry(block).translated(contentOffset());
+}
