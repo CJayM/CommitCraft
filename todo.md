@@ -49,20 +49,20 @@
 
   - [ ] File
 
-  - [ ] Edit
+  - [x] Edit
 
-    - [ ] gitignore
+    - [x] gitignore
 
   - [ ] View
 
     - [ ] Repositories
-    - [ ] Journal
-    - [ ] Log
-    - [ ] Branches
+    - [x] Journal
+    - [x] Log
+    - [x] Branches
     - [ ] Commit message
-    - [ ] Diff
-    - [ ] Changes
-    - [ ] Directory
+    - [x] Diff
+    - [x] Changes
+    - [x] Directory
 
   - [ ] Local
 

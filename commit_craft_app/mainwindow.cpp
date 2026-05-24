@@ -267,8 +267,8 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(ui->actionFetch, &QAction::triggered, this, [this]() {
         bool ok;
-        QString remote = QInputDialog::getText(this, tr("Fetch"),
-            tr("Remote name:"), QLineEdit::Normal, "origin", &ok);
+        QString remote = QInputDialog::getItem(this, tr("Fetch"),
+            tr("Remote:"), m_remoteList, 0, true, &ok);
         if (ok && !remote.isEmpty())
             git->fetchRemote(remote);
     });
@@ -284,15 +284,15 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(ui->actionRemoveRemote, &QAction::triggered, this, [this]() {
         bool ok;
-        QString name = QInputDialog::getText(this, tr("Remove Remote"),
-            tr("Remote name:"), QLineEdit::Normal, "origin", &ok);
+        QString name = QInputDialog::getItem(this, tr("Remove Remote"),
+            tr("Remote:"), m_remoteList, 0, false, &ok);
         if (ok && !name.isEmpty())
             git->removeRemote(name);
     });
     connect(ui->actionRenameRemote, &QAction::triggered, this, [this]() {
         bool ok;
-        QString oldName = QInputDialog::getText(this, tr("Rename Remote"),
-            tr("Current name:"), QLineEdit::Normal, "origin", &ok);
+        QString oldName = QInputDialog::getItem(this, tr("Rename Remote"),
+            tr("Current name:"), m_remoteList, 0, false, &ok);
         if (!ok || oldName.isEmpty()) return;
         QString newName = QInputDialog::getText(this, tr("Rename Remote"),
             tr("New name:"), QLineEdit::Normal, "", &ok);
@@ -301,8 +301,8 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(ui->actionPruneRemote, &QAction::triggered, this, [this]() {
         bool ok;
-        QString remote = QInputDialog::getText(this, tr("Prune Remote"),
-            tr("Remote name:"), QLineEdit::Normal, "origin", &ok);
+        QString remote = QInputDialog::getItem(this, tr("Prune Remote"),
+            tr("Remote:"), m_remoteList, 0, false, &ok);
         if (ok && !remote.isEmpty())
             git->pruneRemote(remote);
     });
@@ -365,6 +365,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::addRemoteReady, this, &MainWindow::onAddRemoteReady);
     connect(git, &Git::removeRemoteReady, this, &MainWindow::onRemoveRemoteReady);
     connect(git, &Git::renameRemoteReady, this, &MainWindow::onRenameRemoteReady);
+    connect(git, &Git::remotesReady, this, &MainWindow::onRemotesReady);
     
     // Connect submodule signals
     connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
@@ -1787,4 +1788,9 @@ void MainWindow::onRenameRemoteReady(bool success, const QString &message)
     } else {
         QMessageBox::warning(this, tr("Failed to Rename Remote"), message);
     }
+}
+
+void MainWindow::onRemotesReady(const QList<QString> &remotes)
+{
+    m_remoteList = remotes;
 }

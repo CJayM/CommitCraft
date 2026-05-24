@@ -93,6 +93,7 @@ private slots:
     void onAddRemoteReady(bool success, const QString &message);
     void onRemoveRemoteReady(bool success, const QString &message);
     void onRenameRemoteReady(bool success, const QString &message);
+    void onRemotesReady(const QList<QString> &remotes);
 
     // Submodule slots
     void onSubmodulesReady(const QList<QStringList> &submodules);
@@ -160,6 +161,7 @@ private:
     // Данные для фильтрации по директории
     QList<QPair<QString, QString>> m_allUnstagedFiles;
     QList<QPair<QString, QString>> m_allStagedFiles;
+    QStringList m_remoteList;
     QString m_selectedDirectory;
     QStandardItemModel *m_dirTreeModel;
     QTreeView *m_dirTreeView;
