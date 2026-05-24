@@ -51,14 +51,14 @@ void RepositoryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     painter->setFont(boldFont);
     painter->setPen(QColor(31, 35, 40));
     QString elidedName = fmBold.elidedText(repoName, Qt::ElideRight, rect.width() - padding * 2);
-    painter->drawText(rect.adjusted(padding, 0, -padding, 0), Qt::AlignLeft | Qt::AlignTop, elidedName);
+    painter->drawText(padding + rect.left(), baseY, elidedName);
 
     // --- Путь (мелкий, серый) ---
     painter->setFont(smallFont);
     painter->setPen(QColor(101, 109, 118));
     QString elidedPath = fmSmall.elidedText(fullPath, Qt::ElideRight, rect.width() - padding * 2);
-    int pathY = rect.top() + padding + fmBold.height() + 2 + fmSmall.ascent();
-    painter->drawText(rect.adjusted(padding, 0, -padding, 0), Qt::AlignLeft | Qt::AlignTop, elidedPath);
+    int pathY = rect.top() + padding + fmBold.height() + 4 + fmSmall.ascent();
+    painter->drawText(padding + rect.left(), pathY, elidedPath);
 }
 
 QSize RepositoryDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
