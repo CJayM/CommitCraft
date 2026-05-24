@@ -245,6 +245,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect panel toggle actions
     connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
+    connect(ui->actionToggleBranchesPanel, &QAction::toggled, this, &MainWindow::toggleBranchesPanel);
     connect(ui->actionToggleFilesPanel, &QAction::toggled, this, &MainWindow::toggleFilesPanel);
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
     connect(ui->actionToggleRightPanel, &QAction::toggled, this, &MainWindow::toggleRightPanel);
@@ -1148,6 +1149,11 @@ void MainWindow::selectPrevFile()
 void MainWindow::toggleLeftPanel(bool visible)
 {
     ui->leftFrame->setVisible(visible);
+}
+
+void MainWindow::toggleBranchesPanel(bool visible)
+{
+    ui->branchesWidget->setVisible(visible);
 }
 
 void MainWindow::toggleFilesPanel(bool visible)

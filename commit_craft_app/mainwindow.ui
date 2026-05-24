@@ -631,6 +631,16 @@
     <addaction name="actionEditGitignore"/>
     <addaction name="actionSettings"/>
    </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>Вид</string>
+    </property>
+    <addaction name="actionToggleLeftPanel"/>
+    <addaction name="actionToggleBranchesPanel"/>
+    <addaction name="actionToggleFilesPanel"/>
+    <addaction name="actionToggleTopPanel"/>
+    <addaction name="actionToggleRightPanel"/>
+   </widget>
    <widget class="QMenu" name="menu">
     <property name="title">
      <string>Действия</string>
@@ -649,11 +659,6 @@
     <addaction name="actionPull"/>
     <addaction name="separator"/>
     <addaction name="actionCreateBranch"/>
-    <addaction name="separator"/>
-    <addaction name="actionToggleLeftPanel"/>
-    <addaction name="actionToggleFilesPanel"/>
-    <addaction name="actionToggleTopPanel"/>
-    <addaction name="actionToggleRightPanel"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -663,6 +668,7 @@
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
+   <addaction name="menuView"/>
    <addaction name="menu"/>
    <addaction name="menuHelp"/>
   </widget>
@@ -795,6 +801,20 @@
    </property>
    <property name="toolTip">
     <string>Toggle Left Panel</string>
+   </property>
+  </action>
+  <action name="actionToggleBranchesPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Branches Panel</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle Branches Panel</string>
    </property>
   </action>
   <action name="actionToggleTopPanel">

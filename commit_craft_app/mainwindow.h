@@ -72,6 +72,7 @@ private slots:
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
     void toggleLeftPanel(bool visible);
+    void toggleBranchesPanel(bool visible);
     void toggleFilesPanel(bool visible);
     void toggleTopPanel(bool visible);
     void toggleRightPanel(bool visible);
