@@ -1,95 +1,283 @@
 #include "diffeditor.h"
+#include "ui_diffeditor.h"
 
 #include <QScrollBar>
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <QTimer>
+#include <QEvent>
 #include <QTextBlock>
 #include <QSet>
+#include <QSettings>
+#include <QPixmap>
+#include <QDir>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
-    , m_leftPanel(new DiffPanel(this))
-    , m_rightPanel(new DiffPanel(this))
+    , ui(new Ui::DiffEditor)
+    , m_isImageFile(false)
     , m_currentHunkIndex(-1)
     , m_syncingScroll(false)
-    , m_layout(new QVBoxLayout(this))
-    , m_splitter(new QSplitter(Qt::Horizontal, this))
 {
-    m_layout->setContentsMargins(0, 0, 0, 0);
-    m_layout->setSpacing(0);
+    ui->setupUi(this);
 
-    // Добавить панели в splitter
-    m_splitter->addWidget(m_leftPanel);
-    m_splitter->addWidget(m_rightPanel);
-
-    m_layout->addWidget(m_splitter);
-    setLayout(m_layout);
+    // Загрузить настройки расширений
+    QSettings settings("CommitCraft", "AppSettings");
+    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
+    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
+                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
+    m_imageExtensions = settings.value("imageExtensions", defaultImageExts).toStringList();
+    m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
 
     // Подключить синхронизацию скролла
-    connect(m_leftPanel->verticalScrollBar(), &QScrollBar::valueChanged,
+    connect(ui->leftPanel->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &DiffEditor::synchronizeScrollLeftToRight);
-    connect(m_rightPanel->verticalScrollBar(), &QScrollBar::valueChanged,
+    connect(ui->rightPanel->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &DiffEditor::synchronizeScrollRightToLeft);
 
     // Подключить синхронизацию зума (через CodeEditor)
-    connect(m_leftPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
-    connect(m_rightPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
+    connect(ui->leftPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
+    connect(ui->rightPanel, &CodeEditor::zoomChanged, this, &DiffEditor::synchronizeZoom);
 
     // Подключить синхронизацию подсветки текущей строки (перемещение курсора)
-    connect(m_leftPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
-        m_rightPanel->setCursorToLine(blockNum);
+    connect(ui->leftPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
+        ui->rightPanel->setCursorToLine(blockNum);
     });
-    connect(m_rightPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
-        m_leftPanel->setCursorToLine(blockNum);
+    connect(ui->rightPanel, &DiffPanel::panelCursorMoved, this, [this](int blockNum) {
+        ui->leftPanel->setCursorToLine(blockNum);
     });
+
+    // Connect partial staging buttons
+    connect(ui->stageSelectedButton, &QPushButton::clicked, this, &DiffEditor::onStageSelectedClicked);
+    connect(ui->revertSelectedButton, &QPushButton::clicked, this, &DiffEditor::onRevertSelectedClicked);
+
+    // Connect context menu signals from panels
+    connect(ui->leftPanel, &DiffPanel::stageSelectedRequested, this, &DiffEditor::onStageSelectedClicked);
+    connect(ui->rightPanel, &DiffPanel::stageSelectedRequested, this, &DiffEditor::onStageSelectedClicked);
+    connect(ui->leftPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
+    connect(ui->rightPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
+
+    // --- HunkActionPanel (overlay between left and right panels) ---
+    // Создаём как дочерний элемент textDiffPage, а не splitter'а,
+    // чтобы быть выше native-детей splitter'а в Z-order
+    m_hunkActionPanel = new HunkActionPanel(ui->textDiffPage);
+    m_hunkActionPanel->setSourcePanel(ui->rightPanel);
+    m_hunkActionPanel->winId(); // принудительно создать HWND
+    m_hunkActionPanel->show();
+
+    // Позиционировать панель между leftPanel и rightPanel при изменении splitter
+    auto positionActionPanel = [this]() {
+        int splitterX = ui->diffSplitter->x();
+        int splitterY = ui->diffSplitter->y();
+        int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
+        m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
+        m_hunkActionPanel->raise();
+    };
+    positionActionPanel();
+    connect(ui->diffSplitter, &QSplitter::splitterMoved, this, positionActionPanel);
+    ui->diffSplitter->installEventFilter(this);
+
+    connect(m_hunkActionPanel, &HunkActionPanel::stageHunkRequested,
+            this, &DiffEditor::onStageHunkClicked);
+    connect(m_hunkActionPanel, &HunkActionPanel::revertHunkRequested,
+            this, &DiffEditor::onRevertHunkClicked);
+
+    // Отложенная инициализация позиции (после первого layout)
+    QTimer::singleShot(0, this, [this]() {
+        int splitterX = ui->diffSplitter->x();
+        int splitterY = ui->diffSplitter->y();
+        int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
+        if (leftEdge > 0) {
+            m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
+            m_hunkActionPanel->raise();
+        }
+    });
+}
+
+DiffEditor::~DiffEditor()
+{
+    delete ui;
 }
 
 void DiffEditor::setContents(const QString &leftContent,
                               const QString &rightContent,
-                              const QString &fileName)
+                              const QString &fileName,
+                              const QString &repositoryPath)
 {
+    // Убираем лишние кавычки если есть
+    QString cleanFileName = fileName.trimmed();
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    }
+
     m_leftFullContent = leftContent;
     m_rightFullContent = rightContent;
-    m_fileName = fileName;
+    m_fileName = cleanFileName;
+    m_repositoryPath = repositoryPath;
 
     // Очистить предыдущие diff-данные
-    m_leftPanel->clearDiffData();
-    m_rightPanel->clearDiffData();
+    ui->leftPanel->clearDiffData();
+    ui->rightPanel->clearDiffData();
     m_hunkPositions.clear();
     m_currentHunkIndex = -1;
 
-    // Показать полное содержимое (будет заменено на side-by-side diff в applyDiffData)
-    m_leftPanel->setContent(leftContent);
-    m_rightPanel->setContent(rightContent);
+    // Проверить тип файла
+    bool isImage = checkFileType(cleanFileName);
+
+    if (isImage) {
+        // Для графических файлов - показываем изображение
+        ui->stackedWidget->setCurrentWidget(ui->imagePreviewPage);
+        
+        // Очищаем старые данные
+        ui->imageDisplayLabel->clear();
+        ui->imageInfoLabel->clear();
+        
+        // Пытаемся загрузить изображение
+        QPixmap pixmap;
+        QFileInfo fi(cleanFileName);
+        QString fullPath;
+        
+        if (fi.isAbsolute()) {
+            fullPath = cleanFileName;
+        } else if (!m_repositoryPath.isEmpty()) {
+            // Используем QDir для корректной сборки пути
+            QDir dir(m_repositoryPath);
+            fullPath = dir.filePath(cleanFileName);
+            // Преобразуем в нативный формат для Windows
+            fullPath = QDir::toNativeSeparators(fullPath);
+        } else {
+            fullPath = QDir::current().absoluteFilePath(cleanFileName);
+        }
+
+        // Для Qt 6 используем load с QString напрямую
+        if (QFile::exists(fullPath)) {
+            pixmap.load(fullPath);
+        }
+        
+        if (!pixmap.isNull()) {
+            // Показываем изображение
+            ui->imageDisplayLabel->setPixmap(pixmap);
+            
+            // Информация о файле
+            QString sizeText = QString("%1 x %2 px").arg(pixmap.width()).arg(pixmap.height());
+            QString infoText = QString("<b>%1</b><br>%2: %3")
+                                    .arg(cleanFileName,
+                                         QStringLiteral("Размер изображения"),
+                                         sizeText);
+            ui->imageInfoLabel->setText(infoText);
+        } else {
+            ui->imageInfoLabel->setText(QStringLiteral("Не удалось загрузить изображение: %1<br>Путь: %2").arg(cleanFileName, fullPath));
+        }
+    } else {
+        // Для текстовых файлов - используем обычный diff
+        ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
+        
+        // Показать полное содержимое (будет заменено на side-by-side diff в applyDiffData)
+        ui->leftPanel->setContent(leftContent);
+        ui->rightPanel->setContent(rightContent);
+    }
 
     // Применить подсветку синтаксиса
     applySyntaxHighlighting(fileName);
+
+    updateButtonsVisibility();
+}
+
+void DiffEditor::setDiffMode(HunkActionPanel::DiffMode mode)
+{
+    m_hunkActionPanel->setDiffMode(mode);
+}
+
+void DiffEditor::setFileIsNew(bool isNew)
+{
+    m_fileIsNew = isNew;
+    m_hunkActionPanel->setFileIsNew(isNew);
 }
 
 void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
 {
     if (hunks.isEmpty()) {
-        m_leftPanel->clearDiffData();
-        m_rightPanel->clearDiffData();
+        // Новый (untracked) файл — показываем одну Stage-кнопку в начале
+        if (m_fileIsNew && !m_fileName.isEmpty()) {
+            m_currentHunks.clear();
+            m_currentHunkIndex = 0;
+            m_hunkPositions = {0};
+            m_hunkActionPanel->setHunkPositions(m_hunkPositions);
+            m_hunkActionPanel->show();
+            updateButtonsVisibility();
+            repositionActionPanel();
+            return;
+        }
+        ui->leftPanel->clearDiffData();
+        ui->rightPanel->clearDiffData();
+        m_currentHunks.clear();
+        m_currentHunkIndex = -1;
+        m_hunkPositions.clear();
+        m_hunkActionPanel->clear();
+        m_hunkActionPanel->hide();
+        updateButtonsVisibility();
         return;
     }
+
+    m_hunkActionPanel->show();
+    m_currentHunks = hunks;
 
     QStringList leftLines = m_leftFullContent.split('\n');
     QStringList rightLines = m_rightFullContent.split('\n');
 
     QVector<SyncedLine> syncedLines = buildSyncedLines(hunks, leftLines, rightLines);
+    m_syncedLines = syncedLines;
 
-    // Сохранить позиции ханков для навигации (индексы в syncedLines)
+    // Сохранить позиции ханков для навигации (индексы в syncedLines).
+    // Для каждого ханка ищем первую строку с изменением (зелёный/красный фон),
+    // а не контекстную строку.
     m_hunkPositions.clear();
-    int currentHunkIdx = -1;
-    for (int i = 0; i < syncedLines.size(); ++i) {
-        const auto &sl = syncedLines[i];
-        if (!sl.isSeparator && sl.hunkIndex != currentHunkIdx) {
-            // Нашли первую строку нового ханка
-            currentHunkIdx = sl.hunkIndex;
-            m_hunkPositions.append(i);
+    {
+        int currentHunkIdx = -1;
+        QSet<int> foundHunkChange;
+        for (int i = 0; i < syncedLines.size(); ++i) {
+            const auto &sl = syncedLines[i];
+            int hIdx = sl.hunkIndex;
+            if (hIdx < 0)
+                continue; // разделитель
+            if (hIdx != currentHunkIdx) {
+                currentHunkIdx = hIdx;
+                // Новый ханк — ещё не нашли его change-строку
+            }
+            if (!foundHunkChange.contains(currentHunkIdx)) {
+                // Ищем первую строку с изменением (не контекст)
+                if (sl.isRemoved || sl.isAdded || sl.isModified) {
+                    m_hunkPositions.append(i);
+                    foundHunkChange.insert(currentHunkIdx);
+                }
+            }
+        }
+        // Если для какого-то ханка не нашли change (только контекст),
+        // используем первую строку ханка — подстраховка
+        if (m_hunkPositions.size() < syncedLines.size()) {
+            currentHunkIdx = -1;
+            for (int i = 0; i < syncedLines.size(); ++i) {
+                const auto &sl = syncedLines[i];
+                if (sl.isSeparator) continue;
+                if (sl.hunkIndex != currentHunkIdx) {
+                    currentHunkIdx = sl.hunkIndex;
+                    if (!foundHunkChange.contains(currentHunkIdx)) {
+                        m_hunkPositions.append(i);
+                        foundHunkChange.insert(currentHunkIdx);
+                    }
+                }
+            }
         }
     }
+
+    // Передать позиции ханков в HunkActionPanel
+    m_hunkActionPanel->setHunkPositions(m_hunkPositions);
+
+    // Обновить позицию панели (размеры могли измениться после загрузки контента)
+    repositionActionPanel();
 
     // Заполнить панели синхронизированным содержимым
     populatePanels(syncedLines);
@@ -102,8 +290,8 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         leftNums.append(sl.leftLineNum);
         rightNums.append(sl.rightLineNum);
     }
-    m_leftPanel->setLineNumbers(leftNums);
-    m_rightPanel->setLineNumbers(rightNums);
+    ui->leftPanel->setLineNumbers(leftNums);
+    ui->rightPanel->setLineNumbers(rightNums);
 
     // Вычислить intra-line diff для Modified строк
     auto leftMap = DiffHighlighter::buildLineDiffMapLeft(hunks);
@@ -150,21 +338,43 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         }
     }
 
-    m_leftPanel->setDiffData(leftDiffMap);
-    m_rightPanel->setDiffData(rightDiffMap);
-    m_leftPanel->setPlaceholderLines(leftPlaceholders);
-    m_rightPanel->setPlaceholderLines(rightPlaceholders);
+    ui->leftPanel->setDiffData(leftDiffMap);
+    ui->rightPanel->setDiffData(rightDiffMap);
+    ui->leftPanel->setPlaceholderLines(leftPlaceholders);
+    ui->rightPanel->setPlaceholderLines(rightPlaceholders);
+
+    updateButtonsVisibility();
 }
 
 void DiffEditor::applyFontSettings(const QString &fontFamily, int fontSize)
 {
     QFont font(fontFamily, fontSize);
-    m_leftPanel->setFont(font);
-    m_rightPanel->setFont(font);
+    ui->leftPanel->setFont(font);
+    ui->rightPanel->setFont(font);
 
     // Сброс зума на 100% чтобы избежать конфликта с новым размером шрифта
-    m_leftPanel->setZoom(100);
-    m_rightPanel->setZoom(100);
+    ui->leftPanel->setZoom(100);
+    ui->rightPanel->setZoom(100);
+}
+
+bool DiffEditor::isImageFile() const
+{
+    return m_isImageFile;
+}
+
+bool DiffEditor::isSyntaxFile() const
+{
+    return !m_isImageFile && !m_syntaxExtensions.isEmpty();
+}
+
+void DiffEditor::updateFileTypeSettings()
+{
+    QSettings settings("CommitCraft", "AppSettings");
+    QStringList defaultImageExts = {"png", "jpg", "jpeg", "gif", "bmp", "svg", "ico", "webp", "tiff"};
+    QStringList defaultSyntaxExts = {"cpp", "h", "hpp", "c", "java", "py", "js", "ts", "html", "css",
+                                     "xml", "json", "yaml", "yml", "md", "sh", "bat", "ps1", "go", "rs"};
+    m_imageExtensions = settings.value("imageExtensions", defaultImageExts).toStringList();
+    m_syntaxExtensions = settings.value("syntaxExtensions", defaultSyntaxExts).toStringList();
 }
 
 QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
@@ -230,7 +440,7 @@ QVector<SyncedLine> DiffEditor::buildSyncedLines(const QList<Hunk> &hunks,
             QVector<QString> addedContents;
             QVector<int> addedRightNums;
         };
-        
+
         ChangeGroup currentGroup;
         int leftIdx = hunkLeftStart - 1; // 0-based
         int rightIdx = hunkRightStart - 1; // 0-based
@@ -350,7 +560,7 @@ void DiffEditor::populatePanels(const QVector<SyncedLine> &syncedLines)
     QString leftText, rightText;
     for (int i = 0; i < syncedLines.size(); ++i) {
         const auto &sl = syncedLines[i];
-        
+
         if (sl.isSeparator) {
             // Текст-разделитель между чанками
             leftText += "...";
@@ -359,28 +569,38 @@ void DiffEditor::populatePanels(const QVector<SyncedLine> &syncedLines)
             leftText += sl.leftText;
             rightText += sl.rightText;
         }
-        
+
         if (i < syncedLines.size() - 1) {
             leftText += '\n';
             rightText += '\n';
         }
     }
 
-    m_leftPanel->setContent(leftText);
-    m_rightPanel->setContent(rightText);
+    ui->leftPanel->setContent(leftText);
+    ui->rightPanel->setContent(rightText);
 }
 
 void DiffEditor::clear()
 {
-    m_leftPanel->setPlainText("");
-    m_rightPanel->setPlainText("");
-    m_leftPanel->clearDiffData();
-    m_rightPanel->clearDiffData();
+    ui->leftPanel->setPlainText("");
+    ui->rightPanel->setPlainText("");
+    ui->leftPanel->clearDiffData();
+    ui->rightPanel->clearDiffData();
     m_hunkPositions.clear();
     m_currentHunkIndex = -1;
+    m_currentHunks.clear();
     m_leftFullContent.clear();
     m_rightFullContent.clear();
     m_fileName.clear();
+    m_fileIsNew = false;
+    m_hunkActionPanel->clear();
+    m_hunkActionPanel->hide();
+
+    // Показать текстовый diff
+    ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
+    m_isImageFile = false;
+
+    updateButtonsVisibility();
 }
 
 bool DiffEditor::navigateToNextHunk()
@@ -437,18 +657,18 @@ void DiffEditor::scrollToHunk(int hunkIndex)
     int lineIndex = m_hunkPositions[hunkIndex];
 
     // Прокрутить к строке ханка
-    QTextBlock leftBlock = m_leftPanel->document()->findBlockByLineNumber(lineIndex);
+    QTextBlock leftBlock = ui->leftPanel->document()->findBlockByLineNumber(lineIndex);
     if (leftBlock.isValid()) {
         QTextCursor leftCursor(leftBlock);
-        m_leftPanel->setTextCursor(leftCursor);
-        m_leftPanel->ensureCursorVisible();
+        ui->leftPanel->setTextCursor(leftCursor);
+        ui->leftPanel->ensureCursorVisible();
     }
 
-    QTextBlock rightBlock = m_rightPanel->document()->findBlockByLineNumber(lineIndex);
+    QTextBlock rightBlock = ui->rightPanel->document()->findBlockByLineNumber(lineIndex);
     if (rightBlock.isValid()) {
         QTextCursor rightCursor(rightBlock);
-        m_rightPanel->setTextCursor(rightCursor);
-        m_rightPanel->ensureCursorVisible();
+        ui->rightPanel->setTextCursor(rightCursor);
+        ui->rightPanel->ensureCursorVisible();
     }
 }
 
@@ -456,9 +676,9 @@ void DiffEditor::synchronizeScrollLeftToRight(int value)
 {
     if (m_syncingScroll)
         return;
-    
+
     m_syncingScroll = true;
-    m_rightPanel->verticalScrollBar()->setValue(value);
+    ui->rightPanel->verticalScrollBar()->setValue(value);
     m_syncingScroll = false;
 }
 
@@ -466,32 +686,216 @@ void DiffEditor::synchronizeScrollRightToLeft(int value)
 {
     if (m_syncingScroll)
         return;
-    
+
     m_syncingScroll = true;
-    m_leftPanel->verticalScrollBar()->setValue(value);
+    ui->leftPanel->verticalScrollBar()->setValue(value);
     m_syncingScroll = false;
 }
 
 void DiffEditor::synchronizeZoom(int zoom)
 {
-    bool leftBlocked = m_leftPanel->blockSignals(true);
-    bool rightBlocked = m_rightPanel->blockSignals(true);
+    bool leftBlocked = ui->leftPanel->blockSignals(true);
+    bool rightBlocked = ui->rightPanel->blockSignals(true);
 
-    if (sender() == m_leftPanel)
-        m_rightPanel->setZoom(zoom);
-    else if (sender() == m_rightPanel)
-        m_leftPanel->setZoom(zoom);
+    if (sender() == ui->leftPanel)
+        ui->rightPanel->setZoom(zoom);
+    else if (sender() == ui->rightPanel)
+        ui->leftPanel->setZoom(zoom);
 
-    m_leftPanel->blockSignals(leftBlocked);
-    m_rightPanel->blockSignals(rightBlocked);
+    ui->leftPanel->blockSignals(leftBlocked);
+    ui->rightPanel->blockSignals(rightBlocked);
 }
 
 void DiffEditor::applySyntaxHighlighting(const QString &fileName)
 {
     QFileInfo fi(fileName);
     QString ext = fi.suffix().toLower();
-    Q_UNUSED(ext);
+    
+    bool useSyntax = m_syntaxExtensions.contains(ext);
+    ui->leftPanel->setSyntaxHighlighting(useSyntax);
+    ui->rightPanel->setSyntaxHighlighting(useSyntax);
+}
 
-    m_leftPanel->setSyntaxHighlighting(true);
-    m_rightPanel->setSyntaxHighlighting(true);
+bool DiffEditor::checkFileType(const QString &fileName)
+{
+    QFileInfo fi(fileName);
+    QString ext = fi.suffix().toLower();
+
+    m_isImageFile = m_imageExtensions.contains(ext);
+    return m_isImageFile;
+}
+
+void DiffEditor::updateButtonsVisibility()
+{
+    bool visible = !m_isImageFile && (!m_currentHunks.isEmpty() || m_fileIsNew);
+    ui->stageSelectedButton->setVisible(visible);
+    ui->revertSelectedButton->setVisible(visible);
+}
+
+void DiffEditor::repositionActionPanel()
+{
+    int splitterX = ui->diffSplitter->x();
+    int splitterY = ui->diffSplitter->y();
+    int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
+    m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
+    m_hunkActionPanel->raise();
+}
+
+QStringList DiffEditor::getSelectedLines() const
+{
+    QStringList lines;
+    QTextCursor cursor = ui->rightPanel->textCursor();  // Use right panel (working tree)
+    if (cursor.hasSelection()) {
+        QString selectedText = cursor.selectedText();
+        lines = selectedText.split('\n', Qt::SkipEmptyParts);
+    }
+    return lines;
+}
+
+QList<int> DiffEditor::getSelectedHunkIndexes() const
+{
+    QList<int> selectedHunks;
+    QTextCursor cursor = ui->rightPanel->textCursor();
+    const DiffPanel *panel = ui->rightPanel;
+    if (!cursor.hasSelection()) {
+        cursor = ui->leftPanel->textCursor();
+        panel = ui->leftPanel;
+    }
+    if (!cursor.hasSelection()) {
+        return selectedHunks;
+    }
+
+    int startBlock = panel->document()->findBlock(cursor.selectionStart()).blockNumber();
+    int endBlock = panel->document()->findBlock(cursor.selectionEnd()).blockNumber();
+    if (endBlock < startBlock) {
+        qSwap(startBlock, endBlock);
+    }
+
+    for (int block = startBlock; block <= endBlock && block < m_syncedLines.size(); ++block) {
+        int hunkIndex = m_syncedLines[block].hunkIndex;
+        if (hunkIndex >= 0 && !selectedHunks.contains(hunkIndex)) {
+            selectedHunks.append(hunkIndex);
+        }
+    }
+    return selectedHunks;
+}
+
+QString DiffEditor::buildPatchForHunks(const QString &fileName, const QList<int> &hunkIndexes) const
+{
+    if (fileName.isEmpty() || hunkIndexes.isEmpty() || m_currentHunks.isEmpty()) {
+        return QString();
+    }
+
+    QString cleanFileName = fileName;
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    }
+    cleanFileName.replace('\\', '/');
+
+    QString patch;
+    patch += QStringLiteral("diff --git a/%1 b/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("--- a/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("+++ b/%1\n").arg(cleanFileName);
+
+    for (int idx : hunkIndexes) {
+        if (idx < 0 || idx >= m_currentHunks.size()) {
+            continue;
+        }
+
+        const Hunk &hunk = m_currentHunks[idx];
+        patch += QStringLiteral("@@ -%1,%2 +%3,%4 @@").arg(hunk.leftStart).arg(hunk.leftSize).arg(hunk.rightStart).arg(hunk.rightSize);
+        if (!hunk.caption.isEmpty()) {
+            patch += QStringLiteral(" ") + hunk.caption;
+        }
+        patch += QStringLiteral("\n");
+
+        for (const HunkLine &line : hunk.lines) {
+            QChar prefix = ' ';
+            switch (line.type) {
+            case HunkLine::Unchanged:
+                prefix = ' ';
+                break;
+            case HunkLine::Removed:
+                prefix = '-';
+                break;
+            case HunkLine::Added:
+                prefix = '+';
+                break;
+            }
+            patch += prefix + line.content + QStringLiteral("\n");
+        }
+    }
+
+    return patch;
+}
+
+bool DiffEditor::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == ui->diffSplitter && event->type() == QEvent::Resize) {
+        repositionActionPanel();
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void DiffEditor::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+
+    QAction *stageAction = menu.addAction("Stage Selected Lines");
+    QAction *revertAction = menu.addAction("Revert Selected Lines");
+
+    // Подключить сигналы к существующим слотам
+    connect(stageAction, &QAction::triggered, this, &DiffEditor::onStageSelectedClicked);
+    connect(revertAction, &QAction::triggered, this, &DiffEditor::onRevertSelectedClicked);
+
+    menu.exec(event->globalPos());
+}
+
+void DiffEditor::onStageSelectedClicked()
+{
+    QList<int> selectedHunks = getSelectedHunkIndexes();
+    if (selectedHunks.isEmpty()) {
+        // No selected hunks, do nothing
+        return;
+    }
+
+    QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+    if (!patch.isEmpty()) {
+        emit stageSelectedPatch(m_fileName, patch);
+    }
+}
+
+void DiffEditor::onRevertSelectedClicked()
+{
+    QList<int> selectedHunks = getSelectedHunkIndexes();
+    if (selectedHunks.isEmpty()) {
+        // No selected hunks, do nothing
+        return;
+    }
+
+    QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+    if (!patch.isEmpty()) {
+        emit revertSelectedPatch(m_fileName, patch);
+    }
+}
+
+void DiffEditor::onStageHunkClicked(int hunkIndex)
+{
+    QList<int> hunks = {hunkIndex};
+    QString patch = buildPatchForHunks(m_fileName, hunks);
+    if (!patch.isEmpty()) {
+        emit stageSelectedPatch(m_fileName, patch);
+    } else if (m_fileIsNew) {
+        // Новый (untracked) файл — стейджим целиком
+        emit stageNewFileRequested(m_fileName);
+    }
+}
+
+void DiffEditor::onRevertHunkClicked(int hunkIndex)
+{
+    QList<int> hunks = {hunkIndex};
+    QString patch = buildPatchForHunks(m_fileName, hunks);
+    if (!patch.isEmpty()) {
+        emit revertSelectedPatch(m_fileName, patch);
+    }
 }

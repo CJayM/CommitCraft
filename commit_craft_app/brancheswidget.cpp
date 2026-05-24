@@ -20,25 +20,53 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     , m_contextRemoteName("")
 {
     m_layout = new QVBoxLayout(this);
-    m_layout->setContentsMargins(2, 2, 2, 2);
-    m_layout->setSpacing(2);
+    m_layout->setContentsMargins(4, 4, 4, 4);
+    m_layout->setSpacing(4);
 
-    // Верхняя панель с заголовком и кнопкой Refresh                                                                                                                                                │
+    // Применяем стиль к фрейму
+    setStyleSheet(R"(
+        BranchesWidget {
+            background-color: #ffffff;
+            border: none;
+        }
+        QToolButton#branchesRefreshBtn {
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 14px;
+            background: transparent;
+            color: #656d76;
+        }
+        QToolButton#branchesRefreshBtn:hover {
+            background-color: #e8eaed;
+            border-color: #d0d7de;
+            color: #1f2328;
+        }
+        QLabel#branchesTitle {
+            font-weight: 700;
+            font-size: 12px;
+            color: #656d76;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 4px;
+        }
+    )");
+
+    // Верхняя панель с заголовком и кнопкой Refresh
     QWidget *topBar = new QWidget(this);
     QHBoxLayout *topLayout = new QHBoxLayout(topBar);
     topLayout->setContentsMargins(0, 0, 0, 0);
     topLayout->setSpacing(4);
 
     QLabel *titleLabel = new QLabel(tr("Branches"), this);
-    QFont font = titleLabel->font();
-    font.setBold(true);
-    titleLabel->setFont(font);
+    titleLabel->setObjectName("branchesTitle");
     topLayout->addWidget(titleLabel);
 
     topLayout->addStretch();
 
     m_refreshButton = new QToolButton(this);
-    m_refreshButton->setText("⟳");
+    m_refreshButton->setObjectName("branchesRefreshBtn");
+    m_refreshButton->setText(QString::fromUtf8("\u21BB")); // ↻
     m_refreshButton->setToolTip(tr("Refresh branches"));
     m_refreshButton->setCursor(Qt::PointingHandCursor);
     connect(m_refreshButton, &QToolButton::clicked, this, &BranchesWidget::refresh);
@@ -171,6 +199,21 @@ void BranchesWidget::setGit(Git *git)
     }
 }
 
+void BranchesWidget::clear()
+{
+    clearChildren(m_localBranchesRoot);
+    clearChildren(m_remotesRoot);
+    clearChildren(m_tagsRoot);
+    clearChildren(m_stashesRoot);
+
+    m_localBranchesRoot->setText(0, "Local Branches");
+    m_remotesRoot->setText(0, "Remotes");
+    m_tagsRoot->setText(0, "Tags");
+    m_stashesRoot->setText(0, "Stashes");
+
+    m_currentBranchName.clear();
+}
+
 void BranchesWidget::refresh()
 {
     if (!m_git)
@@ -193,15 +236,15 @@ void BranchesWidget::createRootItems()
     m_localBranchesRoot = new QTreeWidgetItem(m_treeWidget);
     m_localBranchesRoot->setText(0, "Local Branches");
     m_localBranchesRoot->setExpanded(true);
-    
+
     m_remotesRoot = new QTreeWidgetItem(m_treeWidget);
     m_remotesRoot->setText(0, "Remotes");
     m_remotesRoot->setExpanded(false);
-    
+
     m_tagsRoot = new QTreeWidgetItem(m_treeWidget);
     m_tagsRoot->setText(0, "Tags");
     m_tagsRoot->setExpanded(false);
-    
+
     m_stashesRoot = new QTreeWidgetItem(m_treeWidget);
     m_stashesRoot->setText(0, "Stashes");
     m_stashesRoot->setExpanded(false);

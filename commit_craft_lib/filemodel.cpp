@@ -32,7 +32,6 @@ QVariant FileModel::data(const QModelIndex &index, int role) const
     QString relativeDir = QFileInfo(relativePath).path();
     // Если путь равен "." или пустой, значит файл в корне репозитория
     if (relativeDir == "." || relativeDir.isEmpty()) relativeDir = "";
-    else relativeDir += "/";
 
     switch (role) {
     case Qt::DisplayRole:
@@ -43,6 +42,12 @@ QVariant FileModel::data(const QModelIndex &index, int role) const
             return fileName;
         } else if (index.column() == 2) {
             return relativeDir;
+        }
+        break;
+    case Qt::ForegroundRole:
+        if (index.column() == 2) {
+            // Серый цвет для директории
+            return QColor(128, 128, 128);
         }
         break;
     case Qt::BackgroundRole:
@@ -109,25 +114,16 @@ QString FileModel::getRelativePath(int row) const
 
 QColor FileModel::getStatusBackgroundColor(const QString &status) const
 {
-    // Define colors for each status type:
-    // 'M' - Modified (light blue)
-    if (status == "M") return QColor(173, 216, 230); // Light blue
-    // 'T' - Type changed (light purple)
-    if (status == "T") return QColor(230, 173, 230); // Light purple
-    // 'A' - Added (light green)
-    if (status == "A") return QColor(144, 238, 144); // Light green
-    // 'D' - Deleted (light pink)
-    if (status == "D") return QColor(255, 182, 193); // Light pink
-    // 'R' - Renamed (light yellow)
-    if (status == "R") return QColor(255, 255, 224); // Light yellow
-    // 'C' - Copied (light orange)
-    if (status == "C") return QColor(255, 218, 185); // Light orange
-    // 'U' - Unmerged (light gray)
-    if (status == "U") return QColor(211, 211, 211); // Light gray
-    // '?' - Untracked (default color)
-    if (status == "?") return QColor(255, 255, 255); // White
-    // Default color for any other status
-    return QColor(255, 255, 255); // White
+    // Современные приглушённые цвета статусов (GitHub-inspired)
+    if (status == "M") return QColor(213, 228, 255); // Modified — голубой
+    if (status == "T") return QColor(229, 215, 240); // Type changed — сиреневый
+    if (status == "A") return QColor(218, 251, 225); // Added — зелёный
+    if (status == "D") return QColor(255, 235, 233); // Deleted — красный
+    if (status == "R") return QColor(255, 245, 210); // Renamed — жёлтый
+    if (status == "C") return QColor(255, 228, 200); // Copied — оранжевый
+    if (status == "U") return QColor(246, 248, 250); // Unmerged — серый
+    if (status == "?") return QColor(255, 255, 255); // Untracked — белый
+    return QColor(255, 255, 255);
 }
 
 QString FileModel::getStatusSymbol(const QString &status) const

@@ -34,6 +34,9 @@ public:
     void setSyntaxHighlighting(bool enabled);
     bool syntaxHighlighting() const;
 
+    /// Позиция блока (строки) относительно viewport в пикселях по Y
+    QRectF blockViewportRect(int blockNumber) const;
+
 signals:
     void zoomChanged(int zoom);
 

@@ -1,12 +1,12 @@
 #ifndef COMMITITEMDELEGATE_H
 #define COMMITITEMDELEGATE_H
 
-#include <QList>
 #include <QMetaType>
 #include <QStyledItemDelegate>
+#include "commithistorymodel.h"
 
-// Register QList<QString> for use with QVariant
-Q_DECLARE_METATYPE(QList<QString>)
+// Register CommitData for use with QVariant
+Q_DECLARE_METATYPE(CommitData)
 
 class CommitItemDelegate : public QStyledItemDelegate
 {
@@ -17,9 +17,6 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
-
-private:
-    void paintCommitItem(QPainter *painter, const QStyleOptionViewItem &option, const QList<QString> &commitData) const;
 };
 
 #endif // COMMITITEMDELEGATE_H

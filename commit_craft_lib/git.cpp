@@ -13,6 +13,7 @@ Git::Git(QObject *parent)
     , m_fileContentProcess(new QProcess(this))
     , m_addFileProcess(new QProcess(this))
     , m_unstageFileProcess(new QProcess(this))
+    , m_deleteFilesProcess(new QProcess(this))
     , m_commitProcess(new QProcess(this))
     , m_branchesProcess(new QProcess(this))
     , m_currentBranchProcess(new QProcess(this))
@@ -21,10 +22,12 @@ Git::Git(QObject *parent)
     , m_tagsProcess(new QProcess(this))
     , m_stashesProcess(new QProcess(this))
     , m_checkoutProcess(new QProcess(this))
+    , m_commitOpProcess(new QProcess(this))
     , m_branchModifyProcess(new QProcess(this))
     , m_remoteProcess(new QProcess(this))
     , m_stashProcess(new QProcess(this))
     , m_createStashProcess(new QProcess(this))
+    , m_submoduleProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -51,6 +54,10 @@ Git::Git(QObject *parent)
     connect(m_unstageFileProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onUnstageFileFinished);
     connect(m_unstageFileProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_deleteFilesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onDeleteFilesFinished);
+    connect(m_deleteFilesProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
     
     connect(m_commitProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCommitFinished);
@@ -86,6 +93,10 @@ Git::Git(QObject *parent)
             this, &Git::onCheckoutFinished);
     connect(m_checkoutProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 
+    connect(m_commitOpProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCommitOpFinished);
+    connect(m_commitOpProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
     connect(m_branchModifyProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCreateBranchFinished); // Универсальный слот для всех операций модификации
     connect(m_branchModifyProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
@@ -103,6 +114,11 @@ Git::Git(QObject *parent)
     connect(m_createStashProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCreateStashFinished);
     connect(m_createStashProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+    
+    // Submodule operations
+    connect(m_submoduleProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onSubmodulesFinished); // По умолчанию getSubmodules
+    connect(m_submoduleProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -110,6 +126,18 @@ Git::Git(QObject *parent)
 void Git::setRepositoryPath(const QString &path)
 {
     m_repositoryPath = path;
+    
+    // Настраиваем Git на использование UTF-8 и отключение quotePath
+    QProcess configProcess;
+    configProcess.setProgram(gitPath());
+    configProcess.setArguments(QStringList() << "config" << "core.quotePath" << "false");
+    configProcess.setWorkingDirectory(m_repositoryPath);
+    configProcess.start();
+    configProcess.waitForFinished(2000);
+    
+    configProcess.setArguments(QStringList() << "config" << "i18n.commitencoding" << "utf-8");
+    configProcess.start();
+    configProcess.waitForFinished(2000);
 }
 
 QString Git::repositoryPath() const
@@ -186,8 +214,12 @@ void Git::getDiffWorkingTree(const QString &fileName)
 
 void Git::getCommitHistory()
 {
+    // --graph добавляет префикс графа (с *, |, /, \),
+    // %x1F — разделитель между префиксом графа и данными коммита
     setupProcess(m_commitHistoryProcess,
-                 QStringList() << "log" << "--pretty=format:%H|%an|%ad|%s" << "--date=short");
+                 QStringList() << "log" << "--graph"
+                               << "--pretty=format:%x1F%H|%an|%ad|%s|%P|%d"
+                               << "--date=short" << "--all");
     m_commitHistoryProcess->start();
 }
 
@@ -254,6 +286,49 @@ void Git::unstageFiles(const QStringList &fileNames)
     m_unstageFileProcess->start();
 }
 
+bool Git::isFileTracked(const QString &fileName)
+{
+    QStringList args;
+    args << "ls-files" << "--error-unmatch";
+    
+    // Используем относительный путь
+    QFileInfo fileInfo(QDir(m_repositoryPath).absoluteFilePath(fileName));
+    QString relativePath = QDir(m_repositoryPath).relativeFilePath(fileInfo.absoluteFilePath());
+    args << relativePath;
+    
+    QProcess process;
+    process.setProgram(getGitExecutable());
+    process.setArguments(args);
+    process.setWorkingDirectory(m_repositoryPath);
+    process.start();
+    process.waitForFinished();
+    
+    return process.exitCode() == 0;
+}
+
+void Git::deleteFiles(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty()) return;
+
+    QStringList absoluteFilePaths;
+    for (const QString &file : fileNames) {
+        absoluteFilePaths << QDir(m_repositoryPath).absoluteFilePath(file);
+    }
+
+    QStringList args;
+    args << "rm" << "-f"; // -f для игнорирования несуществующих файлов
+    
+    // Добавляем относительные пути к файлам (без кавычек)
+    for (const QString &absolutePath : absoluteFilePaths) {
+        QFileInfo fileInfo(absolutePath);
+        QString relativePath = QDir(m_repositoryPath).relativeFilePath(fileInfo.absoluteFilePath());
+        args << relativePath;
+    }
+
+    setupProcess(m_deleteFilesProcess, args);
+    m_deleteFilesProcess->start();
+}
+
 void Git::commit(const QString &message, bool amend)
 {
     QStringList args;
@@ -264,6 +339,32 @@ void Git::commit(const QString &message, bool amend)
     }
     setupProcess(m_commitProcess, args);
     m_commitProcess->start();
+}
+
+bool Git::applyPatchToIndex(const QString &patchFilePath)
+{
+    QProcess process;
+    process.setProgram(getGitExecutable());
+    process.setArguments(QStringList() << "apply" << "--cached" << "--whitespace=nowarn" << patchFilePath);
+    process.setWorkingDirectory(m_repositoryPath);
+    process.start();
+    if (!process.waitForFinished(-1)) {
+        return false;
+    }
+    return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+}
+
+bool Git::revertPatchInWorkingTree(const QString &patchFilePath)
+{
+    QProcess process;
+    process.setProgram(getGitExecutable());
+    process.setArguments(QStringList() << "apply" << "-R" << "--whitespace=nowarn" << patchFilePath);
+    process.setWorkingDirectory(m_repositoryPath);
+    process.start();
+    if (!process.waitForFinished(-1)) {
+        return false;
+    }
+    return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
 }
 
 void Git::onStatusFinished(int exitCode, QProcess::ExitStatus exitStatus)
@@ -301,12 +402,39 @@ void Git::onCommitHistoryFinished(int exitCode, QProcess::ExitStatus exitStatus)
 
         QList<QList<QString>> commits;
         for (const QString &line : lines) {
-            QStringList parts = line.split('|');
+            // Ищем разделитель \x1F между префиксом графа и данными
+            int sepIdx = line.indexOf(QChar(0x1F));
+            if (sepIdx < 0)
+                continue; // строка только с графом (|\ /), без коммита
+
+            QString graphPrefix = line.left(sepIdx);
+            QString dataPart = line.mid(sepIdx + 1);
+
+            // Определяем колонку коммита по позиции '*' в префиксе графа
+            int starPos = graphPrefix.indexOf('*');
+            int graphColumn = (starPos >= 0) ? starPos / 2 : 0;
+
+            // Парсим данные коммита
+            QStringList parts = dataPart.split('|');
             if (parts.size() >= 4) {
-                // Format the hash to show only first 8 characters
-                if (!parts[0].isEmpty()) {
-                    parts[0] = parts[0].left(8);
+                // parts[0] - hash
+                // parts[1] - author
+                // parts[2] - date
+                // parts[3] - message
+                // parts[4] - parents (может быть пустым)
+                // parts[5] - refs (ветки, теги - может быть пустым)
+
+                // Очищаем refs от лишних скобок и пробелов
+                if (parts.size() > 5 && !parts[5].isEmpty()) {
+                    QString refs = parts[5].trimmed();
+                    refs = refs.replace("(", "").replace(")", "").trimmed();
+                    parts[5] = refs;
                 }
+
+                // Добавляем graphColumn как 7-й элемент и graphPrefix как 8-й
+                parts.append(QString::number(graphColumn));
+                parts.append(graphPrefix);
+
                 commits.append(parts);
             }
         }
@@ -347,6 +475,17 @@ void Git::onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus)
         QString msg = m_unstageFileProcess->readAllStandardError();
         emit unstageFileReady(false, QString("Failed to execute git reset: %1").arg(msg));
         emit error(QString("Failed to execute git reset: %1").arg(msg));
+    }
+}
+
+void Git::onDeleteFilesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        emit deleteFilesReady(true, "Files deleted successfully");
+    } else {
+        QString msg = m_deleteFilesProcess->readAllStandardError();
+        emit deleteFilesReady(false, QString("Failed to execute git rm: %1").arg(msg));
+        emit error(QString("Failed to execute git rm: %1").arg(msg));
     }
 }
 
@@ -634,6 +773,84 @@ void Git::onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus)
     }
 }
 
+void Git::checkoutCommit(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "checkout" << hash;
+
+    m_commitOpProcess->setProperty("operation", "checkoutCommit");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::revertCommit(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "revert" << "--no-edit" << hash;
+
+    m_commitOpProcess->setProperty("operation", "revert");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::cherryPick(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "cherry-pick" << hash;
+
+    m_commitOpProcess->setProperty("operation", "cherryPick");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::rebaseOnto(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "rebase" << hash;
+
+    m_commitOpProcess->setProperty("operation", "rebase");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::mergeCommit(const QString &hash, bool noFf)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "merge";
+    if (noFf)
+        args << "--no-ff";
+    args << hash;
+
+    m_commitOpProcess->setProperty("operation", "merge");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
 void Git::createBranch(const QString &name, const QString &fromRef)
 {
     if (m_repositoryPath.isEmpty()) {
@@ -718,6 +935,50 @@ void Git::onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
     onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
 }
 
+void Git::onCommitOpFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_commitOpProcess->property("operation").toString();
+    QString hash = m_commitOpProcess->property("hash").toString();
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString msg;
+        if (operation == "checkoutCommit")
+            msg = QString("Checked out commit %1").arg(hash.left(7));
+        else if (operation == "revert")
+            msg = QString("Reverted commit %1").arg(hash.left(7));
+        else if (operation == "cherryPick")
+            msg = QString("Cherry-picked commit %1").arg(hash.left(7));
+        else if (operation == "rebase")
+            msg = QString("Rebase onto %1 successful").arg(hash.left(7));
+        else if (operation == "merge")
+            msg = QString("Merged commit %1").arg(hash.left(7));
+
+        if (operation == "checkoutCommit")
+            emit checkoutCommitReady(true, msg);
+        else if (operation == "revert")
+            emit revertCommitReady(true, msg);
+        else if (operation == "cherryPick")
+            emit cherryPickReady(true, msg);
+        else if (operation == "rebase")
+            emit rebaseReady(true, msg);
+        else if (operation == "merge")
+            emit mergeReady(true, msg);
+    } else {
+        QString errorMsg = m_commitOpProcess->readAllStandardError().trimmed();
+        if (operation == "checkoutCommit")
+            emit checkoutCommitReady(false, QString("Checkout failed: %1").arg(errorMsg));
+        else if (operation == "revert")
+            emit revertCommitReady(false, QString("Revert failed: %1").arg(errorMsg));
+        else if (operation == "cherryPick")
+            emit cherryPickReady(false, QString("Cherry-pick failed: %1").arg(errorMsg));
+        else if (operation == "rebase")
+            emit rebaseReady(false, QString("Rebase failed: %1").arg(errorMsg));
+        else if (operation == "merge")
+            emit mergeReady(false, QString("Merge failed: %1").arg(errorMsg));
+        emit error(errorMsg);
+    }
+}
+
 // ==========================================
 // Remote Operations Implementation
 // ==========================================
@@ -767,6 +1028,95 @@ void Git::getRemoteUrl(const QString &remote)
     m_remoteProcess->start(getGitExecutable(), args);
 }
 
+void Git::addRemote(const QString &name, const QString &url)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "add" << name << url;
+
+    m_remoteProcess->setProperty("operation", "addRemote");
+    m_remoteProcess->setProperty("remoteName", name);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::removeRemote(const QString &name)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "remove" << name;
+
+    m_remoteProcess->setProperty("operation", "removeRemote");
+    m_remoteProcess->setProperty("remoteName", name);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::renameRemote(const QString &oldName, const QString &newName)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "rename" << oldName << newName;
+
+    m_remoteProcess->setProperty("operation", "renameRemote");
+    m_remoteProcess->setProperty("remoteName", oldName);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::pushRemote(const QString &remote, const QString &branch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "push";
+    if (!remote.isEmpty()) {
+        args << remote;
+    }
+    if (!branch.isEmpty()) {
+        args << branch;
+    }
+    
+    m_remoteProcess->setProperty("operation", "push");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->setProperty("branchName", branch);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::pullRemote(const QString &remote, const QString &branch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "pull";
+    if (!remote.isEmpty()) {
+        args << remote;
+    }
+    if (!branch.isEmpty()) {
+        args << branch;
+    }
+    
+    m_remoteProcess->setProperty("operation", "pull");
+    m_remoteProcess->setProperty("remoteName", remote);
+    m_remoteProcess->setProperty("branchName", branch);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
 void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     QString operation = m_remoteProcess->property("operation").toString();
@@ -780,6 +1130,16 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
         } else if (operation == "url") {
             QString url = m_remoteProcess->readAllStandardOutput().trimmed();
             emit remoteUrlReady(remote, url);
+        } else if (operation == "push") {
+            emit pushReady(true, QString("Push to %1 successful").arg(remote.isEmpty() ? "origin" : remote));
+        } else if (operation == "pull") {
+            emit pullReady(true, QString("Pull from %1 successful").arg(remote.isEmpty() ? "origin" : remote));
+        } else if (operation == "addRemote") {
+            emit addRemoteReady(true, QString("Remote '%1' added").arg(remote));
+        } else if (operation == "removeRemote") {
+            emit removeRemoteReady(true, QString("Remote '%1' removed").arg(remote));
+        } else if (operation == "renameRemote") {
+            emit renameRemoteReady(true, QString("Remote renamed to '%1'").arg(remote));
         }
     } else {
         QString errorMsg = m_remoteProcess->readAllStandardError();
@@ -791,6 +1151,21 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
             emit error(QString("Prune failed: %1").arg(errorMsg));
         } else if (operation == "url") {
             emit remoteUrlReady(remote, "");
+        } else if (operation == "push") {
+            emit pushReady(false, QString("Push failed: %1").arg(errorMsg));
+            emit error(QString("Push failed: %1").arg(errorMsg));
+        } else if (operation == "pull") {
+            emit pullReady(false, QString("Pull failed: %1").arg(errorMsg));
+            emit error(QString("Pull failed: %1").arg(errorMsg));
+        } else if (operation == "addRemote") {
+            emit addRemoteReady(false, QString("Failed to add remote: %1").arg(errorMsg));
+            emit error(QString("Failed to add remote: %1").arg(errorMsg));
+        } else if (operation == "removeRemote") {
+            emit removeRemoteReady(false, QString("Failed to remove remote: %1").arg(errorMsg));
+            emit error(QString("Failed to remove remote: %1").arg(errorMsg));
+        } else if (operation == "renameRemote") {
+            emit renameRemoteReady(false, QString("Failed to rename remote: %1").arg(errorMsg));
+            emit error(QString("Failed to rename remote: %1").arg(errorMsg));
         }
     }
 }
@@ -940,4 +1315,181 @@ void Git::onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     onApplyStashFinished(exitCode, exitStatus);
+}
+
+// Submodule operations implementation
+void Git::getSubmodules()
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "status" << "--recursive";
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::initSubmodule(const QString &path)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "init" << path;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::updateSubmodule(const QString &path, bool fetch)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "update" << "--init";
+    if (fetch)
+        args << "--remote";
+    if (!path.isEmpty())
+        args << path;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::syncSubmodule(const QString &path)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "sync";
+    if (!path.isEmpty())
+        args << path;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::forEachSubmodule(const QString &command)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path not set");
+        return;
+    }
+    
+    QStringList args;
+    args << "submodule" << "foreach" << "--recursive" << command;
+    setupProcess(m_submoduleProcess, args);
+    m_submoduleProcess->start();
+}
+
+void Git::onSubmodulesFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        QString output = QString::fromUtf8(m_submoduleProcess->readAllStandardOutput());
+        QList<QStringList> submodules;
+        
+        // Parse submodule status output
+        // Format: [status] commit path (url)
+        // Status can be: ' ' (clean), '-' (not initialized), '+' (modified), 'U' (merge conflicts)
+        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        for (const QString &line : lines) {
+            if (line.trimmed().isEmpty())
+                continue;
+            
+            QStringList parts;
+            QString statusChar;
+            QString commit;
+            QString path;
+            QString url;
+            QString branch;
+            bool isDirty = false;
+            bool isUninitialized = false;
+            bool isMissing = false;
+
+            // Parse line format: " status commit path (url)"
+            QRegularExpression re(
+                R"REGEX(^\s*([ \-\+U])([0-9a-f]+)?\s+(\S+)(?:\s+\(([^)]+)\))?;)REGEX");
+            QRegularExpressionMatch match = re.match(line);
+            
+            if (match.hasMatch()) {
+                statusChar = match.captured(1);
+                commit = match.captured(2).isEmpty() ? QString() : match.captured(2);
+                path = match.captured(3);
+                url = match.captured(4);
+                
+                // Determine status
+                if (statusChar == '-') {
+                    isUninitialized = true;
+                } else if (statusChar == '+') {
+                    isDirty = true;
+                } else if (statusChar == 'U') {
+                    isDirty = true; // Merge conflicts
+                }
+                
+                parts << path << path << url << branch << commit << commit 
+                      << (isDirty ? "true" : "false") 
+                      << (isUninitialized ? "true" : "false")
+                      << (isMissing ? "true" : "false");
+                submodules << parts;
+            }
+        }
+        
+        emit submodulesReady(submodules);
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submodulesReady(QList<QStringList>());
+        emit error(QString("Failed to get submodules: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleInitFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        emit submoduleInitReady(true, "Submodule initialized successfully");
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleInitReady(false, QString("Failed to initialize submodule: %1").arg(errorMsg));
+        emit error(QString("Failed to initialize submodule: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        emit submoduleUpdateReady(true, "Submodule updated successfully");
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleUpdateReady(false, QString("Failed to update submodule: %1").arg(errorMsg));
+        emit error(QString("Failed to update submodule: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleSyncFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        emit submoduleSyncReady(true, "Submodule synced successfully");
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleSyncReady(false, QString("Failed to sync submodule: %1").arg(errorMsg));
+        emit error(QString("Failed to sync submodule: %1").arg(errorMsg));
+    }
+}
+
+void Git::onSubmoduleForeachFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+        QString output = QString::fromUtf8(m_submoduleProcess->readAllStandardOutput());
+        emit submoduleForeachReady(true, output);
+    } else {
+        QString errorMsg = QString::fromUtf8(m_submoduleProcess->readAllStandardError());
+        emit submoduleForeachReady(false, QString("Failed to execute command in submodules: %1").arg(errorMsg));
+        emit error(QString("Failed to execute command in submodules: %1").arg(errorMsg));
+    }
 }

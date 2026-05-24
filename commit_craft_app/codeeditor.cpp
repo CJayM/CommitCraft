@@ -95,7 +95,8 @@ void CodeEditor::highlightCurrentLine()
     if (!isReadOnly()) {
         QTextEdit::ExtraSelection selection;
 
-        QColor lineColor = QColor(Qt::yellow).lighter(160);
+        // Современный голубоватый оттенок для текущей строки
+        QColor lineColor(210, 230, 255, 80);
 
         selection.format.setBackground(lineColor);
         selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -110,14 +111,14 @@ void CodeEditor::highlightCurrentLine()
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
 {
     QPainter painter(lineNumberArea);
-    painter.fillRect(event->rect(), QColor(240, 240, 240));
+    painter.fillRect(event->rect(), QColor(245, 247, 250));
 
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
     int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
     int bottom = top + qRound(blockBoundingRect(block).height());
 
-    QColor textColor(140, 140, 140);
+    QColor textColor(148, 155, 164);
     painter.setPen(textColor);
 
     while (block.isValid() && top <= event->rect().bottom()) {
@@ -151,13 +152,13 @@ void CodeEditor::zoomOut(int range)
 void CodeEditor::setZoom(int zoom)
 {
     int oldZoom = m_zoom;
-    m_zoom = qBound(10, zoom, 150); // Limit zoom between 10% and 300%
+    m_zoom = qBound(10, zoom, 150); // Limit zoom between 10% and 150%
 
     // Only update if zoom actually changed
     if (m_zoom != oldZoom) {
         // Calculate the font size based on zoom level
         QFont f = font();
-        f.setPointSizeF(14.0 * m_zoom / 100.0);
+        f.setPointSizeF(qMax(1.0, 14.0 * m_zoom / 100.0));
         setFont(f);
 
         // Update line number area
@@ -194,4 +195,12 @@ void CodeEditor::setSyntaxHighlighting(bool enabled)
 bool CodeEditor::syntaxHighlighting() const
 {
     return m_syntaxHighlighting;
+}
+
+QRectF CodeEditor::blockViewportRect(int blockNumber) const
+{
+    QTextBlock block = document()->findBlockByNumber(blockNumber);
+    if (!block.isValid())
+        return QRectF();
+    return blockBoundingGeometry(block).translated(contentOffset());
 }

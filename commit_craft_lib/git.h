@@ -33,7 +33,12 @@ public:
     void addFiles(const QStringList &fileNames);
     void unstageFile(const QString &fileName);
     void unstageFiles(const QStringList &fileNames);
+    bool isFileTracked(const QString &fileName);
+    void deleteFiles(const QStringList &fileNames);
     void commit(const QString &message, bool amend = false);
+
+    bool applyPatchToIndex(const QString &patchFilePath);
+    bool revertPatchInWorkingTree(const QString &patchFilePath);
 
     // Branch operations
     void getLocalBranches();
@@ -47,17 +52,34 @@ public:
     void createBranch(const QString &name, const QString &fromRef = "");
     void deleteBranch(const QString &branch, bool force = false);
     void renameBranch(const QString &oldName, const QString &newName);
+    void checkoutCommit(const QString &hash);
+    void revertCommit(const QString &hash);
+    void cherryPick(const QString &hash);
+    void rebaseOnto(const QString &hash);
+    void mergeCommit(const QString &hash, bool noFf = true);
 
     // Remote operations
     void fetchRemote(const QString &remote);
     void pruneRemote(const QString &remote);
     void getRemoteUrl(const QString &remote);
+    void pushRemote(const QString &remote = "", const QString &branch = "");
+    void pullRemote(const QString &remote = "", const QString &branch = "");
+    void addRemote(const QString &name, const QString &url);
+    void removeRemote(const QString &name);
+    void renameRemote(const QString &oldName, const QString &newName);
 
     // Stash operations
     void createStash(const QStringList &files, const QString &message);
     void applyStash(const QString &stashRef, bool drop = false);
     void dropStash(const QString &stashRef);
     void showStash(const QString &stashRef);
+    
+    // Submodule operations
+    void getSubmodules();
+    void initSubmodule(const QString &path);
+    void updateSubmodule(const QString &path, bool fetch = false);
+    void syncSubmodule(const QString &path);
+    void forEachSubmodule(const QString &command);
     
 signals:
     // Git operation results
@@ -68,6 +90,7 @@ signals:
     void commitReady(bool success, const QString &message);
     void addFileReady(bool success, const QString &message);
     void unstageFileReady(bool success, const QString &message);
+    void deleteFilesReady(bool success, const QString &message);
     void error(const QString &error);
 
     // Branch modification results
@@ -75,17 +98,34 @@ signals:
     void branchCreated(bool success, const QString &message);
     void branchDeleted(bool success, const QString &message);
     void branchRenamed(bool success, const QString &message);
+    void checkoutCommitReady(bool success, const QString &message);
+    void revertCommitReady(bool success, const QString &message);
+    void cherryPickReady(bool success, const QString &message);
+    void rebaseReady(bool success, const QString &message);
+    void mergeReady(bool success, const QString &message);
 
     // Remote signals
     void fetchReady(bool success, const QString &message);
     void pruneReady(bool success, const QString &message);
     void remoteUrlReady(const QString &remote, const QString &url);
+    void pushReady(bool success, const QString &message);
+    void pullReady(bool success, const QString &message);
+    void addRemoteReady(bool success, const QString &message);
+    void removeRemoteReady(bool success, const QString &message);
+    void renameRemoteReady(bool success, const QString &message);
 
     // Stash signals
     void stashCreated(bool success, const QString &message);
     void stashApplied(bool success, const QString &message);
     void stashDropped(bool success, const QString &message);
     void stashShown(const QString &diff);
+    
+    // Submodule signals
+    void submodulesReady(const QList<QStringList> &submodules); // name, path, url, branch, commit, head, dirty, uninitialized, missing
+    void submoduleInitReady(bool success, const QString &message);
+    void submoduleUpdateReady(bool success, const QString &message);
+    void submoduleSyncReady(bool success, const QString &message);
+    void submoduleForeachReady(bool success, const QString &output);
 
     // Branch operation results
     void localBranchesReady(const QList<QString> &branches, const QString &currentBranch);
@@ -101,6 +141,7 @@ private slots:
     void onFileContentFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onAddFileFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onUnstageFileFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onDeleteFilesFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onCommitFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProcessError(QProcess::ProcessError error);
 
@@ -117,6 +158,7 @@ private slots:
     void onCreateBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onCommitOpFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
     // Remote slots
     void onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -129,6 +171,13 @@ private slots:
     void onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
+    // Submodule slots
+    void onSubmodulesFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleInitFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleSyncFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSubmoduleForeachFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    
 private:
     QString m_repositoryPath;
     QString m_gitPath;
@@ -140,6 +189,7 @@ private:
     QProcess *m_fileContentProcess;
     QProcess *m_addFileProcess;
     QProcess *m_unstageFileProcess;
+    QProcess *m_deleteFilesProcess;
     QProcess *m_commitProcess;
 
     // Processes for branch operations
@@ -152,10 +202,12 @@ private:
 
     // Process for branch modification
     QProcess *m_checkoutProcess;
+    QProcess *m_commitOpProcess;     // Для commit операций (revert/cherry-pick/rebase/merge)
     QProcess *m_branchModifyProcess; // Для create/delete/rename
     QProcess *m_remoteProcess;       // Для fetch/prune/url
     QProcess *m_stashProcess;        // Для stash операций (apply/drop/show)
     QProcess *m_createStashProcess;  // Для создания stash
+    QProcess *m_submoduleProcess;    // Для submodule операций
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;
