@@ -735,7 +735,7 @@
     <string>Go to Previous Hunk</string>
    </property>
    <property name="shortcut">
-    <string/>
+    <string>Shift+F6</string>
    </property>
   </action>
   <action name="actionNextHunk">
@@ -750,7 +750,7 @@
     <string>Go to Next Hunk</string>
    </property>
    <property name="shortcut">
-    <string/>
+    <string>F6</string>
    </property>
   </action>
   <action name="actionStageFile">
