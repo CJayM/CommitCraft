@@ -1028,6 +1028,51 @@ void Git::getRemoteUrl(const QString &remote)
     m_remoteProcess->start(getGitExecutable(), args);
 }
 
+void Git::addRemote(const QString &name, const QString &url)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "add" << name << url;
+
+    m_remoteProcess->setProperty("operation", "addRemote");
+    m_remoteProcess->setProperty("remoteName", name);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::removeRemote(const QString &name)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "remove" << name;
+
+    m_remoteProcess->setProperty("operation", "removeRemote");
+    m_remoteProcess->setProperty("remoteName", name);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
+void Git::renameRemote(const QString &oldName, const QString &newName)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "remote" << "rename" << oldName << newName;
+
+    m_remoteProcess->setProperty("operation", "renameRemote");
+    m_remoteProcess->setProperty("remoteName", oldName);
+    m_remoteProcess->start(getGitExecutable(), args);
+}
+
 void Git::pushRemote(const QString &remote, const QString &branch)
 {
     if (m_repositoryPath.isEmpty()) {
@@ -1089,6 +1134,12 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
             emit pushReady(true, QString("Push to %1 successful").arg(remote.isEmpty() ? "origin" : remote));
         } else if (operation == "pull") {
             emit pullReady(true, QString("Pull from %1 successful").arg(remote.isEmpty() ? "origin" : remote));
+        } else if (operation == "addRemote") {
+            emit addRemoteReady(true, QString("Remote '%1' added").arg(remote));
+        } else if (operation == "removeRemote") {
+            emit removeRemoteReady(true, QString("Remote '%1' removed").arg(remote));
+        } else if (operation == "renameRemote") {
+            emit renameRemoteReady(true, QString("Remote renamed to '%1'").arg(remote));
         }
     } else {
         QString errorMsg = m_remoteProcess->readAllStandardError();
@@ -1106,6 +1157,15 @@ void Git::onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus)
         } else if (operation == "pull") {
             emit pullReady(false, QString("Pull failed: %1").arg(errorMsg));
             emit error(QString("Pull failed: %1").arg(errorMsg));
+        } else if (operation == "addRemote") {
+            emit addRemoteReady(false, QString("Failed to add remote: %1").arg(errorMsg));
+            emit error(QString("Failed to add remote: %1").arg(errorMsg));
+        } else if (operation == "removeRemote") {
+            emit removeRemoteReady(false, QString("Failed to remove remote: %1").arg(errorMsg));
+            emit error(QString("Failed to remove remote: %1").arg(errorMsg));
+        } else if (operation == "renameRemote") {
+            emit renameRemoteReady(false, QString("Failed to rename remote: %1").arg(errorMsg));
+            emit error(QString("Failed to rename remote: %1").arg(errorMsg));
         }
     }
 }

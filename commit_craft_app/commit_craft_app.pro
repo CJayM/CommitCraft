@@ -14,9 +14,11 @@ SOURCES += \
     diffeditor.cpp \
     diffhighlighter.cpp \
     diffpanel.cpp \
+    hunkactionpanel.cpp \
     intralinediff.cpp \
     main.cpp \
     mainwindow.cpp \
+    repositorydelegate.cpp \
     settingsdialog.cpp \
     syntaxhighlighter.cpp
 
@@ -26,9 +28,11 @@ HEADERS += \
     diffeditor.h \
     diffhighlighter.h \
     diffpanel.h \
+    hunkactionpanel.h \
     intralinediff.h \
     linenumberarea.h \
     mainwindow.h \
+    repositorydelegate.h \
     settingsdialog.h \
     syntaxhighlighter.h
 

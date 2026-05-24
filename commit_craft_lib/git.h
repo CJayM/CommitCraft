@@ -64,6 +64,9 @@ public:
     void getRemoteUrl(const QString &remote);
     void pushRemote(const QString &remote = "", const QString &branch = "");
     void pullRemote(const QString &remote = "", const QString &branch = "");
+    void addRemote(const QString &name, const QString &url);
+    void removeRemote(const QString &name);
+    void renameRemote(const QString &oldName, const QString &newName);
 
     // Stash operations
     void createStash(const QStringList &files, const QString &message);
@@ -107,6 +110,9 @@ signals:
     void remoteUrlReady(const QString &remote, const QString &url);
     void pushReady(bool success, const QString &message);
     void pullReady(bool success, const QString &message);
+    void addRemoteReady(bool success, const QString &message);
+    void removeRemoteReady(bool success, const QString &message);
+    void renameRemoteReady(bool success, const QString &message);
 
     // Stash signals
     void stashCreated(bool success, const QString &message);

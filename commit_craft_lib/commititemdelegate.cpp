@@ -3,19 +3,22 @@
 #include <QApplication>
 #include <QStyleOptionViewItem>
 #include <QFontMetrics>
+#include <QLinearGradient>
 
-// Цвет ветки по индексу колонки (должен совпадать с моделью)
+// Цвет ветки по индексу колонки (современная палитра)
 static QColor branchColorForColumn(int col)
 {
     static const QVector<QColor> colors = {
-        QColor(230, 57, 70),    // красный
-        QColor(46, 204, 113),   // зеленый
-        QColor(52, 152, 219),   // синий
-        QColor(155, 89, 182),   // фиолетовый
-        QColor(241, 196, 15),   // желтый
-        QColor(230, 126, 34),   // оранжевый
-        QColor(26, 188, 156),   // бирюзовый
-        QColor(241, 128, 23),   // темно-оранжевый
+        QColor(207, 34, 46),    // красный
+        QColor(9, 133, 48),     // зелёный
+        QColor(9, 105, 218),    // синий
+        QColor(130, 80, 223),   // фиолетовый
+        QColor(204, 164, 16),   // жёлтый
+        QColor(219, 102, 21),   // оранжевый
+        QColor(17, 159, 137),   // бирюзовый
+        QColor(186, 84, 136),   // розовый
+        QColor(42, 154, 192),   // голубой
+        QColor(140, 160, 60),   // оливковый
     };
     return colors[col % colors.size()];
 }
@@ -36,18 +39,26 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
 
     CommitData commit = data.value<CommitData>();
 
-    // Фон выделения
-    QStyleOptionViewItem opt = option;
-    QApplication::style()->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter);
-
     QRect rect = option.rect;
     painter->setRenderHint(QPainter::Antialiasing, true);
 
+    // --- Фон ---
+    // Чередование фона для чётных/нечётных строк
+    if (index.row() % 2 == 1) {
+        painter->fillRect(rect, QColor(248, 249, 251));
+    }
+
+    // Фон выделения
+    if (option.state & QStyle::State_Selected) {
+        painter->fillRect(rect, QColor(221, 244, 255)); // #ddf4ff
+    }
+
     // --- Параметры графа ---
-    const int dotRadius = 6;
-    const int lineHeight = 3;
-    const int columnSpacing = 20;
+    const int dotRadius = 5;
+    const int lineWidth = 2;
+    const int columnSpacing = 18;
     const int leftMargin = 8;
+    const int topPadding = 4;
 
     int centerY = rect.center().y();
     int dotX = leftMargin + commit.graphColumn * columnSpacing + dotRadius;
@@ -61,7 +72,9 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     // 1. Вертикальные линии для активных колонок
     for (int col : commit.activeColumns) {
         int colX = leftMargin + col * columnSpacing + dotRadius;
-        painter->setPen(QPen(branchColorForColumn(col), lineHeight));
+        QColor lineColor = branchColorForColumn(col);
+        lineColor.setAlpha(120); // полупрозрачные линии
+        painter->setPen(QPen(lineColor, lineWidth));
         if (col == commit.graphColumn && isBranchCreation)
             painter->drawLine(colX, rect.top(), colX, dotY - dotRadius);
         else
@@ -71,7 +84,9 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     // 2. Диагональ ответвления
     if (isBranchCreation) {
         int parentDotX = leftMargin + firstParentCol * columnSpacing + dotRadius;
-        painter->setPen(QPen(branchColorForColumn(firstParentCol), lineHeight));
+        QColor lineColor = branchColorForColumn(firstParentCol);
+        lineColor.setAlpha(120);
+        painter->setPen(QPen(lineColor, lineWidth));
         painter->drawLine(dotX, dotY, parentDotX, rect.bottom());
     }
 
@@ -80,16 +95,19 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         int parentCol = (p < commit.parentColumns.size()) ? commit.parentColumns[p] : -1;
         if (parentCol < 0) continue;
         int parentDotX = leftMargin + parentCol * columnSpacing + dotRadius;
-        painter->setPen(QPen(branchColorForColumn(parentCol), lineHeight));
+        QColor lineColor = branchColorForColumn(parentCol);
+        lineColor.setAlpha(120);
+        painter->setPen(QPen(lineColor, lineWidth));
         painter->drawLine(dotX, dotY, parentDotX, rect.bottom());
     }
 
     // 4. Точка коммита
-    painter->setBrush(commit.branchColor);
-    painter->setPen(commit.branchColor);
+    QColor dotColor = commit.branchColor;
+    painter->setBrush(dotColor);
+    painter->setPen(QPen(dotColor.darker(120), 1));
     painter->drawEllipse(QPoint(dotX, dotY), dotRadius, dotRadius);
 
-    // --- Текст (хэш + сообщение + refs + дата) ---
+    // --- Текст ---
 
     // Хэш коммита — сразу после последней активной колонки
     int maxActiveCol = commit.graphColumn;
@@ -97,38 +115,50 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         if (col > maxActiveCol) maxActiveCol = col;
     int hashX = leftMargin + (maxActiveCol + 1) * columnSpacing + dotRadius + 8;
 
-    QFont normFont = painter->font();
+    QFont normFont = option.widget ? option.widget->font() : painter->font();
+    QFont smallFont = normFont;
+    {
+        int ps = normFont.pointSize();
+        if (ps <= 1) {
+            // Font was set via pixel size (stylesheet)
+            int px = qMax(1, normFont.pixelSize() - 1);
+            smallFont.setPixelSize(px);
+        } else {
+            smallFont.setPointSize(qMax(1, ps - 1));
+        }
+    }
     QFont boldFont = normFont;
     boldFont.setBold(true);
+
     QFontMetrics fmBold(boldFont);
     QFontMetrics fmNorm(normFont);
+    QFontMetrics fmSmall(smallFont);
 
     int hashWidth = fmBold.horizontalAdvance(commit.shortHash);
-    int baseY = rect.top() + 2; // отступ сверху
+    int baseY = rect.top() + topPadding;
 
-    // Рисуем хэш
-    painter->setFont(boldFont);
-    painter->setPen(commit.branchColor);
-    painter->drawText(hashX, baseY + fmBold.ascent(), commit.shortHash);
+    // --- Строка 1: хэш + сообщение + refs ---
 
-    // --- Строка 1: сообщение + refs ---
+    // Рисуем хэш (моноширинный, полупрозрачный)
+    painter->setFont(smallFont);
+    painter->setPen(QColor(148, 155, 164)); // серый хэш
+    painter->drawText(hashX, baseY + fmSmall.ascent(), commit.shortHash);
+
     // Вычисляем ширину refs
     int refsTotalWidth = 0;
     QList<int> refWidths;
     for (const QString &ref : commit.refs) {
-        int rw = fmNorm.horizontalAdvance(ref) + 12;
+        int rw = fmNorm.horizontalAdvance(ref) + 14;
         refWidths.append(rw);
         refsTotalWidth += rw + 4;
     }
     if (!refWidths.isEmpty()) refsTotalWidth -= 4;
 
-    int msgX = hashX + hashWidth + 8;
-    int msgMaxWidth = rect.right() - 5 - msgX - refsTotalWidth - 4;
+    int msgX = hashX + hashWidth + 10;
+    int msgMaxWidth = rect.right() - 8 - msgX - refsTotalWidth - 4;
 
-    painter->setFont(normFont);
-
-    // Определяем цвет текста: HEAD → Accent, иначе обычный
-    QColor textColor = option.palette.color(QPalette::Text);
+    // Рисуем сообщение коммита
+    // HEAD или selected → bold
     bool isHead = false;
     for (const QString &ref : commit.refs) {
         if (ref.contains("HEAD", Qt::CaseInsensitive)) {
@@ -136,56 +166,63 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
             break;
         }
     }
-    if (isHead) {
-        textColor = option.palette.color(QPalette::Accent);
-    }
 
-    // Выделенная строка — перебиваем цвет на HighlightedText
-    if ((option.state & QStyle::State_Selected) | (isHead)) {
+    if (isHead || (option.state & QStyle::State_Selected)) {
         painter->setFont(boldFont);
+    } else {
+        painter->setFont(normFont);
     }
 
-    painter->setPen(textColor);
+    painter->setPen(QColor(31, 35, 40)); // #1f2328 - основной текст
     QString elidedMsg = fmNorm.elidedText(commit.message, Qt::ElideRight,
                                           qMax(msgMaxWidth, 10));
     painter->drawText(msgX, baseY + fmBold.ascent(), elidedMsg);
 
-    painter->setFont(normFont);
-
-    // Рисуем refs справа на той же строке — цветом ветки коммита
-    QColor refColor = branchColorForColumn(commit.graphColumn);
-    int refsX = rect.right() - 5;
-    for (int i = 0; i < commit.refs.size(); ++i) {
+    // Рисуем refs справа на той же строке — как современные badge
+    QColor refBg = branchColorForColumn(commit.graphColumn);
+    int refsX = rect.right() - 8;
+    for (int i = commit.refs.size() - 1; i >= 0; --i) {
         const QString &ref = commit.refs[i];
         int rw = refWidths[i];
         refsX -= rw;
 
-        int refHeight = fmNorm.height() + 6;
-        int refY = baseY - 2;
+        // Badge фон — современный полупрозрачный стиль
+        QColor bg = refBg;
+        bg.setAlpha(isHead ? 25 : 18);
+        painter->setBrush(bg);
+        painter->setPen(QPen(refBg, 1.0));
+
+        // Скруглённый прямоугольник
+        int refHeight = fmNorm.height() + 5;
+        int refY = baseY - 1;
         QRect refRect(refsX, refY, rw, refHeight);
+        painter->drawRoundedRect(refRect, 4, 4);
 
-        painter->setPen(refColor);
-        painter->setBrush(QColor(refColor.red(), refColor.green(), refColor.blue(), 30));
-        painter->drawRoundedRect(refRect, 3, 3);
-
-        painter->setPen(refColor);
-        painter->setFont(normFont);
+        // Текст badge
+        if (isHead) {
+            painter->setFont(boldFont);
+            painter->setPen(refBg);
+        } else {
+            painter->setFont(normFont);
+            painter->setPen(refBg);
+        }
         painter->drawText(refRect.adjusted(6, 0, -6, 0), Qt::AlignVCenter, ref);
 
-        refsX -= 4; // промежуток между бейджами
+        refsX -= 4;
     }
 
     // --- Строка 2: дата и автор ---
+    painter->setFont(smallFont);
     int line2Y = baseY + fmBold.height() + 2;
-    painter->setPen(Qt::gray);
+    painter->setPen(QColor(101, 109, 118)); // #656d76 - серый текст
     QString dateAuthor = commit.author + ", " + commit.date;
-    QString elidedDA = fmNorm.elidedText(dateAuthor, Qt::ElideRight, rect.width() - 10);
-    painter->drawText(hashX, line2Y + fmNorm.ascent(), elidedDA);
+    QString elidedDA = fmNorm.elidedText(dateAuthor, Qt::ElideRight, rect.width() - hashX - 10);
+    painter->drawText(hashX, line2Y + fmSmall.ascent(), elidedDA);
 }
 
 QSize CommitItemDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     QSize size = QStyledItemDelegate::sizeHint(option, index);
-    size.setHeight(36);
+    size.setHeight(42);
     return size;
 }

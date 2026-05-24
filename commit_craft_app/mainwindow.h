@@ -14,6 +14,10 @@
 #include <QTimer>
 #include <QFileSystemModel>
 #include <QStandardItemModel>
+#include <QAction>
+#include <QListView>
+#include <QSortFilterProxyModel>
+#include <QStandardItemModel>
 
 class QTreeView;
 
@@ -30,6 +34,7 @@ class CommitItemDelegate;
 class Git;
 class GitParser;
 class DiffEditor;
+class RepositoryDelegate;
 class SubmoduleModel;
 
 // Forward declare FileModel from the library
@@ -48,6 +53,7 @@ protected:
 
 private slots:
     void openSettingsDialog();
+    void editGitignore();
     void openRepository();
     void refreshGitStatus();
     void onGitStatusFinished(const QString &output);
@@ -60,6 +66,7 @@ private slots:
     void onGitError(const QString &error);
     void showFileContextMenu(const QPoint &pos);
     void showStagedFileContextMenu(const QPoint &pos);
+    void showCommitHistoryContextMenu(const QPoint &pos);
     void addSelectedFile();
     void unstageSelectedFile();
     void unstageSelectedFiles(const QStringList &files);
@@ -70,6 +77,8 @@ private slots:
     void onFileTableSelectionChanged();
     void onStagedFileTableSelectionChanged();
     void toggleLeftPanel(bool visible);
+    void toggleRepositoryPanel(bool visible);
+    void toggleBranchesPanel(bool visible);
     void toggleFilesPanel(bool visible);
     void toggleTopPanel(bool visible);
     void toggleRightPanel(bool visible);
@@ -78,12 +87,24 @@ private slots:
     void synchronizeZoom(int zoom);
     void navigateToNextHunk();
     void navigateToPrevHunk();
+    void selectNextFile();
+    void selectPrevFile();
     void showAboutDialog();
     void stageSelectedFilesHotkey();
     void unstageSelectedFilesHotkey();
     void clearSelection();
     void onPushReady(bool success, const QString &message);
     void onPullReady(bool success, const QString &message);
+    void onFetchReady(bool success, const QString &message);
+    void onAddRemoteReady(bool success, const QString &message);
+    void onRemoveRemoteReady(bool success, const QString &message);
+    void onRenameRemoteReady(bool success, const QString &message);
+    void onRemotesReady(const QList<QString> &remotes);
+    void onCheckoutCommitReady(bool success, const QString &message);
+    void onRevertCommitReady(bool success, const QString &message);
+    void onCherryPickReady(bool success, const QString &message);
+    void onRebaseReady(bool success, const QString &message);
+    void onMergeReady(bool success, const QString &message);
 
     // Submodule slots
     void onSubmodulesReady(const QList<QStringList> &submodules);
@@ -151,10 +172,24 @@ private:
     // Данные для фильтрации по директории
     QList<QPair<QString, QString>> m_allUnstagedFiles;
     QList<QPair<QString, QString>> m_allStagedFiles;
+    QStringList m_remoteList;
     QString m_selectedDirectory;
+    QStandardItemModel *m_repositoryModel;
+    QSortFilterProxyModel *m_repositoryFilterModel;
+    RepositoryDelegate *m_repositoryDelegate;
     QStandardItemModel *m_dirTreeModel;
     QTreeView *m_dirTreeView;
     void rebuildDirectoryTree();
     void applyDirectoryFilter();
+
+    // Недавние репозитории
+    void openRepositoryPath(const QString &path);
+    void addRecentRepository(const QString &path);
+    void updateRecentRepositoriesMenu();
+
+    QStringList m_recentRepositories;
+    QAction *m_recentSeparator = nullptr;
+    QMenu *m_recentReposMenu = nullptr;
+    void updateRepositoryList();
 };
 #endif // MAINWINDOW_H

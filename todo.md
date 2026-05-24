@@ -7,10 +7,9 @@
 - [x] Разделить колонки на Name и Relative Directory
 - [x] Обновлять панели после изменений файлов на диске или после выполнения git-действий
 - [x] В контекстном меню для модифицированных файлов отображать название пункта "добавить" как "Фиксировать", а для недобавленных как "Добавить"
-- [ ] Название директории сделать серым и без слеща в конце
-- [ ] Добавить панель с директориями (как фильтр)
+- [ ] Название директории сделать серым и без слеша в конце
+- [x] Добавить панель с директориями (как фильтр)
 - [x] Добавить в контекстное меню пункты:
-  - [ ] Revert
   - [x] Copy file path
   - [x] Open file
   - [x] Open folder
@@ -21,12 +20,19 @@
 ## DiffEditor
 
 - [x] Заменить шрифт на Consolas
-- [ ] Для графических файлов отображать текущую картинку
-- [ ] Позволять делать stage и revert для отдельных строк кода
+- [x] Для графических файлов отображать текущую картинку
+- [x] Позволять делать stage и revert для отдельных строк кода
 - [x] Поправить нумерацию строк
 - [ ] Разделить название файла и путь к директории
 - [ ] Index Editor
   - [ ] 
+
+
+
+## Branches
+
+- [ ] Добавить удаление для веток у Remotes
+- [ ] Убрать Apply/Drop у не Stash
 
 
 
@@ -41,50 +47,52 @@
 
 - [ ] Добавить в главное меню:
 
-  - [ ] File
+  - [x] File
 
-  - [ ] Edit
+    - [x] Список предыдущих репозиториев
 
-    - [ ] gitignore
+  - [x] Edit
 
-  - [ ] View
+    - [x] gitignore
 
+  - [x] View
+  
     - [ ] Repositories
-    - [ ] Journal
-    - [ ] Log
-    - [ ] Branches
+    - [x] Journal
+    - [x] Log
+    - [x] Branches
     - [ ] Commit message
-    - [ ] Diff
-    - [ ] Changes
-    - [ ] Directory
+    - [x] Diff
+  - [x] Changes
+    - [x] Directory
 
-  - [ ] Local
+  - [x] Local
 
-    - [ ] Create Branch
+    - [x] Create Branch
 
-  - [ ] Remote
+  - [x] Remote
 
-    - [ ] Add remote
+    - [x] Add remote
 
   - [ ] Help
-
-    - [ ] Reference
+  
+  - [ ] Reference
     - [ ] About
-
+  
     
 
 
 
 ## Hotkeys
 
-- [ ] Ctrl+t - застейджить файл
-- [ ] Ctrl+shift+t - отстэйджить
+- [x] Ctrl+t - застейджить файл
+- [x] Ctrl+shift+t - отстэйджить
 - [x] Ctrl+Enter - коммит
-- [ ] Esc - убрать выделение файла (очистить DiffEditor)
-- [ ] F6 - следующее изменение
-- [ ] shift+F6 - предыдущее изменение
-- [ ] F7 - Push
-- [ ] F8 - Pull
+- [x] Esc - убрать выделение файла (очистить DiffEditor)
+- [x] F6 - следующее изменение
+- [x] shift+F6 - предыдущее изменение
+- [x] F7 - Push
+- [x] F8 - Pull
 
 
 
@@ -113,7 +121,7 @@
 
 - [ ] The **Reflog** view shows the chronological history of `HEAD` to help you access “lost” commits.
 - [ ] **Submodules**
-- [ ] GraphView
+- [x] GraphView
 - [ ] Blame
 - [ ] Bisect
 - [ ] Conflict solver

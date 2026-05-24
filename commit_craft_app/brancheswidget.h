@@ -25,6 +25,9 @@ public:
     /// Обновить все данные дерева
     void refresh();
 
+    /// Очистить дерево веток
+    void clear();
+
 signals:
     /// Сигнал о том, что ветка была изменена (checkout)
     void branchChanged(const QString &branchName);

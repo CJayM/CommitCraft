@@ -33,6 +33,7 @@ SOURCES += \
     $$PWD/../commit_craft_app/diffhighlighter.cpp \
     $$PWD/../commit_craft_app/diffpanel.cpp \
     $$PWD/../commit_craft_app/diffeditor.cpp \
+    $$PWD/../commit_craft_app/hunkactionpanel.cpp \
     $$PWD/../commit_craft_app/codeeditor.cpp \
     $$PWD/../commit_craft_app/syntaxhighlighter.cpp
 
@@ -41,6 +42,7 @@ HEADERS += \
     $$PWD/../commit_craft_app/diffhighlighter.h \
     $$PWD/../commit_craft_app/diffpanel.h \
     $$PWD/../commit_craft_app/diffeditor.h \
+    $$PWD/../commit_craft_app/hunkactionpanel.h \
     $$PWD/../commit_craft_app/codeeditor.h \
     $$PWD/../commit_craft_app/linenumberarea.h \
     $$PWD/../commit_craft_app/syntaxhighlighter.h

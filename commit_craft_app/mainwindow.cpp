@@ -32,6 +32,7 @@
 #include <git.h>
 #include <gitparser.h>
 #include <submodulemodel.h>
+#include "repositorydelegate.h"
 #include "settingsdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -70,6 +71,48 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Setup file system watcher for auto-refresh
     setupFileSystemWatcher();
+
+    // Load recent repositories from settings
+    m_recentRepositories = settings->value("recentRepositories").toStringList();
+    updateRecentRepositoriesMenu();
+
+    // Initialize repository list panel
+    m_repositoryModel = new QStandardItemModel(this);
+    m_repositoryFilterModel = new QSortFilterProxyModel(this);
+    m_repositoryFilterModel->setSourceModel(m_repositoryModel);
+    m_repositoryFilterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    m_repositoryDelegate = new RepositoryDelegate(this);
+    m_repositoryDelegate->setActivePath(repositoryPath);
+    ui->repositoryList->setModel(m_repositoryFilterModel);
+    ui->repositoryList->setItemDelegate(m_repositoryDelegate);
+    ui->repositoryList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    updateRepositoryList();
+
+    // Highlight current repo in list
+    {
+        for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
+            QModelIndex idx = m_repositoryModel->index(i, 0);
+            if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
+                QModelIndex proxyIdx = m_repositoryFilterModel->mapFromSource(idx);
+                ui->repositoryList->setCurrentIndex(proxyIdx);
+                break;
+            }
+        }
+    }
+
+    // Connect repository filter
+    connect(ui->repositoryFilterEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
+        m_repositoryFilterModel->setFilterFixedString(text);
+    });
+
+    // Connect repository list double-click
+    connect(ui->repositoryList, &QListView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (index.isValid()) {
+            QString path = index.data(Qt::DisplayRole).toString();
+            if (!path.isEmpty())
+                openRepositoryPath(path);
+        }
+    });
 
     // DiffEditor создан через promoted widget в mainwindow.ui
     // Получаем ссылатель на него
@@ -128,6 +171,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect partial staging signals
     connect(diffEditor, &DiffEditor::stageSelectedPatch, this, &MainWindow::onStageSelectedPatch);
     connect(diffEditor, &DiffEditor::revertSelectedPatch, this, &MainWindow::onRevertSelectedPatch);
+    connect(diffEditor, &DiffEditor::stageNewFileRequested, this, [this](const QString &fileName) {
+        git->addFile(fileName);
+        refreshGitStatus();
+    });
     
     // Connect create branch action
     connect(ui->actionCreateBranch, &QAction::triggered, this, &MainWindow::onCreateBranch);
@@ -192,6 +239,13 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
+    // Commit operation handlers
+    connect(git, &Git::checkoutCommitReady, this, &MainWindow::onCheckoutCommitReady);
+    connect(git, &Git::revertCommitReady, this, &MainWindow::onRevertCommitReady);
+    connect(git, &Git::cherryPickReady, this, &MainWindow::onCherryPickReady);
+    connect(git, &Git::rebaseReady, this, &MainWindow::onRebaseReady);
+    connect(git, &Git::mergeReady, this, &MainWindow::onMergeReady);
+
     // Подключаем сигнал создания stash для обновления интерфейса
     connect(git, &Git::stashCreated, this, [this](bool success, const QString &message) {
         if (success) {
@@ -202,7 +256,27 @@ MainWindow::MainWindow(QWidget *parent)
             QMessageBox::warning(this, tr("Ошибка Git"), message);
         }
     });
-    
+
+    // Branch delete/rename, stash apply/drop, fetch/prune → тоже обновляем историю
+    connect(git, &Git::branchDeleted, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::branchRenamed, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::stashApplied, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::stashDropped, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::fetchReady, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+    connect(git, &Git::pruneReady, this, [this](bool success, const QString &) {
+        if (success) { ui->branchesWidget->refresh(); refreshGitStatus(); }
+    });
+
     // Если репозиторий загружен из настроек, обновляем панель веток
     if (!repositoryPath.isEmpty() && isGitRepository(repositoryPath)) {
         ui->branchesWidget->refresh();
@@ -211,11 +285,14 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    connect(ui->actionEditGitignore, &QAction::triggered, this, &MainWindow::editGitignore);
     connect(ui->actionCommit, &QAction::triggered, this, &MainWindow::commitChanges);
     connect(ui->actionRefresh, &QAction::triggered, this, &MainWindow::refreshGitStatus);
     
     // Connect panel toggle actions
     connect(ui->actionToggleLeftPanel, &QAction::toggled, this, &MainWindow::toggleLeftPanel);
+    connect(ui->actionToggleRepositoryPanel, &QAction::toggled, this, &MainWindow::toggleRepositoryPanel);
+    connect(ui->actionToggleBranchesPanel, &QAction::toggled, this, &MainWindow::toggleBranchesPanel);
     connect(ui->actionToggleFilesPanel, &QAction::toggled, this, &MainWindow::toggleFilesPanel);
     connect(ui->actionToggleTopPanel, &QAction::toggled, this, &MainWindow::toggleTopPanel);
     connect(ui->actionToggleRightPanel, &QAction::toggled, this, &MainWindow::toggleRightPanel);
@@ -230,10 +307,51 @@ MainWindow::MainWindow(QWidget *parent)
         m_pushPullSource = m_lastSelectionSource;
         git->pushRemote(); 
     });
-    connect(ui->actionPull, &QAction::triggered, this, [this]() { 
+    connect(ui->actionPull, &QAction::triggered, this, [this]() {
         // Store the current selection to restore after pull
         m_pushPullSource = m_lastSelectionSource;
-        git->pullRemote(); 
+        git->pullRemote();
+    });
+    connect(ui->actionFetch, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString remote = QInputDialog::getItem(this, tr("Fetch"),
+            tr("Remote:"), m_remoteList, 0, true, &ok);
+        if (ok && !remote.isEmpty())
+            git->fetchRemote(remote);
+    });
+    connect(ui->actionAddRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString name = QInputDialog::getText(this, tr("Add Remote"),
+            tr("Remote name:"), QLineEdit::Normal, "", &ok);
+        if (!ok || name.isEmpty()) return;
+        QString url = QInputDialog::getText(this, tr("Add Remote"),
+            tr("Remote URL:"), QLineEdit::Normal, "", &ok);
+        if (ok && !url.isEmpty())
+            git->addRemote(name, url);
+    });
+    connect(ui->actionRemoveRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString name = QInputDialog::getItem(this, tr("Remove Remote"),
+            tr("Remote:"), m_remoteList, 0, false, &ok);
+        if (ok && !name.isEmpty())
+            git->removeRemote(name);
+    });
+    connect(ui->actionRenameRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString oldName = QInputDialog::getItem(this, tr("Rename Remote"),
+            tr("Current name:"), m_remoteList, 0, false, &ok);
+        if (!ok || oldName.isEmpty()) return;
+        QString newName = QInputDialog::getText(this, tr("Rename Remote"),
+            tr("New name:"), QLineEdit::Normal, "", &ok);
+        if (ok && !newName.isEmpty())
+            git->renameRemote(oldName, newName);
+    });
+    connect(ui->actionPruneRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString remote = QInputDialog::getItem(this, tr("Prune Remote"),
+            tr("Remote:"), m_remoteList, 0, false, &ok);
+        if (ok && !remote.isEmpty())
+            git->pruneRemote(remote);
     });
     
     // Добавляем actions в окно чтобы работали глобальные hotkeys
@@ -290,6 +408,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::error, this, &MainWindow::onGitError);
     connect(git, &Git::pushReady, this, &MainWindow::onPushReady);
     connect(git, &Git::pullReady, this, &MainWindow::onPullReady);
+    connect(git, &Git::fetchReady, this, &MainWindow::onFetchReady);
+    connect(git, &Git::addRemoteReady, this, &MainWindow::onAddRemoteReady);
+    connect(git, &Git::removeRemoteReady, this, &MainWindow::onRemoveRemoteReady);
+    connect(git, &Git::renameRemoteReady, this, &MainWindow::onRenameRemoteReady);
+    connect(git, &Git::remotesReady, this, &MainWindow::onRemotesReady);
     
     // Connect submodule signals
     connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
@@ -303,6 +426,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     ui->stagedFilesTable->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->stagedFilesTable, &QTableView::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
+
+    ui->commitHistoryList->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->commitHistoryList, &QTreeView::customContextMenuRequested, this, &MainWindow::showCommitHistoryContextMenu);
     
     // Set initial state of commit action and button
     ui->actionCommit->setEnabled(false);
@@ -379,6 +505,75 @@ void MainWindow::openSettingsDialog()
     }
 }
 
+void MainWindow::editGitignore()
+{
+    if (repositoryPath.isEmpty())
+        return;
+
+    QString gitignorePath = QDir(repositoryPath).filePath(".gitignore");
+
+    // Create the file if it doesn't exist
+    if (!QFile::exists(gitignorePath)) {
+        QFile file(gitignorePath);
+        file.open(QIODevice::WriteOnly);
+        file.close();
+    }
+
+    QDesktopServices::openUrl(QUrl::fromLocalFile(gitignorePath));
+}
+
+void MainWindow::addRecentRepository(const QString &path)
+{
+    // Remove if already present (to move it to top)
+    m_recentRepositories.removeAll(path);
+
+    // Add to the beginning
+    m_recentRepositories.prepend(path);
+
+    // Save to QSettings (full list, no cap)
+    settings->setValue("recentRepositories", m_recentRepositories);
+
+    // Rebuild the menu (capped at 12) and the repository list panel
+    updateRecentRepositoriesMenu();
+    updateRepositoryList();
+}
+
+void MainWindow::updateRecentRepositoriesMenu()
+{
+    // Remove old recent repo submenu and separator
+    if (m_recentReposMenu) {
+        ui->menuFile->removeAction(m_recentReposMenu->menuAction());
+        delete m_recentReposMenu;
+        m_recentReposMenu = nullptr;
+    }
+
+    if (m_recentSeparator) {
+        ui->menuFile->removeAction(m_recentSeparator);
+        delete m_recentSeparator;
+        m_recentSeparator = nullptr;
+    }
+
+    if (m_recentRepositories.isEmpty())
+        return;
+
+    // Add separator
+    m_recentSeparator = ui->menuFile->addSeparator();
+
+    // Create submenu
+    m_recentReposMenu = new QMenu(tr("Открыть предыдущие"), this);
+    ui->menuFile->addAction(m_recentReposMenu->menuAction());
+
+    // Add recent repos (newest first, capped at 12)
+    int count = 0;
+    for (const QString &path : m_recentRepositories) {
+        if (++count > 12) break;
+        QAction *action = m_recentReposMenu->addAction(path);
+        connect(action, &QAction::triggered, this, [this, path]() {
+            openRepositoryPath(path);
+        });
+    }
+}
+
 void MainWindow::refreshGitStatus()
 {
     git->getStatus();
@@ -408,11 +603,15 @@ void MainWindow::onGitStatusFinished(const QString &output)
             QStringList subFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
             for (const QString &subFile : subFiles) {
                 QString fullFilePath = file + subFile;
-                qDebug() << "Adding untracked file from directory:" << fullFilePath;
                 unstagedFiles.append(qMakePair("?", fullFilePath));
             }
+            continue; // саму директорию не добавляем
         }
-        
+
+        // Пропускаем записи, которые являются директориями
+        if (file.endsWith("/"))
+            continue;
+
         if (indexedStatus != " " && indexedStatus != "?") {
             stagedFiles.append(qMakePair(indexedStatus, file));
         }
@@ -475,29 +674,62 @@ void MainWindow::openRepository()
                                                     repositoryPath,
                                                     QFileDialog::ShowDirsOnly
                                                     | QFileDialog::DontResolveSymlinks);
-    
+
     if (!dir.isEmpty()) {
-        // Check if the selected directory is a Git repository
-        if (isGitRepository(dir)) {
-            repositoryPath = dir;
-            // Save the repository path to settings
-            settings->setValue("repositoryPath", repositoryPath);
-            setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
-            
-            // Обновляем watcher для нового репозитория
-            m_fsWatcher->removePaths(m_fsWatcher->directories());
-            m_fsWatcher->addPath(repositoryPath);
+        openRepositoryPath(dir);
+    }
+}
 
-            refreshGitStatus();
+void MainWindow::openRepositoryPath(const QString &path)
+{
+    if (!isGitRepository(path)) {
+        QMessageBox::warning(this, tr("Ошибка"),
+                            tr("Выбранная директория не является Git репозиторием."));
+        return;
+    }
 
-            // Очищаем фильтр директорий
-            m_selectedDirectory.clear();
+    repositoryPath = path;
+    settings->setValue("repositoryPath", repositoryPath);
+    git->setRepositoryPath(repositoryPath);
+    setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
 
-            // Обновляем панель веток
-            ui->branchesWidget->refresh();
-        } else {
-            QMessageBox::warning(this, tr("Ошибка"), 
-                                tr("Выбранная директория не является Git репозиторием."));
+    // Очищаем все панели перед загрузкой нового репозитория
+    ui->filesTable->clearSelection();
+    ui->stagedFilesTable->clearSelection();
+    unstagedFilesModel->setFiles({});
+    stagedFilesModel->setFiles({});
+    commitHistoryModel->setCommits({});
+    m_dirTreeModel->clear();
+    diffEditor->clear();
+    m_lastSelectedFileName.clear();
+    ui->diffFileNameLabel->clear();
+    m_allUnstagedFiles.clear();
+    m_allStagedFiles.clear();
+    m_selectedDirectory.clear();
+
+    // Обновляем watcher для нового репозитория
+    m_fsWatcher->removePaths(m_fsWatcher->directories());
+    m_fsWatcher->addPath(repositoryPath);
+
+    // Очищаем и обновляем панель веток
+    ui->branchesWidget->clear();
+    ui->branchesWidget->refresh();
+
+    refreshGitStatus();
+
+    // Добавляем в список недавних
+    addRecentRepository(path);
+
+    // Выделить открытый репозиторий в списке
+    m_repositoryDelegate->setActivePath(repositoryPath);
+    ui->repositoryList->viewport()->update();
+    for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
+        QModelIndex srcIdx = m_repositoryModel->index(i, 0);
+        if (srcIdx.data(Qt::DisplayRole).toString() == repositoryPath) {
+            QModelIndex proxyIdx = m_repositoryFilterModel->mapFromSource(srcIdx);
+            ui->repositoryList->setCurrentIndex(proxyIdx);
+            ui->repositoryList->scrollTo(proxyIdx, QAbstractItemView::EnsureVisible);
+            break;
         }
     }
 }
@@ -728,6 +960,77 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
     contextMenu.exec(ui->stagedFilesTable->viewport()->mapToGlobal(pos));
 }
 
+void MainWindow::showCommitHistoryContextMenu(const QPoint &pos)
+{
+    QModelIndex index = ui->commitHistoryList->indexAt(pos);
+    if (!index.isValid()) return;
+
+    QString commitHash = commitHistoryModel->getCommitHash(index.row());
+    if (commitHash.isEmpty()) return;
+
+    QMenu contextMenu(this);
+
+    // Checkout
+    QAction *checkoutAction = contextMenu.addAction(tr("Checkout"));
+    connect(checkoutAction, &QAction::triggered, this, [this, commitHash]() {
+        git->checkoutCommit(commitHash);
+    });
+
+    // Revert
+    QAction *revertAction = contextMenu.addAction(tr("Revert"));
+    connect(revertAction, &QAction::triggered, this, [this, commitHash]() {
+        git->revertCommit(commitHash);
+    });
+
+    // Cherry pick
+    QAction *cherryPickAction = contextMenu.addAction(tr("Cherry pick"));
+    connect(cherryPickAction, &QAction::triggered, this, [this, commitHash]() {
+        git->cherryPick(commitHash);
+    });
+
+    // Rebase
+    QAction *rebaseAction = contextMenu.addAction(tr("Rebase"));
+    connect(rebaseAction, &QAction::triggered, this, [this, commitHash]() {
+        git->rebaseOnto(commitHash);
+    });
+
+    contextMenu.addSeparator();
+
+    // Merge Commit (--no-ff)
+    QAction *mergeAction = contextMenu.addAction(tr("Merge Commit"));
+    connect(mergeAction, &QAction::triggered, this, [this, commitHash]() {
+        git->mergeCommit(commitHash, true);
+    });
+
+    // Fast Forward
+    QAction *ffAction = contextMenu.addAction(tr("Fast Forward"));
+    connect(ffAction, &QAction::triggered, this, [this, commitHash]() {
+        git->mergeCommit(commitHash, false);
+    });
+
+    contextMenu.addSeparator();
+
+    // Create Branch from this commit
+    QAction *createBranchAction = contextMenu.addAction(tr("Create Branch"));
+    connect(createBranchAction, &QAction::triggered, this, [this, commitHash]() {
+        bool ok;
+        QString branchName = QInputDialog::getText(this, tr("Create Branch"),
+            tr("Branch name:"), QLineEdit::Normal, "", &ok);
+        if (ok && !branchName.isEmpty())
+            git->createBranch(branchName, commitHash);
+    });
+
+    contextMenu.addSeparator();
+
+    // Copy commit_id
+    QAction *copyAction = contextMenu.addAction(tr("Copy \"commit_id\""));
+    connect(copyAction, &QAction::triggered, this, [commitHash]() {
+        QGuiApplication::clipboard()->setText(commitHash);
+    });
+
+    contextMenu.exec(ui->commitHistoryList->viewport()->mapToGlobal(pos));
+}
+
 void MainWindow::unstageSelectedFiles(const QStringList &files)
 {
     if (files.isEmpty()) return;
@@ -827,12 +1130,27 @@ void MainWindow::updateDiffPanel(const QString &fileName)
     QString leftVersion, rightVersion;
 
     if (m_lastSelectionSource == SelectionSource::Staged) {
+        diffEditor->setDiffMode(HunkActionPanel::StagedDiff);
+
         leftContent = getFileContent(fileName, false);   // HEAD
         rightContent = getFileContent(fileName, true);   // staged
         leftVersion = "HEAD";
         rightVersion = "Staged";
         git->getDiffStaged(fileName);
     } else {
+        diffEditor->setDiffMode(HunkActionPanel::UnstagedDiff);
+
+        // Проверить, является ли файл новым (untracked) — статус "?"
+        bool isUntracked = false;
+        for (int i = 0; i < unstagedFilesModel->rowCount(); ++i) {
+            if (unstagedFilesModel->getFileName(i) == fileName
+                && unstagedFilesModel->getFileStatus(i) == "?") {
+                isUntracked = true;
+                break;
+            }
+        }
+        diffEditor->setFileIsNew(isUntracked);
+
         bool isStaged = false;
         for (int i = 0; i < stagedFilesModel->rowCount(); ++i) {
             if (stagedFilesModel->getFileName(i) == fileName) {
@@ -941,21 +1259,69 @@ void MainWindow::navigateToNextHunk()
     if (diffEditor->navigateToNextHunk())
         return;
 
-    // 2. Если конец файла достигнут, переключаемся на следующий файл в списке unstaged
+    // 2. Если конец файла достигнут, переключаемся на следующий файл
+    selectNextFile();
+}
+
+void MainWindow::navigateToPrevHunk()
+{
+    // 1. Пробуем перейти к предыдущему ханку в текущем файле
+    if (diffEditor->navigateToPrevHunk())
+        return;
+
+    // 2. Если начало файла достигнуто, переключаемся на предыдущий файл
+    selectPrevFile();
+}
+
+void MainWindow::selectNextFile()
+{
     if (m_lastSelectionSource == SelectionSource::Unstaged) {
-        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
-        QModelIndex next = current.sibling(current.row() + 1, 0);
+        QModelIndexList sel = ui->filesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex next = sel.first().sibling(row + 1, 0);
         if (next.isValid()) {
-            // Устанавливаем флаг отложенной навигации
             m_pendingNavigation = PendingNavigation::GoNext;
-            
-            // Выбираем следующий файл (это вызовет асинхронную загрузку diff)
-            ui->filesTable->selectionModel()->select(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->selectionModel()->setCurrentIndex(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
             ui->filesTable->scrollTo(next);
         }
+    } else if (m_lastSelectionSource == SelectionSource::Staged) {
+        QModelIndexList sel = ui->stagedFilesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex next = sel.first().sibling(row + 1, 0);
+        if (next.isValid()) {
+            m_pendingNavigation = PendingNavigation::GoNext;
+            ui->stagedFilesTable->selectionModel()->setCurrentIndex(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->stagedFilesTable->scrollTo(next);
+        }
     }
-    
-    // Обновляем состояние кнопок
+    updateNavigationButtonsState();
+}
+
+void MainWindow::selectPrevFile()
+{
+    if (m_lastSelectionSource == SelectionSource::Unstaged) {
+        QModelIndexList sel = ui->filesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex prev = sel.first().sibling(row - 1, 0);
+        if (prev.isValid()) {
+            m_pendingNavigation = PendingNavigation::GoPrev;
+            ui->filesTable->selectionModel()->setCurrentIndex(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->filesTable->scrollTo(prev);
+        }
+    } else if (m_lastSelectionSource == SelectionSource::Staged) {
+        QModelIndexList sel = ui->stagedFilesTable->selectionModel()->selectedRows();
+        if (sel.isEmpty()) return;
+        int row = sel.first().row();
+        QModelIndex prev = sel.first().sibling(row - 1, 0);
+        if (prev.isValid()) {
+            m_pendingNavigation = PendingNavigation::GoPrev;
+            ui->stagedFilesTable->selectionModel()->setCurrentIndex(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            ui->stagedFilesTable->scrollTo(prev);
+        }
+    }
     updateNavigationButtonsState();
 }
 
@@ -964,9 +1330,19 @@ void MainWindow::toggleLeftPanel(bool visible)
     ui->leftFrame->setVisible(visible);
 }
 
+void MainWindow::toggleRepositoryPanel(bool visible)
+{
+    ui->repositoryFrame->setVisible(visible);
+}
+
+void MainWindow::toggleBranchesPanel(bool visible)
+{
+    ui->branchesWidget->setVisible(visible);
+}
+
 void MainWindow::toggleFilesPanel(bool visible)
 {
-    ui->fileDirectoriesFrame->setVisible(visible);
+    ui->widget_2->setVisible(visible);
 }
 
 void MainWindow::toggleTopPanel(bool visible)
@@ -1004,30 +1380,6 @@ void MainWindow::onAmendCheckBoxChanged(int state)
             }
         }
     }
-}
-
-void MainWindow::navigateToPrevHunk()
-{
-    // 1. Пробуем перейти к предыдущему ханку в текущем файле
-    if (diffEditor->navigateToPrevHunk())
-        return;
-
-    // 2. Если начало файла достигнуто, переключаемся на предыдущий файл в списке unstaged
-    if (m_lastSelectionSource == SelectionSource::Unstaged) {
-        QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
-        QModelIndex prev = current.sibling(current.row() - 1, 0);
-        if (prev.isValid()) {
-            // Устанавливаем флаг отложенной навигации
-            m_pendingNavigation = PendingNavigation::GoPrev;
-            
-            // Выбираем предыдущий файл (это вызовет асинхронную загрузку diff)
-            ui->filesTable->selectionModel()->select(prev, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
-            ui->filesTable->scrollTo(prev);
-        }
-    }
-    
-    // Обновляем состояние кнопок
-    updateNavigationButtonsState();
 }
 
 void MainWindow::saveFontSettings(const QString &fontFamily, int fontSize)
@@ -1202,9 +1554,16 @@ void MainWindow::updateNavigationButtonsState()
     bool hasNext = false;
     bool hasPrev = false;
 
-    // Получаем информацию о текущем файле
-    QModelIndex current = ui->filesTable->selectionModel()->currentIndex();
-    int totalFiles = ui->filesTable->model()->rowCount();
+    QModelIndex current;
+    int totalFiles = 0;
+
+    if (m_lastSelectionSource == SelectionSource::Staged) {
+        current = ui->stagedFilesTable->selectionModel()->currentIndex();
+        totalFiles = ui->stagedFilesTable->model()->rowCount();
+    } else {
+        current = ui->filesTable->selectionModel()->currentIndex();
+        totalFiles = ui->filesTable->model()->rowCount();
+    }
 
     if (totalFiles > 0 && current.isValid()) {
         bool isFirstFile = (current.row() == 0);
@@ -1216,13 +1575,9 @@ void MainWindow::updateNavigationButtonsState()
         bool atHunkEnd = diffEditor->isAtLastHunk();
 
         // Логика для кнопки Next:
-        // Можно идти дальше, если мы не в конце списка ханков текущего файла
-        // ИЛИ если мы в конце ханков, но есть еще файлы в списке
         hasNext = (!atHunkEnd && !isHunkEmpty) || !isLastFile;
 
         // Логика для кнопки Prev:
-        // Можно идти назад, если мы не в начале списка ханков
-        // ИЛИ если мы в начале ханков, но есть предыдущие файлы
         hasPrev = (!atHunkStart && !isHunkEmpty) || !isFirstFile;
     }
 
@@ -1530,5 +1885,114 @@ void MainWindow::onPullReady(bool success, const QString &message)
         refreshGitStatus();
     } else {
         QMessageBox::warning(this, tr("Pull Failed"), message);
+    }
+}
+
+void MainWindow::onFetchReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Fetch Successful"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Fetch Failed"), message);
+    }
+}
+
+void MainWindow::onAddRemoteReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Remote Added"), message);
+        ui->branchesWidget->refresh();
+    } else {
+        QMessageBox::warning(this, tr("Failed to Add Remote"), message);
+    }
+}
+
+void MainWindow::onRemoveRemoteReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Remote Removed"), message);
+        ui->branchesWidget->refresh();
+    } else {
+        QMessageBox::warning(this, tr("Failed to Remove Remote"), message);
+    }
+}
+
+void MainWindow::onRenameRemoteReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Remote Renamed"), message);
+        ui->branchesWidget->refresh();
+    } else {
+        QMessageBox::warning(this, tr("Failed to Rename Remote"), message);
+    }
+}
+
+void MainWindow::onRemotesReady(const QList<QString> &remotes)
+{
+    m_remoteList = remotes;
+}
+
+void MainWindow::updateRepositoryList()
+{
+    m_repositoryModel->clear();
+    QStringList sorted = m_recentRepositories;
+    sorted.sort(Qt::CaseInsensitive);
+    for (const QString &path : sorted) {
+        QStandardItem *item = new QStandardItem(path);
+        m_repositoryModel->appendRow(item);
+    }
+}
+
+void MainWindow::onCheckoutCommitReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Checkout"), message);
+        ui->branchesWidget->refresh();
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Checkout Failed"), message);
+    }
+}
+
+void MainWindow::onRevertCommitReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Revert"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Revert Failed"), message);
+    }
+}
+
+void MainWindow::onCherryPickReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Cherry Pick"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Cherry Pick Failed"), message);
+    }
+}
+
+void MainWindow::onRebaseReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Rebase"), message);
+        ui->branchesWidget->refresh();
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Rebase Failed"), message);
+    }
+}
+
+void MainWindow::onMergeReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Merge"), message);
+        ui->branchesWidget->refresh();
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Merge Failed"), message);
     }
 }

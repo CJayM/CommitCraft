@@ -3,6 +3,7 @@
 
 #include "diffpanel.h"
 #include "diffhighlighter.h"
+#include "hunkactionpanel.h"
 
 #include <gitparser.h>
 
@@ -60,6 +61,9 @@ public:
     /// Применить diff-данные и перестроить side-by-side view
     void applyDiffData(const QList<Hunk> &hunks);
 
+    /// Установить режим diff (staged/unstaged) для HunkActionPanel
+    void setDiffMode(HunkActionPanel::DiffMode mode);
+
     /// Применить настройки шрифта к обеим панелям
     void applyFontSettings(const QString &fontFamily, int fontSize);
 
@@ -72,10 +76,15 @@ public:
     /// Обновить настройки расширений из QSettings
     void updateFileTypeSettings();
 
+    /// Установить флаг «файл новый (untracked)» — показать кнопку Stage для всего файла
+    void setFileIsNew(bool isNew);
+
 signals:
     void hunkNavigated(int hunkIndex);
     void stageSelectedPatch(const QString &fileName, const QString &patch);
     void revertSelectedPatch(const QString &fileName, const QString &patch);
+    /// Запрос на добавление нового (untracked) файла целиком
+    void stageNewFileRequested(const QString &fileName);
 
 public slots:
     /// Навигация к следующему ханку. Возвращает false если достигнут конец списка.
@@ -96,6 +105,7 @@ public slots:
 
 protected:
     void contextMenuEvent(QContextMenuEvent *event);
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
     void synchronizeScrollLeftToRight(int value);
@@ -103,6 +113,8 @@ private slots:
     void synchronizeZoom(int zoom);
     void onStageSelectedClicked();
     void onRevertSelectedClicked();
+    void onStageHunkClicked(int hunkIndex);
+    void onRevertHunkClicked(int hunkIndex);
 
 private:
     QStringList getSelectedLines() const;
@@ -128,7 +140,13 @@ private:
     /// Проверить тип файла и вернуть true если это графический файл
     bool checkFileType(const QString &fileName);
 
+    /// Обновить видимость кнопок partial staging
+    void updateButtonsVisibility();
+    /// Перепозиционировать HunkActionPanel относительно splitter'а
+    void repositionActionPanel();
+
     Ui::DiffEditor *ui;
+    HunkActionPanel *m_hunkActionPanel;
     bool m_isImageFile;         // Флаг графического файла
     QStringList m_imageExtensions;  // Расширения графических файлов
     QStringList m_syntaxExtensions; // Расширения для подсветки синтаксиса
@@ -145,6 +163,7 @@ private:
     QString m_leftFullContent;
     QString m_rightFullContent;
     QString m_fileName;
+    bool m_fileIsNew = false;  // true если файл untracked (новый)
 };
 
 #endif // DIFFEDITOR_H
