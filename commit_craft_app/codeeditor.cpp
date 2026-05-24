@@ -152,13 +152,13 @@ void CodeEditor::zoomOut(int range)
 void CodeEditor::setZoom(int zoom)
 {
     int oldZoom = m_zoom;
-    m_zoom = qBound(10, zoom, 150); // Limit zoom between 10% and 300%
+    m_zoom = qBound(10, zoom, 150); // Limit zoom between 10% and 150%
 
     // Only update if zoom actually changed
     if (m_zoom != oldZoom) {
         // Calculate the font size based on zoom level
         QFont f = font();
-        f.setPointSizeF(14.0 * m_zoom / 100.0);
+        f.setPointSizeF(qMax(1.0, 14.0 * m_zoom / 100.0));
         setFont(f);
 
         // Update line number area

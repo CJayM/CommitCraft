@@ -117,7 +117,16 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
 
     QFont normFont = painter->font();
     QFont smallFont = normFont;
-    smallFont.setPointSize(normFont.pointSize() - 1);
+    {
+        int ps = normFont.pointSize();
+        if (ps <= 1) {
+            // Font was set via pixel size (stylesheet)
+            int px = qMax(1, normFont.pixelSize() - 1);
+            smallFont.setPixelSize(px);
+        } else {
+            smallFont.setPointSize(qMax(1, ps - 1));
+        }
+    }
     QFont boldFont = normFont;
     boldFont.setBold(true);
 
