@@ -22,6 +22,7 @@ Git::Git(QObject *parent)
     , m_tagsProcess(new QProcess(this))
     , m_stashesProcess(new QProcess(this))
     , m_checkoutProcess(new QProcess(this))
+    , m_commitOpProcess(new QProcess(this))
     , m_branchModifyProcess(new QProcess(this))
     , m_remoteProcess(new QProcess(this))
     , m_stashProcess(new QProcess(this))
@@ -91,6 +92,10 @@ Git::Git(QObject *parent)
     connect(m_checkoutProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCheckoutFinished);
     connect(m_checkoutProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    connect(m_commitOpProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCommitOpFinished);
+    connect(m_commitOpProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 
     connect(m_branchModifyProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onCreateBranchFinished); // Универсальный слот для всех операций модификации
@@ -768,6 +773,84 @@ void Git::onCheckoutFinished(int exitCode, QProcess::ExitStatus exitStatus)
     }
 }
 
+void Git::checkoutCommit(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "checkout" << hash;
+
+    m_commitOpProcess->setProperty("operation", "checkoutCommit");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::revertCommit(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "revert" << "--no-edit" << hash;
+
+    m_commitOpProcess->setProperty("operation", "revert");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::cherryPick(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "cherry-pick" << hash;
+
+    m_commitOpProcess->setProperty("operation", "cherryPick");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::rebaseOnto(const QString &hash)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "rebase" << hash;
+
+    m_commitOpProcess->setProperty("operation", "rebase");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
+void Git::mergeCommit(const QString &hash, bool noFf)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "merge";
+    if (noFf)
+        args << "--no-ff";
+    args << hash;
+
+    m_commitOpProcess->setProperty("operation", "merge");
+    m_commitOpProcess->setProperty("hash", hash);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
 void Git::createBranch(const QString &name, const QString &fromRef)
 {
     if (m_repositoryPath.isEmpty()) {
@@ -850,6 +933,50 @@ void Git::onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     onCreateBranchFinished(exitCode, exitStatus); // Перенаправляем, так как логика одинаковая
+}
+
+void Git::onCommitOpFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    QString operation = m_commitOpProcess->property("operation").toString();
+    QString hash = m_commitOpProcess->property("hash").toString();
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        QString msg;
+        if (operation == "checkoutCommit")
+            msg = QString("Checked out commit %1").arg(hash.left(7));
+        else if (operation == "revert")
+            msg = QString("Reverted commit %1").arg(hash.left(7));
+        else if (operation == "cherryPick")
+            msg = QString("Cherry-picked commit %1").arg(hash.left(7));
+        else if (operation == "rebase")
+            msg = QString("Rebase onto %1 successful").arg(hash.left(7));
+        else if (operation == "merge")
+            msg = QString("Merged commit %1").arg(hash.left(7));
+
+        if (operation == "checkoutCommit")
+            emit checkoutCommitReady(true, msg);
+        else if (operation == "revert")
+            emit revertCommitReady(true, msg);
+        else if (operation == "cherryPick")
+            emit cherryPickReady(true, msg);
+        else if (operation == "rebase")
+            emit rebaseReady(true, msg);
+        else if (operation == "merge")
+            emit mergeReady(true, msg);
+    } else {
+        QString errorMsg = m_commitOpProcess->readAllStandardError().trimmed();
+        if (operation == "checkoutCommit")
+            emit checkoutCommitReady(false, QString("Checkout failed: %1").arg(errorMsg));
+        else if (operation == "revert")
+            emit revertCommitReady(false, QString("Revert failed: %1").arg(errorMsg));
+        else if (operation == "cherryPick")
+            emit cherryPickReady(false, QString("Cherry-pick failed: %1").arg(errorMsg));
+        else if (operation == "rebase")
+            emit rebaseReady(false, QString("Rebase failed: %1").arg(errorMsg));
+        else if (operation == "merge")
+            emit mergeReady(false, QString("Merge failed: %1").arg(errorMsg));
+        emit error(errorMsg);
+    }
 }
 
 // ==========================================
