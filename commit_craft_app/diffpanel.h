@@ -58,6 +58,16 @@ signals:
     /// Сигнал перемещения курсора с номером строки (для синхронизации)
     void panelCursorMoved(int blockNumber);
 
+    /// Запрос на добавление в Stage выделенных строк
+    void stageSelectedRequested();
+
+    /// Запрос на отмену (revert) выделенных строк
+    void revertSelectedRequested();
+
+protected:
+    /// Контекстное меню с опциями partial staging
+    void contextMenuEvent(QContextMenuEvent *event) override;
+
 private:
     /// Применить diff-подсветку через ExtraSelections (фон ПОД текстом)
     void applyDiffHighlighting();

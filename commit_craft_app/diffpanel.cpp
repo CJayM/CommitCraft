@@ -4,6 +4,9 @@
 #include <QScrollBar>
 #include <QSignalBlocker>
 #include <QPainter>
+#include <QMenu>
+#include <QAction>
+#include <QContextMenuEvent>
 
 DiffPanel::DiffPanel(QWidget *parent)
     : CodeEditor(parent)
@@ -292,4 +295,30 @@ void DiffPanel::paintEvent(QPaintEvent *event)
         block = block.next();
         blockNumber++;
     }
+}
+
+void DiffPanel::contextMenuEvent(QContextMenuEvent *event)
+{
+    // Показываем меню только если есть diff-изменения
+    bool hasChanges = false;
+    for (auto it = m_lineDiffMap.constBegin(); it != m_lineDiffMap.constEnd(); ++it) {
+        if (it->type != DiffType::Unchanged) {
+            hasChanges = true;
+            break;
+        }
+    }
+    if (!hasChanges) {
+        QPlainTextEdit::contextMenuEvent(event);
+        return;
+    }
+
+    QMenu menu(this);
+
+    QAction *stageAction = menu.addAction(tr("Stage Selected Lines"));
+    QAction *revertAction = menu.addAction(tr("Revert Selected Lines"));
+
+    connect(stageAction, &QAction::triggered, this, &DiffPanel::stageSelectedRequested);
+    connect(revertAction, &QAction::triggered, this, &DiffPanel::revertSelectedRequested);
+
+    menu.exec(event->globalPos());
 }

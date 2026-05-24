@@ -51,6 +51,12 @@ DiffEditor::DiffEditor(QWidget *parent)
     // Connect partial staging buttons
     connect(ui->stageSelectedButton, &QPushButton::clicked, this, &DiffEditor::onStageSelectedClicked);
     connect(ui->revertSelectedButton, &QPushButton::clicked, this, &DiffEditor::onRevertSelectedClicked);
+
+    // Connect context menu signals from panels
+    connect(ui->leftPanel, &DiffPanel::stageSelectedRequested, this, &DiffEditor::onStageSelectedClicked);
+    connect(ui->rightPanel, &DiffPanel::stageSelectedRequested, this, &DiffEditor::onStageSelectedClicked);
+    connect(ui->leftPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
+    connect(ui->rightPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
 }
 
 DiffEditor::~DiffEditor()
@@ -138,6 +144,8 @@ void DiffEditor::setContents(const QString &leftContent,
 
     // Применить подсветку синтаксиса
     applySyntaxHighlighting(fileName);
+
+    updateButtonsVisibility();
 }
 
 void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
@@ -146,6 +154,7 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         ui->leftPanel->clearDiffData();
         ui->rightPanel->clearDiffData();
         m_currentHunks.clear();
+        updateButtonsVisibility();
         return;
     }
 
@@ -232,6 +241,8 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     ui->rightPanel->setDiffData(rightDiffMap);
     ui->leftPanel->setPlaceholderLines(leftPlaceholders);
     ui->rightPanel->setPlaceholderLines(rightPlaceholders);
+
+    updateButtonsVisibility();
 }
 
 void DiffEditor::applyFontSettings(const QString &fontFamily, int fontSize)
@@ -483,6 +494,8 @@ void DiffEditor::clear()
     // Показать текстовый diff
     ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
     m_isImageFile = false;
+
+    updateButtonsVisibility();
 }
 
 bool DiffEditor::navigateToNextHunk()
@@ -602,9 +615,16 @@ bool DiffEditor::checkFileType(const QString &fileName)
 {
     QFileInfo fi(fileName);
     QString ext = fi.suffix().toLower();
-    
+
     m_isImageFile = m_imageExtensions.contains(ext);
     return m_isImageFile;
+}
+
+void DiffEditor::updateButtonsVisibility()
+{
+    bool visible = !m_isImageFile && !m_currentHunks.isEmpty();
+    ui->stageSelectedButton->setVisible(visible);
+    ui->revertSelectedButton->setVisible(visible);
 }
 
 QStringList DiffEditor::getSelectedLines() const

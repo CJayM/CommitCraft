@@ -128,6 +128,9 @@ private:
     /// Проверить тип файла и вернуть true если это графический файл
     bool checkFileType(const QString &fileName);
 
+    /// Обновить видимость кнопок partial staging
+    void updateButtonsVisibility();
+
     Ui::DiffEditor *ui;
     bool m_isImageFile;         // Флаг графического файла
     QStringList m_imageExtensions;  // Расширения графических файлов
