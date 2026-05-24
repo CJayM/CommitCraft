@@ -239,6 +239,13 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
+    // Commit operation handlers
+    connect(git, &Git::checkoutCommitReady, this, &MainWindow::onCheckoutCommitReady);
+    connect(git, &Git::revertCommitReady, this, &MainWindow::onRevertCommitReady);
+    connect(git, &Git::cherryPickReady, this, &MainWindow::onCherryPickReady);
+    connect(git, &Git::rebaseReady, this, &MainWindow::onRebaseReady);
+    connect(git, &Git::mergeReady, this, &MainWindow::onMergeReady);
+
     // Подключаем сигнал создания stash для обновления интерфейса
     connect(git, &Git::stashCreated, this, [this](bool success, const QString &message) {
         if (success) {
@@ -419,6 +426,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     ui->stagedFilesTable->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->stagedFilesTable, &QTableView::customContextMenuRequested, this, &MainWindow::showStagedFileContextMenu);
+
+    ui->commitHistoryList->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->commitHistoryList, &QTreeView::customContextMenuRequested, this, &MainWindow::showCommitHistoryContextMenu);
     
     // Set initial state of commit action and button
     ui->actionCommit->setEnabled(false);
@@ -948,6 +958,77 @@ void MainWindow::showStagedFileContextMenu(const QPoint &pos)
     }
 
     contextMenu.exec(ui->stagedFilesTable->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::showCommitHistoryContextMenu(const QPoint &pos)
+{
+    QModelIndex index = ui->commitHistoryList->indexAt(pos);
+    if (!index.isValid()) return;
+
+    QString commitHash = commitHistoryModel->getCommitHash(index.row());
+    if (commitHash.isEmpty()) return;
+
+    QMenu contextMenu(this);
+
+    // Checkout
+    QAction *checkoutAction = contextMenu.addAction(tr("Checkout"));
+    connect(checkoutAction, &QAction::triggered, this, [this, commitHash]() {
+        git->checkoutCommit(commitHash);
+    });
+
+    // Revert
+    QAction *revertAction = contextMenu.addAction(tr("Revert"));
+    connect(revertAction, &QAction::triggered, this, [this, commitHash]() {
+        git->revertCommit(commitHash);
+    });
+
+    // Cherry pick
+    QAction *cherryPickAction = contextMenu.addAction(tr("Cherry pick"));
+    connect(cherryPickAction, &QAction::triggered, this, [this, commitHash]() {
+        git->cherryPick(commitHash);
+    });
+
+    // Rebase
+    QAction *rebaseAction = contextMenu.addAction(tr("Rebase"));
+    connect(rebaseAction, &QAction::triggered, this, [this, commitHash]() {
+        git->rebaseOnto(commitHash);
+    });
+
+    contextMenu.addSeparator();
+
+    // Merge Commit (--no-ff)
+    QAction *mergeAction = contextMenu.addAction(tr("Merge Commit"));
+    connect(mergeAction, &QAction::triggered, this, [this, commitHash]() {
+        git->mergeCommit(commitHash, true);
+    });
+
+    // Fast Forward
+    QAction *ffAction = contextMenu.addAction(tr("Fast Forward"));
+    connect(ffAction, &QAction::triggered, this, [this, commitHash]() {
+        git->mergeCommit(commitHash, false);
+    });
+
+    contextMenu.addSeparator();
+
+    // Create Branch from this commit
+    QAction *createBranchAction = contextMenu.addAction(tr("Create Branch"));
+    connect(createBranchAction, &QAction::triggered, this, [this, commitHash]() {
+        bool ok;
+        QString branchName = QInputDialog::getText(this, tr("Create Branch"),
+            tr("Branch name:"), QLineEdit::Normal, "", &ok);
+        if (ok && !branchName.isEmpty())
+            git->createBranch(branchName, commitHash);
+    });
+
+    contextMenu.addSeparator();
+
+    // Copy commit_id
+    QAction *copyAction = contextMenu.addAction(tr("Copy \"commit_id\""));
+    connect(copyAction, &QAction::triggered, this, [commitHash]() {
+        QGuiApplication::clipboard()->setText(commitHash);
+    });
+
+    contextMenu.exec(ui->commitHistoryList->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::unstageSelectedFiles(const QStringList &files)
@@ -1860,5 +1941,58 @@ void MainWindow::updateRepositoryList()
     for (const QString &path : sorted) {
         QStandardItem *item = new QStandardItem(path);
         m_repositoryModel->appendRow(item);
+    }
+}
+
+void MainWindow::onCheckoutCommitReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Checkout"), message);
+        ui->branchesWidget->refresh();
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Checkout Failed"), message);
+    }
+}
+
+void MainWindow::onRevertCommitReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Revert"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Revert Failed"), message);
+    }
+}
+
+void MainWindow::onCherryPickReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Cherry Pick"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Cherry Pick Failed"), message);
+    }
+}
+
+void MainWindow::onRebaseReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Rebase"), message);
+        ui->branchesWidget->refresh();
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Rebase Failed"), message);
+    }
+}
+
+void MainWindow::onMergeReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Merge"), message);
+        ui->branchesWidget->refresh();
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Merge Failed"), message);
     }
 }

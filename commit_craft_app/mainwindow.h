@@ -66,6 +66,7 @@ private slots:
     void onGitError(const QString &error);
     void showFileContextMenu(const QPoint &pos);
     void showStagedFileContextMenu(const QPoint &pos);
+    void showCommitHistoryContextMenu(const QPoint &pos);
     void addSelectedFile();
     void unstageSelectedFile();
     void unstageSelectedFiles(const QStringList &files);
@@ -99,6 +100,11 @@ private slots:
     void onRemoveRemoteReady(bool success, const QString &message);
     void onRenameRemoteReady(bool success, const QString &message);
     void onRemotesReady(const QList<QString> &remotes);
+    void onCheckoutCommitReady(bool success, const QString &message);
+    void onRevertCommitReady(bool success, const QString &message);
+    void onCherryPickReady(bool success, const QString &message);
+    void onRebaseReady(bool success, const QString &message);
+    void onMergeReady(bool success, const QString &message);
 
     // Submodule slots
     void onSubmodulesReady(const QList<QStringList> &submodules);
