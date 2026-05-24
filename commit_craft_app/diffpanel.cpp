@@ -59,14 +59,14 @@ void DiffPanel::setLineNumbers(const QVector<int> &numbers)
 void DiffPanel::lineNumberAreaPaintEvent(QPaintEvent *event)
 {
     QPainter painter(lineNumberArea);
-    painter.fillRect(event->rect(), QColor(240, 240, 240));
+    painter.fillRect(event->rect(), QColor(245, 247, 250));
 
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
     int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
     int bottom = top + qRound(blockBoundingRect(block).height());
 
-    QColor textColor(140, 140, 140);
+    QColor textColor(148, 155, 164);
     painter.setPen(textColor);
 
     while (block.isValid() && top <= event->rect().bottom()) {
@@ -137,20 +137,20 @@ void DiffPanel::highlightCurrentLineNoEmit()
 {
     QList<QTextEdit::ExtraSelection> selections;
 
-    // Подсветка текущей строки (жёлтая)
+    // Подсветка текущей строки (голубоватая)
     QTextEdit::ExtraSelection selection;
-    QColor lineColor = QColor(Qt::yellow).lighter(160);
+    QColor lineColor(210, 230, 255, 80);
     selection.format.setBackground(lineColor);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
     selection.cursor = textCursor();
     selection.cursor.clearSelection();
     selections.append(selection);
 
-    // Цвета
-    const QColor removedColor(255, 200, 200);
-    const QColor addedColor(200, 255, 200);
-    const QColor modifiedColor(180, 200, 255);
-    const QColor placeholderColor(230, 230, 230); // серый для пустых строк
+    // Современные цвета diff (GitHub-style)
+    const QColor removedColor(255, 235, 233);      // #ffebe9
+    const QColor addedColor(218, 251, 225);         // #dafbe1
+    const QColor modifiedColor(213, 228, 255);      // Subtle blue
+    const QColor placeholderColor(246, 248, 250);   // #f6f8fa - светлый серый
 
     // Добавляем diff-подсветку и placeholder-подсветку
     QTextCursor cursor(document());
@@ -169,8 +169,8 @@ void DiffPanel::highlightCurrentLineNoEmit()
         }
         // Проверяем разделитель чанков
         else if (it != m_lineDiffMap.end() && it->type == DiffType::Separator) {
-            bgColor = QColor(240, 240, 240); // Светло-серый фон
-            fgColor = QColor(150, 150, 150); // Темно-серый текст для "..."
+            bgColor = QColor(246, 248, 250);      // #f6f8fa - светлый серый
+            fgColor = QColor(148, 155, 164);      // #949ba4 - серый текст
             setFg = true;
         }
         // Проверяем diff (красный/зелёный/синий)
@@ -212,10 +212,10 @@ void DiffPanel::applyDiffHighlighting()
     QList<QTextEdit::ExtraSelection> selections;
     QTextCursor cursor(document());
 
-    // Цвета фонов
-    const QColor removedColor(255, 200, 200);
-    const QColor addedColor(200, 255, 200);
-    const QColor modifiedColor(180, 200, 255);
+    // Современные цвета фонов (GitHub-style)
+    const QColor removedColor(255, 235, 233);
+    const QColor addedColor(218, 251, 225);
+    const QColor modifiedColor(213, 228, 255);
 
     // Проходим по всем строкам документа
     QTextBlock block = document()->begin();
@@ -286,7 +286,7 @@ void DiffPanel::paintEvent(QPaintEvent *event)
                 int lineY = blockRect.top() + blockRect.height() / 2;
                 
                 painter.save();
-                painter.setPen(QPen(QColor(180, 180, 180), 1, Qt::DashLine));
+                painter.setPen(QPen(QColor(208, 215, 222), 1, Qt::DashLine));
                 painter.drawLine(visibleRect.left(), lineY, visibleRect.right(), lineY);
                 painter.restore();
             }
