@@ -302,15 +302,29 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionStageFile, &QAction::triggered, this, &MainWindow::stageSelectedFilesHotkey);
     connect(ui->actionUnstageFile, &QAction::triggered, this, &MainWindow::unstageSelectedFilesHotkey);
     connect(ui->actionClearSelection, &QAction::triggered, this, &MainWindow::clearSelection);
-    connect(ui->actionPush, &QAction::triggered, this, [this]() { 
-        // Store the current selection to restore after push
+    connect(ui->actionPush, &QAction::triggered, this, [this]() {
         m_pushPullSource = m_lastSelectionSource;
-        git->pushRemote(); 
+        if (m_remoteList.size() <= 1) {
+            git->pushRemote(m_remoteList.isEmpty() ? "" : m_remoteList.first());
+        } else {
+            bool ok;
+            QString remote = QInputDialog::getItem(this, tr("Push"),
+                tr("Remote:"), m_remoteList, 0, false, &ok);
+            if (ok && !remote.isEmpty())
+                git->pushRemote(remote);
+        }
     });
     connect(ui->actionPull, &QAction::triggered, this, [this]() {
-        // Store the current selection to restore after pull
         m_pushPullSource = m_lastSelectionSource;
-        git->pullRemote();
+        if (m_remoteList.size() <= 1) {
+            git->pullRemote(m_remoteList.isEmpty() ? "" : m_remoteList.first());
+        } else {
+            bool ok;
+            QString remote = QInputDialog::getItem(this, tr("Pull"),
+                tr("Remote:"), m_remoteList, 0, false, &ok);
+            if (ok && !remote.isEmpty())
+                git->pullRemote(remote);
+        }
     });
     connect(ui->actionFetch, &QAction::triggered, this, [this]() {
         bool ok;
