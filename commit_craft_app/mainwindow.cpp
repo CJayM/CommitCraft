@@ -1821,7 +1821,9 @@ void MainWindow::onRemotesReady(const QList<QString> &remotes)
 void MainWindow::updateRepositoryList()
 {
     m_repositoryModel->clear();
-    for (const QString &path : m_recentRepositories) {
+    QStringList sorted = m_recentRepositories;
+    sorted.sort(Qt::CaseInsensitive);
+    for (const QString &path : sorted) {
         QStandardItem *item = new QStandardItem(path);
         m_repositoryModel->appendRow(item);
     }
