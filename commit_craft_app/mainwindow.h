@@ -89,6 +89,10 @@ private slots:
     void clearSelection();
     void onPushReady(bool success, const QString &message);
     void onPullReady(bool success, const QString &message);
+    void onFetchReady(bool success, const QString &message);
+    void onAddRemoteReady(bool success, const QString &message);
+    void onRemoveRemoteReady(bool success, const QString &message);
+    void onRenameRemoteReady(bool success, const QString &message);
 
     // Submodule slots
     void onSubmodulesReady(const QList<QStringList> &submodules);

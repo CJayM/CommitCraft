@@ -260,10 +260,51 @@ MainWindow::MainWindow(QWidget *parent)
         m_pushPullSource = m_lastSelectionSource;
         git->pushRemote(); 
     });
-    connect(ui->actionPull, &QAction::triggered, this, [this]() { 
+    connect(ui->actionPull, &QAction::triggered, this, [this]() {
         // Store the current selection to restore after pull
         m_pushPullSource = m_lastSelectionSource;
-        git->pullRemote(); 
+        git->pullRemote();
+    });
+    connect(ui->actionFetch, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString remote = QInputDialog::getText(this, tr("Fetch"),
+            tr("Remote name:"), QLineEdit::Normal, "origin", &ok);
+        if (ok && !remote.isEmpty())
+            git->fetchRemote(remote);
+    });
+    connect(ui->actionAddRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString name = QInputDialog::getText(this, tr("Add Remote"),
+            tr("Remote name:"), QLineEdit::Normal, "", &ok);
+        if (!ok || name.isEmpty()) return;
+        QString url = QInputDialog::getText(this, tr("Add Remote"),
+            tr("Remote URL:"), QLineEdit::Normal, "", &ok);
+        if (ok && !url.isEmpty())
+            git->addRemote(name, url);
+    });
+    connect(ui->actionRemoveRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString name = QInputDialog::getText(this, tr("Remove Remote"),
+            tr("Remote name:"), QLineEdit::Normal, "origin", &ok);
+        if (ok && !name.isEmpty())
+            git->removeRemote(name);
+    });
+    connect(ui->actionRenameRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString oldName = QInputDialog::getText(this, tr("Rename Remote"),
+            tr("Current name:"), QLineEdit::Normal, "origin", &ok);
+        if (!ok || oldName.isEmpty()) return;
+        QString newName = QInputDialog::getText(this, tr("Rename Remote"),
+            tr("New name:"), QLineEdit::Normal, "", &ok);
+        if (ok && !newName.isEmpty())
+            git->renameRemote(oldName, newName);
+    });
+    connect(ui->actionPruneRemote, &QAction::triggered, this, [this]() {
+        bool ok;
+        QString remote = QInputDialog::getText(this, tr("Prune Remote"),
+            tr("Remote name:"), QLineEdit::Normal, "origin", &ok);
+        if (ok && !remote.isEmpty())
+            git->pruneRemote(remote);
     });
     
     // Добавляем actions в окно чтобы работали глобальные hotkeys
@@ -320,6 +361,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::error, this, &MainWindow::onGitError);
     connect(git, &Git::pushReady, this, &MainWindow::onPushReady);
     connect(git, &Git::pullReady, this, &MainWindow::onPullReady);
+    connect(git, &Git::fetchReady, this, &MainWindow::onFetchReady);
+    connect(git, &Git::addRemoteReady, this, &MainWindow::onAddRemoteReady);
+    connect(git, &Git::removeRemoteReady, this, &MainWindow::onRemoveRemoteReady);
+    connect(git, &Git::renameRemoteReady, this, &MainWindow::onRenameRemoteReady);
     
     // Connect submodule signals
     connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
@@ -1701,5 +1746,45 @@ void MainWindow::onPullReady(bool success, const QString &message)
         refreshGitStatus();
     } else {
         QMessageBox::warning(this, tr("Pull Failed"), message);
+    }
+}
+
+void MainWindow::onFetchReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Fetch Successful"), message);
+        refreshGitStatus();
+    } else {
+        QMessageBox::warning(this, tr("Fetch Failed"), message);
+    }
+}
+
+void MainWindow::onAddRemoteReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Remote Added"), message);
+        ui->branchesWidget->refresh();
+    } else {
+        QMessageBox::warning(this, tr("Failed to Add Remote"), message);
+    }
+}
+
+void MainWindow::onRemoveRemoteReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Remote Removed"), message);
+        ui->branchesWidget->refresh();
+    } else {
+        QMessageBox::warning(this, tr("Failed to Remove Remote"), message);
+    }
+}
+
+void MainWindow::onRenameRemoteReady(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Remote Renamed"), message);
+        ui->branchesWidget->refresh();
+    } else {
+        QMessageBox::warning(this, tr("Failed to Rename Remote"), message);
     }
 }
