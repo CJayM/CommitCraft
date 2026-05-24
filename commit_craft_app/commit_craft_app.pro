@@ -18,6 +18,7 @@ SOURCES += \
     intralinediff.cpp \
     main.cpp \
     mainwindow.cpp \
+    repositorydelegate.cpp \
     settingsdialog.cpp \
     syntaxhighlighter.cpp
 
@@ -31,6 +32,7 @@ HEADERS += \
     intralinediff.h \
     linenumberarea.h \
     mainwindow.h \
+    repositorydelegate.h \
     settingsdialog.h \
     syntaxhighlighter.h
 
