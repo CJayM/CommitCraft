@@ -52,6 +52,11 @@ public:
     void createBranch(const QString &name, const QString &fromRef = "");
     void deleteBranch(const QString &branch, bool force = false);
     void renameBranch(const QString &oldName, const QString &newName);
+    void checkoutCommit(const QString &hash);
+    void revertCommit(const QString &hash);
+    void cherryPick(const QString &hash);
+    void rebaseOnto(const QString &hash);
+    void mergeCommit(const QString &hash, bool noFf = true);
 
     // Remote operations
     void fetchRemote(const QString &remote);
@@ -90,6 +95,11 @@ signals:
     void branchCreated(bool success, const QString &message);
     void branchDeleted(bool success, const QString &message);
     void branchRenamed(bool success, const QString &message);
+    void checkoutCommitReady(bool success, const QString &message);
+    void revertCommitReady(bool success, const QString &message);
+    void cherryPickReady(bool success, const QString &message);
+    void rebaseReady(bool success, const QString &message);
+    void mergeReady(bool success, const QString &message);
 
     // Remote signals
     void fetchReady(bool success, const QString &message);
@@ -142,6 +152,7 @@ private slots:
     void onCreateBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onDeleteBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onRenameBranchFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onCommitOpFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
     // Remote slots
     void onFetchFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -185,6 +196,7 @@ private:
 
     // Process for branch modification
     QProcess *m_checkoutProcess;
+    QProcess *m_commitOpProcess;     // Для commit операций (revert/cherry-pick/rebase/merge)
     QProcess *m_branchModifyProcess; // Для create/delete/rename
     QProcess *m_remoteProcess;       // Для fetch/prune/url
     QProcess *m_stashProcess;        // Для stash операций (apply/drop/show)
