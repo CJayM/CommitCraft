@@ -734,8 +734,8 @@
   </action>
   <action name="actionRefresh">
    <property name="icon">
-    <iconset>
-     <normaloff>icons/refresh.svg</normaloff>icons/refresh.svg</iconset>
+    <iconset resource="icons.qrc">
+     <normaloff>:/icons/icons/refresh.svg</normaloff>:/icons/icons/refresh.svg</iconset>
    </property>
    <property name="text">
     <string>Refresh</string>
@@ -749,8 +749,8 @@
   </action>
   <action name="actionPrevHunk">
    <property name="icon">
-    <iconset>
-     <normaloff>icons/prev_hunk.svg</normaloff>icons/prev_hunk.svg</iconset>
+    <iconset resource="icons.qrc">
+     <normaloff>:/icons/icons/prev_hunk.svg</normaloff>:/icons/icons/prev_hunk.svg</iconset>
    </property>
    <property name="text">
     <string>Previous Hunk</string>
@@ -764,8 +764,8 @@
   </action>
   <action name="actionNextHunk">
    <property name="icon">
-    <iconset>
-     <normaloff>icons/next_hunk.svg</normaloff>icons/next_hunk.svg</iconset>
+    <iconset resource="icons.qrc">
+     <normaloff>:/icons/icons/next_hunk.svg</normaloff>:/icons/icons/next_hunk.svg</iconset>
    </property>
    <property name="text">
     <string>Next Hunk</string>
