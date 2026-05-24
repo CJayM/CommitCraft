@@ -594,19 +594,32 @@ void MainWindow::openRepositoryPath(const QString &path)
 
     repositoryPath = path;
     settings->setValue("repositoryPath", repositoryPath);
+    git->setRepositoryPath(repositoryPath);
     setWindowTitle(QString("Commit Craft v%1 - %2").arg(QCoreApplication::applicationVersion(), repositoryPath));
+
+    // Очищаем все панели перед загрузкой нового репозитория
+    ui->filesTable->clearSelection();
+    ui->stagedFilesTable->clearSelection();
+    unstagedFilesModel->setFiles({});
+    stagedFilesModel->setFiles({});
+    commitHistoryModel->setCommits({});
+    m_dirTreeModel->clear();
+    diffEditor->clear();
+    m_lastSelectedFileName.clear();
+    ui->diffFileNameLabel->clear();
+    m_allUnstagedFiles.clear();
+    m_allStagedFiles.clear();
+    m_selectedDirectory.clear();
 
     // Обновляем watcher для нового репозитория
     m_fsWatcher->removePaths(m_fsWatcher->directories());
     m_fsWatcher->addPath(repositoryPath);
 
-    refreshGitStatus();
-
-    // Очищаем фильтр директорий
-    m_selectedDirectory.clear();
-
-    // Обновляем панель веток
+    // Очищаем и обновляем панель веток
+    ui->branchesWidget->clear();
     ui->branchesWidget->refresh();
+
+    refreshGitStatus();
 
     // Добавляем в список недавних
     addRecentRepository(path);

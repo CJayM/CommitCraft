@@ -199,6 +199,21 @@ void BranchesWidget::setGit(Git *git)
     }
 }
 
+void BranchesWidget::clear()
+{
+    clearChildren(m_localBranchesRoot);
+    clearChildren(m_remotesRoot);
+    clearChildren(m_tagsRoot);
+    clearChildren(m_stashesRoot);
+
+    m_localBranchesRoot->setText(0, "Local Branches");
+    m_remotesRoot->setText(0, "Remotes");
+    m_tagsRoot->setText(0, "Tags");
+    m_stashesRoot->setText(0, "Stashes");
+
+    m_currentBranchName.clear();
+}
+
 void BranchesWidget::refresh()
 {
     if (!m_git)
