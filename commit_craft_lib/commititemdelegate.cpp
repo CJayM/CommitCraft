@@ -115,7 +115,7 @@ void CommitItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         if (col > maxActiveCol) maxActiveCol = col;
     int hashX = leftMargin + (maxActiveCol + 1) * columnSpacing + dotRadius + 8;
 
-    QFont normFont = painter->font();
+    QFont normFont = option.widget ? option.widget->font() : painter->font();
     QFont smallFont = normFont;
     {
         int ps = normFont.pointSize();

@@ -47,36 +47,38 @@
 
 - [ ] Добавить в главное меню:
 
-  - [ ] File
+  - [x] File
+
+    - [x] Список предыдущих репозиториев
 
   - [x] Edit
 
     - [x] gitignore
 
-  - [ ] View
-
+  - [x] View
+  
     - [ ] Repositories
     - [x] Journal
     - [x] Log
     - [x] Branches
     - [ ] Commit message
     - [x] Diff
-    - [x] Changes
+  - [x] Changes
     - [x] Directory
 
-  - [ ] Local
+  - [x] Local
 
-    - [ ] Create Branch
+    - [x] Create Branch
 
-  - [ ] Remote
+  - [x] Remote
 
-    - [ ] Add remote
+    - [x] Add remote
 
   - [ ] Help
-
-    - [ ] Reference
+  
+  - [ ] Reference
     - [ ] About
-
+  
     
 
 
