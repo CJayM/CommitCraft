@@ -78,21 +78,32 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Initialize repository list panel
     m_repositoryModel = new QStandardItemModel(this);
+    m_repositoryFilterModel = new QSortFilterProxyModel(this);
+    m_repositoryFilterModel->setSourceModel(m_repositoryModel);
+    m_repositoryFilterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
     m_repositoryDelegate = new RepositoryDelegate(this);
     m_repositoryDelegate->setActivePath(repositoryPath);
-    ui->repositoryList->setModel(m_repositoryModel);
+    ui->repositoryList->setModel(m_repositoryFilterModel);
     ui->repositoryList->setItemDelegate(m_repositoryDelegate);
     ui->repositoryList->setEditTriggers(QAbstractItemView::NoEditTriggers);
     updateRepositoryList();
 
-    // Выделить текущий репозиторий в списке
-    for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
-        QModelIndex idx = m_repositoryModel->index(i, 0);
-        if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
-            ui->repositoryList->setCurrentIndex(idx);
-            break;
+    // Highlight current repo in list
+    {
+        for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
+            QModelIndex idx = m_repositoryModel->index(i, 0);
+            if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
+                QModelIndex proxyIdx = m_repositoryFilterModel->mapFromSource(idx);
+                ui->repositoryList->setCurrentIndex(proxyIdx);
+                break;
+            }
         }
     }
+
+    // Connect repository filter
+    connect(ui->repositoryFilterEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
+        m_repositoryFilterModel->setFilterFixedString(text);
+    });
 
     // Connect repository list double-click
     connect(ui->repositoryList, &QListView::doubleClicked, this, [this](const QModelIndex &index) {
@@ -703,10 +714,11 @@ void MainWindow::openRepositoryPath(const QString &path)
     m_repositoryDelegate->setActivePath(repositoryPath);
     ui->repositoryList->viewport()->update();
     for (int i = 0; i < m_repositoryModel->rowCount(); ++i) {
-        QModelIndex idx = m_repositoryModel->index(i, 0);
-        if (idx.data(Qt::DisplayRole).toString() == repositoryPath) {
-            ui->repositoryList->setCurrentIndex(idx);
-            ui->repositoryList->scrollTo(idx, QAbstractItemView::EnsureVisible);
+        QModelIndex srcIdx = m_repositoryModel->index(i, 0);
+        if (srcIdx.data(Qt::DisplayRole).toString() == repositoryPath) {
+            QModelIndex proxyIdx = m_repositoryFilterModel->mapFromSource(srcIdx);
+            ui->repositoryList->setCurrentIndex(proxyIdx);
+            ui->repositoryList->scrollTo(proxyIdx, QAbstractItemView::EnsureVisible);
             break;
         }
     }

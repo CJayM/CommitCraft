@@ -16,6 +16,7 @@
 #include <QStandardItemModel>
 #include <QAction>
 #include <QListView>
+#include <QSortFilterProxyModel>
 #include <QStandardItemModel>
 
 class QTreeView;
@@ -168,6 +169,7 @@ private:
     QStringList m_remoteList;
     QString m_selectedDirectory;
     QStandardItemModel *m_repositoryModel;
+    QSortFilterProxyModel *m_repositoryFilterModel;
     RepositoryDelegate *m_repositoryDelegate;
     QStandardItemModel *m_dirTreeModel;
     QTreeView *m_dirTreeView;
