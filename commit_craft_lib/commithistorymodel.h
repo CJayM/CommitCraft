@@ -21,6 +21,8 @@ struct CommitData {
     QColor branchColor;
 };
 
+Q_DECLARE_METATYPE(CommitData)
+
 class CommitHistoryModel : public QAbstractItemModel
 {
     Q_OBJECT

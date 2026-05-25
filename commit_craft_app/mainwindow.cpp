@@ -617,7 +617,7 @@ void MainWindow::onGitStatusFinished(const QString &output)
             QStringList subFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
             for (const QString &subFile : subFiles) {
                 QString fullFilePath = file + subFile;
-                unstagedFiles.append(qMakePair("?", fullFilePath));
+                unstagedFiles.append(qMakePair(QString("?"), fullFilePath));
             }
             continue; // саму директорию не добавляем
         }

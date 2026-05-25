@@ -1,12 +1,8 @@
 #ifndef COMMITITEMDELEGATE_H
 #define COMMITITEMDELEGATE_H
 
-#include <QMetaType>
 #include <QStyledItemDelegate>
 #include "commithistorymodel.h"
-
-// Register CommitData for use with QVariant
-Q_DECLARE_METATYPE(CommitData)
 
 class CommitItemDelegate : public QStyledItemDelegate
 {

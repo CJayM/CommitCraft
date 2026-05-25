@@ -50,7 +50,13 @@ void IntraLineDiffCalculator::computeLCS(const QString &a, const QString &b,
 
     // LCS через динамическое программирование
     // Используем QVarLengthArray для stack allocation при малых размерах
-    QVarLengthArray<QVarLengthArray<int>> dp(m + 1, QVarLengthArray<int>(n + 1, 0));
+    QVarLengthArray<QVarLengthArray<int>> dp(m + 1);
+    for (int i = 0; i <= m; ++i) {
+        dp[i].resize(n + 1);
+        for (int j = 0; j <= n; ++j) {
+            dp[i][j] = 0;
+        }
+    }
 
     for (int i = 1; i <= m; ++i) {
         for (int j = 1; j <= n; ++j) {
@@ -129,7 +135,13 @@ void IntraLineDiffCalculator::computeWordDiff(const QString &a, const QString &b
     // LCS на уровне слов
     const int m = aWords.size();
     const int n = bWords.size();
-    QVarLengthArray<QVarLengthArray<int>> dp(m + 1, QVarLengthArray<int>(n + 1, 0));
+    QVarLengthArray<QVarLengthArray<int>> dp(m + 1);
+    for (int i = 0; i <= m; ++i) {
+        dp[i].resize(n + 1);
+        for (int j = 0; j <= n; ++j) {
+            dp[i][j] = 0;
+        }
+    }
 
     for (int i = 1; i <= m; ++i) {
         for (int j = 1; j <= n; ++j) {

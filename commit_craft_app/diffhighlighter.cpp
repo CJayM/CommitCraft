@@ -192,7 +192,13 @@ double DiffHighlighter::similarityRatio(const QString &a, const QString &b)
     }
 
     // LCS через DP
-    QVarLengthArray<QVarLengthArray<int>> dp(m + 1, QVarLengthArray<int>(n + 1, 0));
+    QVarLengthArray<QVarLengthArray<int>> dp(m + 1);
+    for (int i = 0; i <= m; ++i) {
+        dp[i].resize(n + 1);
+        for (int j = 0; j <= n; ++j) {
+            dp[i][j] = 0;
+        }
+    }
 
     for (int i = 1; i <= m; ++i) {
         for (int j = 1; j <= n; ++j) {

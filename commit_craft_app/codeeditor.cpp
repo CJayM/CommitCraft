@@ -15,10 +15,11 @@ CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent), m_zoom(100), m
 {
     // Установить шрифт Consolas по умолчанию (monospace)
     QFont defaultFont;
-    if (QFontDatabase::hasFamily("Consolas")) {
+    QFontDatabase fontDb;
+    if (fontDb.hasFamily("Consolas")) {
         defaultFont.setFamily("Consolas");
     } else {
-        defaultFont.setFamily(QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
+        defaultFont.setFamily(fontDb.systemFont(QFontDatabase::FixedFont).family());
     }
     defaultFont.setPointSize(10);
     setFont(defaultFont);

@@ -20,6 +20,8 @@ struct SubmoduleInfo {
     SubmoduleInfo() : isDirty(false), isUninitialized(false), isMissing(false) {}
 };
 
+Q_DECLARE_METATYPE(SubmoduleInfo)
+
 class SubmoduleModel : public QAbstractTableModel
 {
     Q_OBJECT
