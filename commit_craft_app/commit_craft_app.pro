@@ -23,6 +23,7 @@ SOURCES += \
     syntaxhighlighter.cpp
 
 HEADERS += \
+    appstyle.h \
     brancheswidget.h \
     codeeditor.h \
     diffeditor.h \

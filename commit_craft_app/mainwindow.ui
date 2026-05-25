@@ -116,7 +116,11 @@
          </layout>
         </item>
         <item>
-         <widget class="QListView" name="repositoryList"/>
+         <widget class="QListView" name="repositoryList">
+          <property name="contextMenuPolicy">
+           <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>
@@ -1049,6 +1053,22 @@
    </property>
    <property name="toolTip">
     <string>Prune stale remote tracking branches</string>
+   </property>
+  </action>
+  <action name="actionRepositoryOpen">
+   <property name="text">
+    <string>Открыть</string>
+   </property>
+   <property name="toolTip">
+    <string>Открыть репозиторий</string>
+   </property>
+  </action>
+  <action name="actionRepositoryOpenDirectory">
+   <property name="text">
+    <string>Открыть директорию</string>
+   </property>
+   <property name="toolTip">
+    <string>Открыть директорию репозитория в файловом менеджере</string>
    </property>
   </action>
  </widget>

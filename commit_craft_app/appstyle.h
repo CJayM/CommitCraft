@@ -20,11 +20,11 @@ inline QString globalStylesheet()
             background-color: #ffffff;
             border-bottom: 1px solid #d0d7de;
             padding: 2px 0px;
-            font-size: 13px;
+            font-size: 12px;
         }
         QMenuBar::item {
-            padding: 4px 10px;
-            border-radius: 6px;
+            padding: 2px 4px;
+            border-radius: 2px;
             margin: 2px 1px;
         }
         QMenuBar::item:selected {
@@ -33,12 +33,12 @@ inline QString globalStylesheet()
         QMenu {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 8px;
-            padding: 4px;
+            border-radius: 2px;
+            padding: 2px;
         }
         QMenu::item {
-            padding: 6px 24px 6px 12px;
-            border-radius: 6px;
+            padding: 2px 8px 2px 8px;
+            border-radius: 2px;
         }
         QMenu::item:selected {
             background-color: #0969da;
@@ -47,23 +47,23 @@ inline QString globalStylesheet()
         QMenu::separator {
             height: 1px;
             background: #d0d7de;
-            margin: 4px 8px;
+            margin: 2px 4px;
         }
 
         /* ===== ТУЛБАР ===== */
         QToolBar {
             background-color: #ffffff;
             border-bottom: 1px solid #d0d7de;
-            spacing: 4px;
-            padding: 2px 4px;
+            spacing: 2px;
+            padding: 2px 2px;
         }
         QToolButton {
             border: 1px solid transparent;
-            border-radius: 6px;
-            padding: 4px;
+            border-radius: 2px;
+            padding: 2px;
             background-color: transparent;
-            min-width: 28px;
-            min-height: 28px;
+            min-width: 14px;
+            min-height: 14px;
         }
         QToolButton:hover {
             background-color: #e8eaed;
@@ -79,13 +79,13 @@ inline QString globalStylesheet()
 
         /* ===== SPLITTER ===== */
         QSplitter::handle {
-            background-color: #d0d7de;
+            background-color: #b0b7be;
         }
         QSplitter::handle:horizontal {
-            width: 1px;
+            width: 2px;
         }
         QSplitter::handle:vertical {
-            height: 1px;
+            height: 2px;
         }
         QSplitter::handle:hover {
             background-color: #0969da;
@@ -95,14 +95,14 @@ inline QString globalStylesheet()
         QTableView {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 8px;
+            border-radius: 2px;
             selection-background-color: #ddf4ff;
             selection-color: #1f2328;
-            font-size: 13px;
+            font-size: 12px;
             outline: none;
         }
         QTableView::item {
-            padding: 6px 8px;
+            padding: 2px 4px;
             border-bottom: 1px solid #f0f2f5;
         }
         QTableView::item:hover {
@@ -120,8 +120,8 @@ inline QString globalStylesheet()
             color: #656d76;
             font-weight: 600;
             font-size: 12px;
-            padding: 6px 8px;
-            border: none;
+            padding: 2px 4px;
+            border: 1px solid #d0d7de;
             border-bottom: 1px solid #d0d7de;
             text-transform: uppercase;
         }
@@ -130,16 +130,16 @@ inline QString globalStylesheet()
         QTreeView {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 8px;
+            border-radius: 2px;
             selection-background-color: #ddf4ff;
             selection-color: #1f2328;
-            font-size: 13px;
+            font-size: 12px;
             outline: none;
         }
         QTreeView::item {
-            padding: 4px 6px;
-            border-radius: 4px;
-            min-height: 24px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            min-height: 14px;
         }
         QTreeView::item:hover {
             background-color: #f3f4f6;
@@ -156,11 +156,11 @@ inline QString globalStylesheet()
         QTextEdit, QPlainTextEdit {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 8px;
-            padding: 4px;
+            border-radius: 2px;
+            padding: 2px;
             selection-background-color: #a3d3ff;
             selection-color: #1f2328;
-            font-size: 13px;
+            font-size: 12px;
         }
         QTextEdit:focus, QPlainTextEdit:focus {
             border-color: #0969da;
@@ -170,12 +170,12 @@ inline QString globalStylesheet()
         QPushButton {
             background-color: #f6f8fa;
             border: 1px solid #d0d7de;
-            border-radius: 6px;
-            padding: 5px 16px;
-            font-size: 13px;
+            border-radius: 2px;
+            padding: 2px 4px;
+            font-size: 12px;
             font-weight: 500;
             color: #1f2328;
-            min-height: 28px;
+            min-height: 14px;
         }
         QPushButton:hover {
             background-color: #e8eaed;
@@ -195,9 +195,9 @@ inline QString globalStylesheet()
             color: #ffffff;
             border-color: #0969da;
             font-weight: 600;
-            border-radius: 6px;
-            padding: 5px 16px;
-            min-height: 28px;
+            border-radius: 2px;
+            padding: 2px 4px;
+            min-height: 14px;
         }
         QPushButton#commitButton:hover,
         QToolButton#commitButton:hover {
@@ -234,15 +234,15 @@ inline QString globalStylesheet()
 
         /* ===== ЧЕКБОКС ===== */
         QCheckBox {
-            spacing: 6px;
-            font-size: 13px;
+            spacing: 2px;
+            font-size: 12px;
             color: #1f2328;
         }
         QCheckBox::indicator {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border: 2px solid #d0d7de;
-            border-radius: 4px;
+            border-radius: 2px;
             background-color: #ffffff;
         }
         QCheckBox::indicator:checked {
@@ -256,16 +256,15 @@ inline QString globalStylesheet()
         /* ===== ЛЕЙБЛЫ ===== */
         QLabel {
             color: #1f2328;
-            font-size: 13px;
+            font-size: 12px;
         }
         QLabel#filesLabel, QLabel#unstagedLabel, QLabel#stagedLabel,
         QLabel#commitLabel, QLabel#repoLabel, QLabel#repositoryLabel {
             font-weight: 600;
             font-size: 12px;
             color: #656d76;
-            padding: 4px 8px;
+            padding: 2px 4px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         /* ===== СТАТУС-БАР ===== */
@@ -274,7 +273,7 @@ inline QString globalStylesheet()
             border-top: 1px solid #d0d7de;
             color: #656d76;
             font-size: 12px;
-            padding: 2px 8px;
+            padding: 2px 4px;
         }
 
         /* ===== СКРОЛЛБАРЫ ===== */
@@ -286,7 +285,7 @@ inline QString globalStylesheet()
         QScrollBar::handle:vertical {
             background: #c1c7cd;
             min-height: 30px;
-            border-radius: 5px;
+            border-radius: 2px;
             margin: 2px;
         }
         QScrollBar::handle:vertical:hover {
@@ -307,7 +306,7 @@ inline QString globalStylesheet()
         QScrollBar::handle:horizontal {
             background: #c1c7cd;
             min-width: 30px;
-            border-radius: 5px;
+            border-radius: 2px;
             margin: 2px;
         }
         QScrollBar::handle:horizontal:hover {
@@ -330,8 +329,8 @@ inline QString globalStylesheet()
             background-color: #1f2328;
             color: #ffffff;
             border: none;
-            border-radius: 6px;
-            padding: 4px 8px;
+            border-radius: 2px;
+            padding: 2px 4px;
             font-size: 12px;
         }
 
@@ -339,10 +338,10 @@ inline QString globalStylesheet()
         QLineEdit {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 13px;
-            min-height: 24px;
+            border-radius: 2px;
+            padding: 2px 4px;
+            font-size: 12px;
+            min-height: 14px;
         }
         QLineEdit:focus {
             border-color: #0969da;
@@ -351,10 +350,10 @@ inline QString globalStylesheet()
         QSpinBox {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 6px;
-            padding: 4px;
+            border-radius: 2px;
+            padding: 2px;
             font-size: 13px;
-            min-height: 24px;
+            min-height: 14px;
         }
         QSpinBox:focus {
             border-color: #0969da;
@@ -363,10 +362,10 @@ inline QString globalStylesheet()
         QFontComboBox {
             background-color: #ffffff;
             border: 1px solid #d0d7de;
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 13px;
-            min-height: 24px;
+            border-radius: 2px;
+            padding: 2px 4px;
+            font-size: 12px;
+            min-height: 14px;
         }
         QFontComboBox:focus {
             border-color: #0969da;
