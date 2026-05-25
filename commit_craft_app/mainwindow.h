@@ -67,6 +67,7 @@ private slots:
     void showFileContextMenu(const QPoint &pos);
     void showStagedFileContextMenu(const QPoint &pos);
     void showCommitHistoryContextMenu(const QPoint &pos);
+    void showRepositoryContextMenu(const QPoint &pos);
     void addSelectedFile();
     void unstageSelectedFile();
     void unstageSelectedFiles(const QStringList &files);

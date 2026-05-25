@@ -443,7 +443,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->commitHistoryList->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->commitHistoryList, &QTreeView::customContextMenuRequested, this, &MainWindow::showCommitHistoryContextMenu);
-    
+
+    // Set up repository list context menu
+    connect(ui->repositoryList, &QListView::customContextMenuRequested, this, &MainWindow::showRepositoryContextMenu);
+
     // Set initial state of commit action and button
     ui->actionCommit->setEnabled(false);
     ui->commitButton->setEnabled(false);
@@ -1043,6 +1046,32 @@ void MainWindow::showCommitHistoryContextMenu(const QPoint &pos)
     });
 
     contextMenu.exec(ui->commitHistoryList->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::showRepositoryContextMenu(const QPoint &pos)
+{
+    QModelIndex index = ui->repositoryList->indexAt(pos);
+    if (!index.isValid()) return;
+
+    // Get the repository path from the model
+    QString repoPath = index.data(Qt::DisplayRole).toString();
+    if (repoPath.isEmpty()) return;
+
+    QMenu contextMenu(this);
+
+    // Open repository action
+    QAction *openAction = contextMenu.addAction(ui->actionRepositoryOpen->text());
+    connect(openAction, &QAction::triggered, this, [this, repoPath]() {
+        openRepositoryPath(repoPath);
+    });
+
+    // Open directory action
+    QAction *openDirAction = contextMenu.addAction(ui->actionRepositoryOpenDirectory->text());
+    connect(openDirAction, &QAction::triggered, this, [repoPath]() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(repoPath));
+    });
+
+    contextMenu.exec(ui->repositoryList->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::unstageSelectedFiles(const QStringList &files)
