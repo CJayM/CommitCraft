@@ -123,6 +123,7 @@ private:
     void restoreSplitterState();
     bool isGitRepository(const QString &path);
     QString getFileContent(const QString &fileName, bool staged);
+    QByteArray getFileRawData(const QString &fileName, bool staged);
     void updateDiffPanel(const QString &fileName);
 
     Ui::MainWindow *ui;

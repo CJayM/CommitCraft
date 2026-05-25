@@ -1204,13 +1204,91 @@ void MainWindow::updateDiffPanel(const QString &fileName)
                                     .arg(fileNameOnly, filePath, versionText));
     ui->diffFileNameLabel->setTextFormat(Qt::RichText);
 
-    diffEditor->setContents(leftContent, rightContent, fileName, repositoryPath);
+    // Get raw bytes for encoding support
+    QByteArray leftData, rightData;
+
+    if (m_lastSelectionSource == SelectionSource::Staged) {
+        leftData = getFileRawData(fileName, false);   // HEAD
+        rightData = getFileRawData(fileName, true);   // staged
+    } else {
+        // Unstaged
+        bool isStaged = false;
+        for (int i = 0; i < stagedFilesModel->rowCount(); ++i) {
+            if (stagedFilesModel->getFileName(i) == fileName) {
+                isStaged = true;
+                break;
+            }
+        }
+
+        if (isStaged) {
+            leftData = getFileRawData(fileName, true);    // staged
+            rightData = getFileRawData(fileName, false);  // current
+        } else {
+            leftData = getFileRawData(fileName, true);    // HEAD
+            rightData = getFileRawData(fileName, false);  // current
+        }
+    }
+
+    diffEditor->setContentsRaw(leftData, rightData, fileName, repositoryPath, "UTF-8");
 }
 
 void MainWindow::synchronizeZoom(int zoom)
 {
     // Больше не используется — синхронизация зума внутри DiffEditor
     Q_UNUSED(zoom);
+}
+
+QByteArray MainWindow::getFileRawData(const QString &fileName, bool staged)
+{
+    QSettings gitSettings("CommitCraft", "Settings");
+    QString gitPath = gitSettings.value("gitPath", "").toString();
+    if (gitPath.isEmpty()) {
+        gitPath = "git";
+    }
+
+    if (staged) {
+        // Для staged версии получаем содержимое из индекса (git show :file)
+        QProcess gitProcess;
+        gitProcess.setProgram(gitPath);
+        gitProcess.setArguments(QStringList() << "show" << (":" + fileName));
+        gitProcess.setWorkingDirectory(repositoryPath);
+        gitProcess.start();
+        gitProcess.waitForFinished(5000);
+
+        if (gitProcess.exitCode() == 0) {
+            QByteArray output = gitProcess.readAllStandardOutput();
+            if (!output.isEmpty()) {
+                return output;
+            }
+        }
+
+        // Fallback: если файл не staged, берём из HEAD
+        gitProcess.setArguments(QStringList() << "show" << ("HEAD:" + fileName));
+        gitProcess.start();
+        gitProcess.waitForFinished(5000);
+
+        if (gitProcess.exitCode() == 0) {
+            return gitProcess.readAllStandardOutput();
+        }
+        return QByteArray();
+    } else {
+        // Для current версии читаем из файловой системы
+        QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
+
+        // Проверяем, существует ли файл
+        if (!QFile::exists(absoluteFilePath)) {
+            // Файл удалён из working tree
+            return QByteArray();
+        }
+
+        QFile file(absoluteFilePath);
+        if (file.open(QIODevice::ReadOnly)) {
+            QByteArray content = file.readAll();
+            file.close();
+            return content;
+        }
+        return QByteArray();
+    }
 }
 
 QString MainWindow::getFileContent(const QString &fileName, bool staged)
@@ -1249,13 +1327,13 @@ QString MainWindow::getFileContent(const QString &fileName, bool staged)
     } else {
         // Для current версии читаем из файловой системы
         QString absoluteFilePath = QDir(repositoryPath).absoluteFilePath(fileName);
-        
+
         // Проверяем, существует ли файл
         if (!QFile::exists(absoluteFilePath)) {
             // Файл удалён из working tree
             return "";
         }
-        
+
         QFile file(absoluteFilePath);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);

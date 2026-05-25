@@ -45,7 +45,7 @@ public:
     explicit DiffEditor(QWidget *parent = nullptr);
     ~DiffEditor();
 
-    /// Установка содержимого для сравнения.
+    /// Установка содержимого для сравнения (из QString).
     /// \param leftContent  Содержимое левой панели (staged / HEAD)
     /// \param rightContent Содержимое правой панели (current / working tree)
     /// \param fileName     Имя файла (для определения типа подсветки синтаксиса)
@@ -54,6 +54,18 @@ public:
                      const QString &rightContent,
                      const QString &fileName,
                      const QString &repositoryPath = QString());
+
+    /// Установка содержимого для сравнения (из сырых байтов).
+    /// \param leftData  Сырые байты левой панели
+    /// \param rightData Сырые байты правой панели
+    /// \param fileName     Имя файла (для определения типа подсветки синтаксиса)
+    /// \param repositoryPath Путь к репозиторию (для загрузки изображений)
+    /// \param encoding     Кодировка для декодирования (по умолчанию UTF-8)
+    void setContentsRaw(const QByteArray &leftData,
+                        const QByteArray &rightData,
+                        const QString &fileName,
+                        const QString &repositoryPath = QString(),
+                        const QString &encoding = "UTF-8");
 
     /// Очистить содержимое
     void clear();
@@ -115,6 +127,7 @@ private slots:
     void onRevertSelectedClicked();
     void onStageHunkClicked(int hunkIndex);
     void onRevertHunkClicked(int hunkIndex);
+    void onEncodingChanged(const QString &encoding);
 
 private:
     QStringList getSelectedLines() const;
@@ -162,6 +175,9 @@ private:
     // Полное содержимое файлов (для side-by-side diff)
     QString m_leftFullContent;
     QString m_rightFullContent;
+    QByteArray m_leftRawData;   // Сырые байты для перекодировки
+    QByteArray m_rightRawData;  // Сырые байты для перекодировки
+    QString m_currentEncoding;  // Текущая кодировка
     QString m_fileName;
     bool m_fileIsNew = false;  // true если файл untracked (новый)
 };

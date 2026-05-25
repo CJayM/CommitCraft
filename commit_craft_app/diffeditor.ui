@@ -32,7 +32,7 @@
       <number>0</number>
      </property>
      <widget class="QWidget" name="textDiffPage">
-      <layout class="QVBoxLayout" name="textDiffLayout">
+      <layout class="QVBoxLayout" name="textDiffLayout" stretch="0,1,0">
        <property name="spacing">
         <number>5</number>
        </property>
@@ -67,7 +67,7 @@
          <item>
           <spacer name="horizontalSpacer">
            <property name="orientation">
-            <enum>Qt::Orientation::Horizontal</enum>
+            <enum>Qt::Vertical</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -82,11 +82,87 @@
        <item>
         <widget class="QSplitter" name="diffSplitter">
          <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
+          <enum>Qt::Horizontal</enum>
          </property>
          <widget class="DiffPanel" name="leftPanel" native="true"/>
          <widget class="DiffPanel" name="rightPanel" native="true"/>
         </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="encodingLayout">
+         <item>
+          <widget class="QLabel" name="endLineLabel">
+           <property name="styleSheet">
+            <string notr="true">background-color: rgb(240, 240, 240); padding: 5px; border-top: 1px solid rgb(200, 200, 200);</string>
+           </property>
+           <property name="text">
+            <string>Line edning: &lt;not realized&gt;</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="encodingSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QComboBox" name="encodingComboBox">
+           <item>
+            <property name="text">
+             <string>UTF-8</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Cyrillic (Windows-1251)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Cyrillic (Windows-866)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Cyrillic (ISO-8859-5)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Cyrillic (KOI8-R)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Cyrillic (KOI8-U)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Windows-1252</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>ISO-8859-1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>ASCII</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
@@ -112,22 +188,19 @@
        </property>
        <item>
         <widget class="QScrollArea" name="imageScrollArea">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
          <property name="widgetResizable">
           <bool>true</bool>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignmentFlag::AlignCenter</set>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::Shape::NoFrame</enum>
          </property>
          <widget class="QWidget" name="scrollAreaWidgetContents">
           <property name="geometry">
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>760</width>
+            <height>560</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="scrollAreaLayout">
@@ -136,9 +209,6 @@
              <property name="text">
               <string/>
              </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
             </widget>
            </item>
            <item>
@@ -146,11 +216,8 @@
              <property name="text">
               <string/>
              </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
              <property name="textFormat">
-              <enum>Qt::TextFormat::RichText</enum>
+              <enum>Qt::PlainText</enum>
              </property>
             </widget>
            </item>

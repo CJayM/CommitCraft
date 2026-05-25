@@ -14,6 +14,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QAction>
+#include <QTextCodec>
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
@@ -60,6 +61,10 @@ DiffEditor::DiffEditor(QWidget *parent)
     connect(ui->leftPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
     connect(ui->rightPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
 
+    // Connect encoding combobox
+    connect(ui->encodingComboBox, QOverload<const QString &>::of(&QComboBox::activated),
+            this, &DiffEditor::onEncodingChanged);
+
     // --- HunkActionPanel (overlay between left and right panels) ---
     // Создаём как дочерний элемент textDiffPage, а не splitter'а,
     // чтобы быть выше native-детей splitter'а в Z-order
@@ -102,6 +107,103 @@ DiffEditor::~DiffEditor()
     delete ui;
 }
 
+void DiffEditor::setContentsRaw(const QByteArray &leftData,
+                                 const QByteArray &rightData,
+                                 const QString &fileName,
+                                 const QString &repositoryPath,
+                                 const QString &encoding)
+{
+    // Убираем лишние кавычки если есть
+    QString cleanFileName = fileName.trimmed();
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    }
+
+    // Store raw bytes for re-encoding
+    m_leftRawData = leftData;
+    m_rightRawData = rightData;
+    m_currentEncoding = encoding;
+    m_fileName = cleanFileName;
+    m_repositoryPath = repositoryPath;
+
+    // Decode with specified encoding
+    QTextCodec *codec = QTextCodec::codecForName(encoding.toUtf8());
+    if (!codec) {
+        codec = QTextCodec::codecForName("UTF-8");
+    }
+
+    m_leftFullContent = codec->toUnicode(leftData);
+    m_rightFullContent = codec->toUnicode(rightData);
+
+    
+    // Очистить предыдущие diff-данные
+    ui->leftPanel->clearDiffData();
+    ui->rightPanel->clearDiffData();
+    m_hunkPositions.clear();
+    m_currentHunkIndex = -1;
+
+    // Проверить тип файла
+    bool isImage = checkFileType(cleanFileName);
+
+    if (isImage) {
+        // Для графических файлов - показываем изображение
+        ui->stackedWidget->setCurrentWidget(ui->imagePreviewPage);
+
+        // Очищаем старые данные
+        ui->imageDisplayLabel->clear();
+        ui->imageInfoLabel->clear();
+
+        // Пытаемся загрузить изображение
+        QPixmap pixmap;
+        QFileInfo fi(cleanFileName);
+        QString fullPath;
+
+        if (fi.isAbsolute()) {
+            fullPath = cleanFileName;
+        } else if (!m_repositoryPath.isEmpty()) {
+            // Используем QDir для корректной сборки пути
+            QDir dir(m_repositoryPath);
+            fullPath = dir.filePath(cleanFileName);
+            // Преобразуем в нативный формат для Windows
+            fullPath = QDir::toNativeSeparators(fullPath);
+        } else {
+            fullPath = QDir::current().absoluteFilePath(cleanFileName);
+        }
+
+        // Для Qt 6 используем load с QString напрямую
+        if (QFile::exists(fullPath)) {
+            pixmap.load(fullPath);
+        }
+
+        if (!pixmap.isNull()) {
+            // Показываем изображение
+            ui->imageDisplayLabel->setPixmap(pixmap);
+
+            // Информация о файле
+            QString sizeText = QString("%1 x %2 px").arg(pixmap.width()).arg(pixmap.height());
+            QString infoText = QString("<b>%1</b><br>%2: %3")
+                                    .arg(cleanFileName,
+                                         QStringLiteral("Размер изображения"),
+                                         sizeText);
+            ui->imageInfoLabel->setText(infoText);
+        } else {
+            ui->imageInfoLabel->setText(QStringLiteral("Не удалось загрузить изображение: %1<br>Путь: %2").arg(cleanFileName, fullPath));
+        }
+    } else {
+        // Для текстовых файлов - используем обычный diff
+        ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
+
+        // Показать полное содержимое (будет заменено на side-by-side diff в applyDiffData)
+        ui->leftPanel->setContent(m_leftFullContent);
+        ui->rightPanel->setContent(m_rightFullContent);
+    }
+
+    // Применить подсветку синтаксиса
+    applySyntaxHighlighting(fileName);
+
+    updateButtonsVisibility();
+}
+
 void DiffEditor::setContents(const QString &leftContent,
                               const QString &rightContent,
                               const QString &fileName,
@@ -113,11 +215,16 @@ void DiffEditor::setContents(const QString &leftContent,
         cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
     }
 
+    // Store as UTF-8 bytes for potential re-encoding
+    m_leftRawData = leftContent.toUtf8();
+    m_rightRawData = rightContent.toUtf8();
+    m_currentEncoding = "UTF-8";
     m_leftFullContent = leftContent;
     m_rightFullContent = rightContent;
     m_fileName = cleanFileName;
     m_repositoryPath = repositoryPath;
 
+    
     // Очистить предыдущие diff-данные
     ui->leftPanel->clearDiffData();
     ui->rightPanel->clearDiffData();
@@ -591,6 +698,9 @@ void DiffEditor::clear()
     m_currentHunks.clear();
     m_leftFullContent.clear();
     m_rightFullContent.clear();
+    m_leftRawData.clear();
+    m_rightRawData.clear();
+    m_currentEncoding.clear();
     m_fileName.clear();
     m_fileIsNew = false;
     m_hunkActionPanel->clear();
@@ -598,7 +708,7 @@ void DiffEditor::clear()
 
     // Показать текстовый diff
     ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
-    m_isImageFile = false;
+    m_isImageFile = false;    
 
     updateButtonsVisibility();
 }
@@ -897,5 +1007,44 @@ void DiffEditor::onRevertHunkClicked(int hunkIndex)
     QString patch = buildPatchForHunks(m_fileName, hunks);
     if (!patch.isEmpty()) {
         emit revertSelectedPatch(m_fileName, patch);
+    }
+}
+
+void DiffEditor::onEncodingChanged(const QString &encoding)
+{
+    // Update the encoding label to reflect the current selection    
+    m_currentEncoding = encoding;
+
+    // Re-decode raw bytes with new encoding if we have raw data
+    if (!m_leftRawData.isEmpty() || !m_rightRawData.isEmpty()) {
+        QTextCodec *codec = QTextCodec::codecForName(encoding.toUtf8());
+        if (!codec) {
+            codec = QTextCodec::codecForUtfText(m_leftRawData);
+            if (!codec) {
+                codec = QTextCodec::codecForHtml(m_leftRawData);
+            }
+            if (!codec) {
+                codec = QTextCodec::codecForName("UTF-8");
+            }
+        }
+
+        // Decode left content
+        if (!m_leftRawData.isEmpty()) {
+            m_leftFullContent = codec->toUnicode(m_leftRawData);
+        }
+
+        // Decode right content
+        if (!m_rightRawData.isEmpty()) {
+            m_rightFullContent = codec->toUnicode(m_rightRawData);
+        }
+
+        // Re-apply content to panels
+        ui->leftPanel->setPlainText(m_leftFullContent);
+        ui->rightPanel->setPlainText(m_rightFullContent);
+
+        // Re-apply diff data if available
+        if (!m_currentHunks.isEmpty()) {
+            applyDiffData(m_currentHunks);
+        }
     }
 }
