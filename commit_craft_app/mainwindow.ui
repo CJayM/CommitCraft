@@ -791,8 +791,8 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
-   <addaction name="actionToggleLeftPanel"/>
    <addaction name="actionToggleRepositoryPanel"/>
+   <addaction name="actionToggleLeftPanel"/>
    <addaction name="actionToggleFilesPanel"/>
    <addaction name="actionToggleTopPanel"/>
    <addaction name="actionToggleRightPanel"/>
@@ -901,7 +901,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Left Panel</string>
+    <string>Commits</string>
    </property>
    <property name="toolTip">
     <string>Toggle Left Panel</string>
@@ -929,7 +929,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Repository Panel</string>
+    <string>Repos</string>
    </property>
    <property name="toolTip">
     <string>Toggle Repository Panel</string>
@@ -943,7 +943,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Top Panel</string>
+    <string>Files</string>
    </property>
    <property name="toolTip">
     <string>Toggle Top Panel</string>
@@ -957,7 +957,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Files Panel</string>
+    <string>Tree</string>
    </property>
    <property name="toolTip">
     <string>Toggle Files Panel</string>
@@ -971,7 +971,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Diff Panel</string>
+    <string>Diff</string>
    </property>
    <property name="toolTip">
     <string>Toggle Diff Panel</string>

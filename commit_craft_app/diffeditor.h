@@ -127,7 +127,7 @@ private slots:
     void onRevertSelectedClicked();
     void onStageHunkClicked(int hunkIndex);
     void onRevertHunkClicked(int hunkIndex);
-    void onEncodingChanged(const QString &encoding);
+    void onEncodingChanged(int index);
 
 private:
     QStringList getSelectedLines() const;

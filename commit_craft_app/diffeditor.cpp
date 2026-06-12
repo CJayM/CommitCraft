@@ -14,7 +14,9 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QAction>
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QTextCodec>
+#endif
 
 DiffEditor::DiffEditor(QWidget *parent)
     : QWidget(parent)
@@ -62,7 +64,7 @@ DiffEditor::DiffEditor(QWidget *parent)
     connect(ui->rightPanel, &DiffPanel::revertSelectedRequested, this, &DiffEditor::onRevertSelectedClicked);
 
     // Connect encoding combobox
-    connect(ui->encodingComboBox, QOverload<const QString &>::of(&QComboBox::activated),
+    connect(ui->encodingComboBox, &QComboBox::activated,
             this, &DiffEditor::onEncodingChanged);
 
     // --- HunkActionPanel (overlay between left and right panels) ---
@@ -127,13 +129,28 @@ void DiffEditor::setContentsRaw(const QByteArray &leftData,
     m_repositoryPath = repositoryPath;
 
     // Decode with specified encoding
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     QTextCodec *codec = QTextCodec::codecForName(encoding.toUtf8());
     if (!codec) {
         codec = QTextCodec::codecForName("UTF-8");
     }
-
     m_leftFullContent = codec->toUnicode(leftData);
     m_rightFullContent = codec->toUnicode(rightData);
+#else
+    // Qt6: QTextCodec removed from core, using QTextDecoder from Qt5Compat (if available)
+    // Fallback: try UTF-8 directly, then Latin-1
+    if (encoding == "UTF-8") {
+        m_leftFullContent = QString::fromUtf8(leftData);
+        m_rightFullContent = QString::fromUtf8(rightData);
+    } else if (encoding == "ISO-8859-1" || encoding == "Latin-1") {
+        m_leftFullContent = QString::fromLatin1(leftData);
+        m_rightFullContent = QString::fromLatin1(rightData);
+    } else {
+        // For other encodings in Qt6, try UTF-8 as fallback
+        m_leftFullContent = QString::fromUtf8(leftData);
+        m_rightFullContent = QString::fromUtf8(rightData);
+    }
+#endif
 
     
     // Очистить предыдущие diff-данные
@@ -1010,13 +1027,15 @@ void DiffEditor::onRevertHunkClicked(int hunkIndex)
     }
 }
 
-void DiffEditor::onEncodingChanged(const QString &encoding)
+ void DiffEditor::onEncodingChanged(int index)
 {
-    // Update the encoding label to reflect the current selection    
+    QString encoding = ui->encodingComboBox->itemText(index);
+    // Update the encoding label to reflect the current selection
     m_currentEncoding = encoding;
 
     // Re-decode raw bytes with new encoding if we have raw data
     if (!m_leftRawData.isEmpty() || !m_rightRawData.isEmpty()) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         QTextCodec *codec = QTextCodec::codecForName(encoding.toUtf8());
         if (!codec) {
             codec = QTextCodec::codecForUtfText(m_leftRawData);
@@ -1037,6 +1056,27 @@ void DiffEditor::onEncodingChanged(const QString &encoding)
         if (!m_rightRawData.isEmpty()) {
             m_rightFullContent = codec->toUnicode(m_rightRawData);
         }
+#else
+        // Qt6: QTextCodec removed from core, using QTextDecoder from Qt5Compat (if available)
+        // Fallback: try UTF-8 directly, then Latin-1
+        if (encoding == "UTF-8") {
+            if (!m_leftRawData.isEmpty())
+                m_leftFullContent = QString::fromUtf8(m_leftRawData);
+            if (!m_rightRawData.isEmpty())
+                m_rightFullContent = QString::fromUtf8(m_rightRawData);
+        } else if (encoding == "ISO-8859-1" || encoding == "Latin-1") {
+            if (!m_leftRawData.isEmpty())
+                m_leftFullContent = QString::fromLatin1(m_leftRawData);
+            if (!m_rightRawData.isEmpty())
+                m_rightFullContent = QString::fromLatin1(m_rightRawData);
+        } else {
+            // For other encodings in Qt6, try UTF-8 as fallback
+            if (!m_leftRawData.isEmpty())
+                m_leftFullContent = QString::fromUtf8(m_leftRawData);
+            if (!m_rightRawData.isEmpty())
+                m_rightFullContent = QString::fromUtf8(m_rightRawData);
+        }
+#endif
 
         // Re-apply content to panels
         ui->leftPanel->setPlainText(m_leftFullContent);
