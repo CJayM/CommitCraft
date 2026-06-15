@@ -2,11 +2,25 @@ QT += widgets
 QT += gui
 CONFIG += c++17
 
-VERSION = 0.2.0
+
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 TARGET = commit_craft
 TEMPLATE = app
+
+
+# --- Version Updater ---
+VERSION_UPDATER_SCRIPT = version_updater.bat
+
+version_update.target = version_update
+version_update.commands = $$VERSION_UPDATER_SCRIPT $$PWD
+version_update.depends = FORCE
+QMAKE_EXTRA_TARGETS += version_update
+
+# Выполнять перед каждой сборкой
+PRE_TARGETDEPS += version_update
+# --------------------
+
 
 SOURCES += \
     brancheswidget.cpp \
