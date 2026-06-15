@@ -5,9 +5,20 @@ CONFIG += c++17
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
+# --- Чтение версии из .version ---
+exists($$PWD/.version) {
+    version_lines = $$cat($$PWD/.version, lines)
+    VERSION = $$member(version_lines, 1)
+} else {
+    VERSION = "0.0.0"
+}
+
+VERSION = $$replace(VERSION, "\\n", "")
+VERSION = $$replace(VERSION, "\\r", "")
+# --- END Чтение версии из .version ---
+
 TARGET = commit_craft
 TEMPLATE = app
-
 
 # --- Version Updater ---
 VERSION_UPDATER_SCRIPT = version_updater.bat
