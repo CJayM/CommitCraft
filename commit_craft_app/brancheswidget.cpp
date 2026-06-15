@@ -266,15 +266,17 @@ void BranchesWidget::populateLocalBranches(const QList<QString> &branches, const
     
     for (const QString &branch : branches) {
         QTreeWidgetItem *item = new QTreeWidgetItem(m_localBranchesRoot);
-        item->setText(0, branch);
         item->setData(0, Qt::UserRole, "branch");
         
         if (branch == currentBranch) {
-            QFont font = item->font(0);
-            font.setBold(true);
-            item->setFont(0, font);
             item->setText(0, "● " + branch);
+        } else {
+            item->setText(0, branch);
         }
+        
+        QFont font = item->font(0);
+        font.setBold(branch == currentBranch);
+        item->setFont(0, font);
     }
 }
 
