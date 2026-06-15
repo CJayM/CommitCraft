@@ -419,6 +419,10 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         
         m_fetchAction->setVisible(false);
         m_pruneAction->setVisible(false);
+        m_applyStashAction->setVisible(false);
+        m_popStashAction->setVisible(false);
+        m_dropStashAction->setVisible(false);
+        m_showStashAction->setVisible(false);
     } else if (type == "remote") {
         // Для Remote показываем только Fetch/Prune
         m_checkoutAction->setVisible(false);
@@ -428,7 +432,11 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         
         m_fetchAction->setVisible(true);
         m_pruneAction->setVisible(true);
-        
+        m_applyStashAction->setVisible(false);
+        m_popStashAction->setVisible(false);
+        m_dropStashAction->setVisible(false);
+        m_showStashAction->setVisible(false);
+
         // Сохраняем имя remote
         m_contextRemoteName = item->text(0);
         int bracketPos = m_contextRemoteName.indexOf(" (");
@@ -462,6 +470,10 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         m_deleteBranchAction->setVisible(false);
         m_fetchAction->setVisible(false);
         m_pruneAction->setVisible(false);
+        m_applyStashAction->setVisible(false);
+        m_popStashAction->setVisible(false);
+        m_dropStashAction->setVisible(false);
+        m_showStashAction->setVisible(false);
         return;
     }
 
