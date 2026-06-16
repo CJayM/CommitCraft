@@ -264,6 +264,26 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="largeFilePage">
+      <layout class="QVBoxLayout" name="largeFileLayout">
+       <item>
+        <widget class="QLabel" name="largeFileLabel">
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 16px; color: #666; padding: 40px;</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

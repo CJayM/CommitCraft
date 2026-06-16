@@ -826,6 +826,22 @@ void DiffEditor::updateButtonsVisibility()
     ui->revertSelectedButton->setVisible(visible);
 }
 
+void DiffEditor::showLargeFileMessage(const QString &fileName, qint64 fileSize)
+{
+    clear();
+
+    double sizeMB = fileSize / (1024.0 * 1024.0);
+    QString msg = QStringLiteral(
+        "<b>%1</b><br><br>"
+        "Файл слишком большой для отображения diff.<br>"
+        "Размер: <b>%2</b>"
+    ).arg(fileName.toHtmlEscaped(),
+          QString::number(sizeMB, 'f', 2) + " MB");
+
+    ui->largeFileLabel->setText(msg);
+    ui->stackedWidget->setCurrentWidget(ui->largeFilePage);
+}
+
 QStringList DiffEditor::getSelectedLines() const
 {
     QStringList lines;

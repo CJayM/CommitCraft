@@ -91,6 +91,9 @@ public:
     /// Установить флаг «файл новый (untracked)» — показать кнопку Stage для всего файла
     void setFileIsNew(bool isNew);
 
+    /// Показать сообщение о слишком большом файле (вместо diff)
+    void showLargeFileMessage(const QString &fileName, qint64 fileSize);
+
 signals:
     void hunkNavigated(int hunkIndex);
     void stageSelectedPatch(const QString &fileName, const QString &patch);

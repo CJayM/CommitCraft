@@ -1174,6 +1174,14 @@ void MainWindow::onStagedFileTableSelectionChanged()
 
 void MainWindow::updateDiffPanel(const QString &fileName)
 {
+    // Проверка размера файла — не отображаем файлы > 100 KB
+    QString fullPath = QDir(repositoryPath).filePath(fileName);
+    QFileInfo fi(fullPath);
+    if (fi.exists() && fi.size() > 100 * 1024) {
+        diffEditor->showLargeFileMessage(fileName, fi.size());
+        return;
+    }
+
     QString leftContent, rightContent;
     QString leftVersion, rightVersion;
 
