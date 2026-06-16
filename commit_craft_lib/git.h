@@ -57,6 +57,7 @@ public:
     void cherryPick(const QString &hash);
     void rebaseOnto(const QString &hash);
     void mergeCommit(const QString &hash, bool noFf = true);
+    void mergeBranch(const QString &branch, bool noFf = true);
 
     // Remote operations
     void fetchRemote(const QString &remote);

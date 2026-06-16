@@ -851,6 +851,24 @@ void Git::mergeCommit(const QString &hash, bool noFf)
     m_commitOpProcess->start(getGitExecutable(), args);
 }
 
+void Git::mergeBranch(const QString &branch, bool noFf)
+{
+    if (m_repositoryPath.isEmpty()) {
+        emit error("Repository path is empty");
+        return;
+    }
+
+    QStringList args;
+    args << "merge";
+    if (noFf)
+        args << "--no-ff";
+    args << branch;
+
+    m_commitOpProcess->setProperty("operation", "merge");
+    m_commitOpProcess->setProperty("hash", branch);
+    m_commitOpProcess->start(getGitExecutable(), args);
+}
+
 void Git::createBranch(const QString &name, const QString &fromRef)
 {
     if (m_repositoryPath.isEmpty()) {

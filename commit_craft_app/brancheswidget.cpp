@@ -98,7 +98,12 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     m_dropStashAction = m_contextMenu->addAction(tr("Drop"));
     m_contextMenu->addSeparator();
     m_showStashAction = m_contextMenu->addAction(tr("Show"));
-    
+    m_pushAction = m_contextMenu->addAction(tr("Push"));
+    m_mergeAction = m_contextMenu->addAction(tr("Merge"));
+    m_pushToMenu = new QMenu(tr("Push to"), this);
+    m_contextMenu->addSeparator();
+    m_contextMenu->addMenu(m_pushToMenu);
+
     connect(m_checkoutAction, &QAction::triggered, this, &BranchesWidget::onCheckoutAction);
     connect(m_createBranchAction, &QAction::triggered, this, &BranchesWidget::onCreateBranchAction);
     connect(m_renameBranchAction, &QAction::triggered, this, &BranchesWidget::onRenameBranchAction);
@@ -109,6 +114,8 @@ BranchesWidget::BranchesWidget(QWidget *parent)
     connect(m_popStashAction, &QAction::triggered, this, &BranchesWidget::onPopStashAction);
     connect(m_dropStashAction, &QAction::triggered, this, &BranchesWidget::onDropStashAction);
     connect(m_showStashAction, &QAction::triggered, this, &BranchesWidget::onShowStashAction);
+    connect(m_pushAction, &QAction::triggered, this, &BranchesWidget::onPushAction);
+    connect(m_mergeAction, &QAction::triggered, this, &BranchesWidget::onMergeAction);
 
     setupTree();
     m_layout->addWidget(m_treeWidget);
@@ -290,7 +297,20 @@ void BranchesWidget::populateRemotes(const QList<QString> &remotes)
     }
     
     m_remotesRoot->setText(0, QString("Remotes (%1)").arg(remotes.size()));
-    
+    m_remotesList = remotes;
+
+    m_pushToMenu->clear();
+    for (const QString &remote : remotes) {
+        QAction *action = m_pushToMenu->addAction(remote);
+        action->setProperty("remoteName", remote);
+        connect(action, &QAction::triggered, this, [this, remote]() {
+            if (!m_contextMenuItem || !m_git) return;
+            QString branchName = m_contextMenuItem->text(0);
+            if (branchName.startsWith("● ")) branchName = branchName.mid(2);
+            m_git->pushRemote(remote, branchName);
+        });
+    }
+
     for (const QString &remote : remotes) {
         QTreeWidgetItem *remoteItem = new QTreeWidgetItem(m_remotesRoot);
         remoteItem->setText(0, remote);
@@ -423,6 +443,21 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         m_popStashAction->setVisible(false);
         m_dropStashAction->setVisible(false);
         m_showStashAction->setVisible(false);
+
+        m_mergeAction->setVisible(!isCurrentBranch);
+        m_mergeAction->setEnabled(!isCurrentBranch);
+
+        if (m_remotesList.size() == 1) {
+            m_pushToMenu->menuAction()->setVisible(false);
+            m_pushAction->setVisible(true);
+            m_pushAction->setEnabled(true);
+        } else if (m_remotesList.size() > 1) {
+            m_pushAction->setVisible(false);
+            m_pushToMenu->menuAction()->setVisible(true);
+        } else {
+            m_pushAction->setVisible(false);
+            m_pushToMenu->menuAction()->setVisible(false);
+        }
     } else if (type == "remote") {
         // Для Remote показываем только Fetch/Prune
         m_checkoutAction->setVisible(false);
@@ -436,6 +471,9 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         m_popStashAction->setVisible(false);
         m_dropStashAction->setVisible(false);
         m_showStashAction->setVisible(false);
+        m_pushAction->setVisible(false);
+        m_mergeAction->setVisible(false);
+        m_pushToMenu->menuAction()->setVisible(false);
 
         // Сохраняем имя remote
         m_contextRemoteName = item->text(0);
@@ -454,7 +492,10 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         m_popStashAction->setVisible(true);
         m_dropStashAction->setVisible(true);
         m_showStashAction->setVisible(true);
-        
+        m_pushAction->setVisible(false);
+        m_mergeAction->setVisible(false);
+        m_pushToMenu->menuAction()->setVisible(false);
+
         // Сохраняем ссылку на stash (первая часть строки, например "stash@{0}")
         QString stashText = item->text(0);
         int colonPos = stashText.indexOf(':');
@@ -474,6 +515,9 @@ void BranchesWidget::contextMenuEvent(QContextMenuEvent *event)
         m_popStashAction->setVisible(false);
         m_dropStashAction->setVisible(false);
         m_showStashAction->setVisible(false);
+        m_pushAction->setVisible(false);
+        m_mergeAction->setVisible(false);
+        m_pushToMenu->menuAction()->setVisible(false);
         return;
     }
 
@@ -600,4 +644,22 @@ void BranchesWidget::onShowStashAction()
     // TODO: Show stash diff in a dialog or panel
     QMessageBox::information(this, tr("Show Stash"), 
         tr("Showing stash \"%1\" is not implemented yet.\nDiff would be shown here.").arg(m_contextStashRef));
+}
+void BranchesWidget::onPushAction()
+{
+    if (!m_contextMenuItem || !m_git) return;
+    QString branchName = m_contextMenuItem->text(0);
+    if (branchName.startsWith("● ")) branchName = branchName.mid(2);
+
+    if (m_remotesList.size() == 1) {
+        m_git->pushRemote(m_remotesList[0], branchName);
+    }
+}
+
+void BranchesWidget::onMergeAction()
+{
+    if (!m_contextMenuItem || !m_git) return;
+    QString branchName = m_contextMenuItem->text(0);
+    if (branchName.startsWith("● ")) branchName = branchName.mid(2);
+    m_git->mergeBranch(branchName);
 }

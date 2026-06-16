@@ -67,6 +67,8 @@ private:
     void onPopStashAction();
     void onDropStashAction();
     void onShowStashAction();
+    void onPushAction();
+    void onMergeAction();
 
     QVBoxLayout *m_layout;
     QToolButton *m_refreshButton; // Кнопка обновления
@@ -96,7 +98,11 @@ private:
     QAction *m_popStashAction;
     QAction *m_dropStashAction;
     QAction *m_showStashAction;
-    
+    QAction *m_pushAction;
+    QAction *m_mergeAction;
+    QMenu *m_pushToMenu;
+    QList<QString> m_remotesList;
+
     QString m_contextRemoteName; // Для операций с remote
     QString m_contextStashRef;   // Для операций со stash
 };
