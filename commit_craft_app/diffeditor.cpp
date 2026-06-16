@@ -4,8 +4,6 @@
 #include <QScrollBar>
 #include <QSplitter>
 #include <QVBoxLayout>
-#include <QTimer>
-#include <QEvent>
 #include <QTextBlock>
 #include <QSet>
 #include <QSettings>
@@ -67,41 +65,13 @@ DiffEditor::DiffEditor(QWidget *parent)
     connect(ui->encodingComboBox, &QComboBox::activated,
             this, &DiffEditor::onEncodingChanged);
 
-    // --- HunkActionPanel (overlay between left and right panels) ---
-    // Создаём как дочерний элемент textDiffPage, а не splitter'а,
-    // чтобы быть выше native-детей splitter'а в Z-order
-    m_hunkActionPanel = new HunkActionPanel(ui->textDiffPage);
-    m_hunkActionPanel->setSourcePanel(ui->rightPanel);
-    m_hunkActionPanel->winId(); // принудительно создать HWND
-    m_hunkActionPanel->show();
+    // HunkActionPanel — встроен в splitter через rightContainer в .ui
+    ui->hunkActionPanel->setSourcePanel(ui->rightPanel);
 
-    // Позиционировать панель между leftPanel и rightPanel при изменении splitter
-    auto positionActionPanel = [this]() {
-        int splitterX = ui->diffSplitter->x();
-        int splitterY = ui->diffSplitter->y();
-        int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
-        m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
-        m_hunkActionPanel->raise();
-    };
-    positionActionPanel();
-    connect(ui->diffSplitter, &QSplitter::splitterMoved, this, positionActionPanel);
-    ui->diffSplitter->installEventFilter(this);
-
-    connect(m_hunkActionPanel, &HunkActionPanel::stageHunkRequested,
+    connect(ui->hunkActionPanel, &HunkActionPanel::stageHunkRequested,
             this, &DiffEditor::onStageHunkClicked);
-    connect(m_hunkActionPanel, &HunkActionPanel::revertHunkRequested,
+    connect(ui->hunkActionPanel, &HunkActionPanel::revertHunkRequested,
             this, &DiffEditor::onRevertHunkClicked);
-
-    // Отложенная инициализация позиции (после первого layout)
-    QTimer::singleShot(0, this, [this]() {
-        int splitterX = ui->diffSplitter->x();
-        int splitterY = ui->diffSplitter->y();
-        int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
-        if (leftEdge > 0) {
-            m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
-            m_hunkActionPanel->raise();
-        }
-    });
 }
 
 DiffEditor::~DiffEditor()
@@ -312,13 +282,13 @@ void DiffEditor::setContents(const QString &leftContent,
 
 void DiffEditor::setDiffMode(HunkActionPanel::DiffMode mode)
 {
-    m_hunkActionPanel->setDiffMode(mode);
+    ui->hunkActionPanel->setDiffMode(mode);
 }
 
 void DiffEditor::setFileIsNew(bool isNew)
 {
     m_fileIsNew = isNew;
-    m_hunkActionPanel->setFileIsNew(isNew);
+    ui->hunkActionPanel->setFileIsNew(isNew);
 }
 
 void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
@@ -329,10 +299,9 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
             m_currentHunks.clear();
             m_currentHunkIndex = 0;
             m_hunkPositions = {0};
-            m_hunkActionPanel->setHunkPositions(m_hunkPositions);
-            m_hunkActionPanel->show();
+            ui->hunkActionPanel->setHunkPositions(m_hunkPositions);
+            ui->hunkActionPanel->show();
             updateButtonsVisibility();
-            repositionActionPanel();
             return;
         }
         ui->leftPanel->clearDiffData();
@@ -340,13 +309,13 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
         m_currentHunks.clear();
         m_currentHunkIndex = -1;
         m_hunkPositions.clear();
-        m_hunkActionPanel->clear();
-        m_hunkActionPanel->hide();
+        ui->hunkActionPanel->clear();
+        ui->hunkActionPanel->hide();
         updateButtonsVisibility();
         return;
     }
 
-    m_hunkActionPanel->show();
+    ui->hunkActionPanel->show();
     m_currentHunks = hunks;
 
     QStringList leftLines = m_leftFullContent.split('\n');
@@ -398,10 +367,7 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     }
 
     // Передать позиции ханков в HunkActionPanel
-    m_hunkActionPanel->setHunkPositions(m_hunkPositions);
-
-    // Обновить позицию панели (размеры могли измениться после загрузки контента)
-    repositionActionPanel();
+    ui->hunkActionPanel->setHunkPositions(m_hunkPositions);
 
     // Заполнить панели синхронизированным содержимым
     populatePanels(syncedLines);
@@ -720,8 +686,8 @@ void DiffEditor::clear()
     m_currentEncoding.clear();
     m_fileName.clear();
     m_fileIsNew = false;
-    m_hunkActionPanel->clear();
-    m_hunkActionPanel->hide();
+    ui->hunkActionPanel->clear();
+    ui->hunkActionPanel->hide();
 
     // Показать текстовый diff
     ui->stackedWidget->setCurrentWidget(ui->textDiffPage);
@@ -859,15 +825,6 @@ void DiffEditor::updateButtonsVisibility()
     ui->revertSelectedButton->setVisible(visible);
 }
 
-void DiffEditor::repositionActionPanel()
-{
-    int splitterX = ui->diffSplitter->x();
-    int splitterY = ui->diffSplitter->y();
-    int leftEdge = splitterX + ui->leftPanel->x() + ui->leftPanel->width();
-    m_hunkActionPanel->setGeometry(leftEdge, splitterY, m_hunkActionPanel->width(), ui->diffSplitter->height());
-    m_hunkActionPanel->raise();
-}
-
 QStringList DiffEditor::getSelectedLines() const
 {
     QStringList lines;
@@ -954,14 +911,6 @@ QString DiffEditor::buildPatchForHunks(const QString &fileName, const QList<int>
     }
 
     return patch;
-}
-
-bool DiffEditor::eventFilter(QObject *obj, QEvent *event)
-{
-    if (obj == ui->diffSplitter && event->type() == QEvent::Resize) {
-        repositionActionPanel();
-    }
-    return QWidget::eventFilter(obj, event);
 }
 
 void DiffEditor::contextMenuEvent(QContextMenuEvent *event)

@@ -117,7 +117,6 @@ public slots:
 
 protected:
     void contextMenuEvent(QContextMenuEvent *event);
-    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
     void synchronizeScrollLeftToRight(int value);
@@ -155,11 +154,8 @@ private:
 
     /// Обновить видимость кнопок partial staging
     void updateButtonsVisibility();
-    /// Перепозиционировать HunkActionPanel относительно splitter'а
-    void repositionActionPanel();
 
     Ui::DiffEditor *ui;
-    HunkActionPanel *m_hunkActionPanel;
     bool m_isImageFile;         // Флаг графического файла
     QStringList m_imageExtensions;  // Расширения графических файлов
     QStringList m_syntaxExtensions; // Расширения для подсветки синтаксиса
