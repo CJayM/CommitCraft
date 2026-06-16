@@ -650,6 +650,11 @@ void MainWindow::onGitStatusFinished(const QString &output)
     // Включаем watcher обратно после обновления
     m_fsWatcher->blockSignals(false);
 
+    // Обновляем diff с актуальными данными моделей
+    if (!m_lastSelectedFileName.isEmpty()) {
+        updateDiffPanel(m_lastSelectedFileName);
+    }
+
     git->getCommitHistory();
 }
 
@@ -1925,10 +1930,6 @@ void MainWindow::onStageSelectedPatch(const QString &fileName, const QString &pa
     }
 
     refreshGitStatus();
-    // Обновляем diff для текущего файла после частичного stage
-    if (!m_lastSelectedFileName.isEmpty()) {
-        updateDiffPanel(m_lastSelectedFileName);
-    }
 }
 
 void MainWindow::onRevertSelectedPatch(const QString &fileName, const QString &patch)
@@ -1952,10 +1953,6 @@ void MainWindow::onRevertSelectedPatch(const QString &fileName, const QString &p
     }
 
     refreshGitStatus();
-    // Обновляем diff для текущего файла после частичного revert
-    if (!m_lastSelectedFileName.isEmpty()) {
-        updateDiffPanel(m_lastSelectedFileName);
-    }
 }
 
 void MainWindow::onSubmodulesReady(const QList<QStringList> &submodules)

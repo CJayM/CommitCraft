@@ -317,6 +317,7 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
 
     ui->hunkActionPanel->show();
     m_currentHunks = hunks;
+    m_currentHunkIndex = -1;
 
     QStringList leftLines = m_leftFullContent.split('\n');
     QStringList rightLines = m_rightFullContent.split('\n');
