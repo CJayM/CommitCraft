@@ -12,6 +12,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QAction>
+#include <QDebug>
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QTextCodec>
 #endif
@@ -881,6 +882,353 @@ QList<int> DiffEditor::getSelectedHunkIndexes() const
     return selectedHunks;
 }
 
+bool DiffEditor::getSelectionSyncedRange(int &startLine, int &endLine) const
+{
+    QTextCursor cursor = ui->rightPanel->textCursor();
+    const DiffPanel *panel = ui->rightPanel;
+    if (!cursor.hasSelection()) {
+        cursor = ui->leftPanel->textCursor();
+        panel = ui->leftPanel;
+    }
+    if (!cursor.hasSelection())
+        return false;
+
+    startLine = panel->document()->findBlock(cursor.selectionStart()).blockNumber();
+    endLine = panel->document()->findBlock(cursor.selectionEnd()).blockNumber();
+    if (endLine < startLine)
+        qSwap(startLine, endLine);
+
+    // Не выходим за пределы syncedLines
+    if (startLine >= m_syncedLines.size())
+        return false;
+    endLine = qMin(endLine, m_syncedLines.size() - 1);
+
+    return startLine <= endLine;
+}
+
+QString DiffEditor::buildPatchForSelection(const QString &fileName, int startSynced, int endSynced) const
+{
+    if (fileName.isEmpty() || m_syncedLines.isEmpty())
+        return QString();
+
+    if (m_fileIsNew) {
+        // Новый файл — стейджим целиком, генерируем diff через /dev/null
+        QString cleanFileName = fileName;
+        if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"'))
+            cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+        cleanFileName.replace('\\', '/');
+
+        QString content;
+        for (int i = startSynced; i <= endSynced && i < m_syncedLines.size(); ++i) {
+            const auto &sl = m_syncedLines[i];
+            if (!sl.isSeparator)
+                content += sl.rightText + "\n";
+        }
+        if (content.endsWith('\n'))
+            content.chop(1);
+
+        QString patch;
+        patch += QStringLiteral("diff --git a/dev/null b/%1\n").arg(cleanFileName);
+        patch += QStringLiteral("new file mode 100644\n");
+        patch += QStringLiteral("--- /dev/null\n");
+        patch += QStringLiteral("+++ b/%1\n").arg(cleanFileName);
+        patch += QStringLiteral("@@ -0,0 +1,%1 @@\n").arg(content.count('\n') + 1);
+        patch += content;
+        if (!content.endsWith('\n'))
+            patch += '\n';
+        return patch;
+    }
+
+    // Собираем только строки, где есть изменения (isRemoved / isAdded / isModified),
+    // плюс контекстные строки для позиционирования патча.
+    // Расширяем диапазон, чтобы захватить 2 строки контекста до и после выделения
+    // — иначе git apply не сможет найти место для патча.
+    int ctxStart = startSynced;
+    int ctxEnd = endSynced;
+
+    // Включаем до 3 строк контекста ДО выделения
+    int beforeCount = 0;
+    for (int i = startSynced - 1; i >= 0 && beforeCount < 3; --i) {
+        if (m_syncedLines[i].isSeparator) break;
+        ctxStart = i;
+        beforeCount++;
+    }
+
+    // Включаем до 3 строк контекста ПОСЛЕ выделения
+    int afterCount = 0;
+    for (int i = endSynced + 1; i < m_syncedLines.size() && afterCount < 3; ++i) {
+        if (m_syncedLines[i].isSeparator) break;
+        ctxEnd = i;
+        afterCount++;
+    }
+
+    QChar firstPrefix = ' ';
+    int firstLeft = -1, firstRight = -1;
+    int leftCount = 0, rightCount = 0;
+    struct PatchLine { QChar prefix; QString text; };
+    QVector<PatchLine> lines;
+
+    for (int i = ctxStart; i <= ctxEnd && i < m_syncedLines.size(); ++i) {
+        const auto &sl = m_syncedLines[i];
+        if (sl.isSeparator)
+            continue;
+
+        if (firstLeft < 0 && sl.leftLineNum >= 0) firstLeft = sl.leftLineNum + 1;
+        if (firstRight < 0 && sl.rightLineNum >= 0) firstRight = sl.rightLineNum + 1;
+
+        // Строки вне пользовательского выделения — контекст для git apply.
+        // Включаем только реальные isContext строки (не isAdded/isRemoved),
+        // иначе пустой leftText для добавленных строк даст битый патч.
+        bool isContextPadding = (i < startSynced || i > endSynced);
+
+        // Убираем \r из контента — git apply на Windows не любит CRLF в патчах
+        QString cleanLeft = sl.leftText;
+        cleanLeft.remove('\r');
+        QString cleanRight = sl.rightText;
+        cleanRight.remove('\r');
+
+        if (isContextPadding) {
+            if (!sl.isContext)
+                continue;
+            leftCount++;
+            rightCount++;
+            lines.append({' ', cleanLeft});
+        } else if (sl.isRemoved && sl.isAdded) {
+            // Modified
+            leftCount++;
+            rightCount++;
+            lines.append({'-', cleanLeft});
+            lines.append({'+', cleanRight});
+        } else if (sl.isRemoved) {
+            leftCount++;
+            lines.append({'-', cleanLeft});
+        } else if (sl.isAdded) {
+            rightCount++;
+            lines.append({'+', cleanRight});
+        } else if (sl.isContext) {
+            leftCount++;
+            rightCount++;
+            lines.append({' ', cleanLeft});
+        }
+    }
+
+    if (lines.isEmpty())
+        return QString();
+
+    qDebug() << "buildPatchForSelection: firstLeft=" << firstLeft << "firstRight=" << firstRight
+             << "leftCount=" << leftCount << "rightCount=" << rightCount;
+
+    // Если выбраны только добавленные строки, берём leftStart из hunk
+    if (firstLeft < 0) {
+        for (int i = startSynced; i <= endSynced && i < m_syncedLines.size(); ++i) {
+            int hIdx = m_syncedLines[i].hunkIndex;
+            if (hIdx >= 0 && hIdx < m_currentHunks.size()) {
+                firstLeft = m_currentHunks[hIdx].leftStart;
+                break;
+            }
+        }
+        if (firstLeft < 0) firstLeft = 1;
+    }
+    if (firstRight < 0) {
+        for (int i = startSynced; i <= endSynced && i < m_syncedLines.size(); ++i) {
+            int hIdx = m_syncedLines[i].hunkIndex;
+            if (hIdx >= 0 && hIdx < m_currentHunks.size()) {
+                firstRight = m_currentHunks[hIdx].rightStart;
+                break;
+            }
+        }
+        if (firstRight < 0) firstRight = 1;
+    }
+
+    QString cleanFileName = fileName;
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"'))
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    cleanFileName.replace('\\', '/');
+
+    QString patch;
+    patch += QStringLiteral("diff --git a/%1 b/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("--- a/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("+++ b/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("@@ -%1,%2 +%3,%4 @@\n").arg(firstLeft).arg(leftCount).arg(firstRight).arg(rightCount);
+
+    for (const auto &pl : lines) {
+        patch += pl.prefix + pl.text + QStringLiteral("\n");
+    }
+
+    return patch;
+}
+
+QString DiffEditor::buildPatchForSelectedHunks(const QString &fileName,
+                                                int startSynced, int endSynced) const
+{
+    if (fileName.isEmpty() || m_currentHunks.isEmpty() || m_syncedLines.isEmpty())
+        return QString();
+
+    if (m_fileIsNew) {
+        // Новый файл — стейджим целиком через setContents (уже содержит весь контент)
+        return buildPatchForSelection(fileName, startSynced, endSynced);
+    }
+
+    // Собираем, какие hunk-индексы затронуты выделением
+    QSet<int> affectedHunks;
+    for (int i = startSynced; i <= endSynced && i < m_syncedLines.size(); ++i) {
+        int hIdx = m_syncedLines[i].hunkIndex;
+        if (hIdx >= 0)
+            affectedHunks.insert(hIdx);
+    }
+    if (affectedHunks.isEmpty()) {
+        qDebug() << "buildPatchForSelectedHunks: no hunk affected";
+        return QString();
+    }
+
+    // Для каждого hunk строим отображение: synced-индекс → hunk-line-индексы
+    // и определяем, какие hunk-линии выделены.
+    // Затем строим патч, включая ВСЕ контекстные линии hunk'а и только
+    // выделенные Removed/Added линии.
+
+    QString cleanFileName = fileName;
+    if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"'))
+        cleanFileName = cleanFileName.mid(1, cleanFileName.length() - 2);
+    cleanFileName.replace('\\', '/');
+
+    QString patch;
+    patch += QStringLiteral("diff --git a/%1 b/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("--- a/%1\n").arg(cleanFileName);
+    patch += QStringLiteral("+++ b/%1\n").arg(cleanFileName);
+
+    for (int hIdx : affectedHunks) {
+        if (hIdx < 0 || hIdx >= m_currentHunks.size())
+            continue;
+
+        const Hunk &hunk = m_currentHunks[hIdx];
+
+        // Строим mapping synced → hunk lines для этого hunk'а
+        // Идём по synced lines, находим все с этим hunkIndex,
+        // и для каждого считаем, какой это по счёту hunk-line
+        // (пропуская контекстные строки ДО hunk — у них hunkIndex = -1)
+        struct SyncedToHunk {
+            int syncedIdx;
+            QVector<int> hunkLineIdxs; // индексы в hunk.lines
+            bool isSelected;
+        };
+        QVector<SyncedToHunk> mapping;
+
+        int hunkLineCounter = 0;
+        bool inHunk = false;
+        for (int si = 0; si < m_syncedLines.size(); ++si) {
+            const auto &sl = m_syncedLines[si];
+            if (sl.hunkIndex == hIdx) {
+                // Контекстные строки до/после hunk имеют hunkIndex,
+                // они соответствуют HunkLine::Unchanged
+                if (sl.isContext) {
+                    mapping.append({si, {hunkLineCounter}, (si >= startSynced && si <= endSynced)});
+                    hunkLineCounter++;
+                } else if (sl.isRemoved && sl.isAdded) {
+                    // Modified = пара (Removed, Added)
+                    mapping.append({si, {hunkLineCounter, hunkLineCounter + 1},
+                                    (si >= startSynced && si <= endSynced)});
+                    hunkLineCounter += 2;
+                } else if (sl.isRemoved) {
+                    mapping.append({si, {hunkLineCounter},
+                                    (si >= startSynced && si <= endSynced)});
+                    hunkLineCounter++;
+                } else if (sl.isAdded) {
+                    mapping.append({si, {hunkLineCounter},
+                                    (si >= startSynced && si <= endSynced)});
+                    hunkLineCounter++;
+                }
+                inHunk = true;
+            } else if (inHunk) {
+                // Вышли из hunk — дальше не идём
+                break;
+            }
+        }
+
+        // Проверяем, есть ли выделенные линии в этом hunk'е
+        bool hasSelected = false;
+        for (const auto &m : mapping) {
+            if (m.isSelected) { hasSelected = true; break; }
+        }
+        if (!hasSelected)
+            continue;
+
+        // Строим отфильтрованный список hunk-линий
+        struct HunkOutLine {
+            QChar prefix;
+            QString text;
+        };
+        QVector<HunkOutLine> outLines;
+        int outLeftCount = 0;
+        int outRightCount = 0;
+
+        for (const auto &m : mapping) {
+            const auto &sl = m_syncedLines[m.syncedIdx];
+
+            if (!m.isSelected) {
+                // Невыделенная линия — включаем только если это контекст
+                if (!sl.isContext)
+                    continue;
+                // Контекстная невыделенная — нужна для позиционирования
+                QString clean = sl.leftText;
+                clean.remove('\r');
+                outLines.append({' ', clean});
+                outLeftCount++;
+                outRightCount++;
+                continue;
+            }
+
+            // Выделенная линия — включаем как есть
+            QString cleanLeft = sl.leftText;
+            cleanLeft.remove('\r');
+            QString cleanRight = sl.rightText;
+            cleanRight.remove('\r');
+
+            if (sl.isRemoved && sl.isAdded) {
+                outLines.append({'-', cleanLeft});
+                outLines.append({'+', cleanRight});
+                outLeftCount++;
+                outRightCount++;
+            } else if (sl.isRemoved) {
+                outLines.append({'-', cleanLeft});
+                outLeftCount++;
+            } else if (sl.isAdded) {
+                outLines.append({'+', cleanRight});
+                outRightCount++;
+            } else if (sl.isContext) {
+                outLines.append({' ', cleanLeft});
+                outLeftCount++;
+                outRightCount++;
+            }
+        }
+
+        if (outLines.isEmpty()) {
+            qDebug() << "buildPatchForSelectedHunks: no output lines for hunk" << hIdx;
+            continue;
+        }
+
+        // Hunk header с оригинальными line numbers из hunk
+        // Для leftCount используем количество линий в левой части (контекст + removed)
+        // Для rightCount используем количество линий в правой части (контекст + added)
+        int headerLeftCount = 0, headerRightCount = 0;
+        for (const auto &ol : outLines) {
+            if (ol.prefix == ' ' || ol.prefix == '-') headerLeftCount++;
+            if (ol.prefix == ' ' || ol.prefix == '+') headerRightCount++;
+        }
+
+        patch += QStringLiteral("@@ -%1,%2 +%3,%4 @@").arg(hunk.leftStart).arg(headerLeftCount)
+                 .arg(hunk.rightStart).arg(headerRightCount);
+        if (!hunk.caption.isEmpty())
+            patch += QStringLiteral(" ") + hunk.caption;
+        patch += QStringLiteral("\n");
+
+        for (const auto &ol : outLines) {
+            patch += ol.prefix + ol.text + QStringLiteral("\n");
+        }
+    }
+
+    return patch;
+}
+
 QString DiffEditor::buildPatchForHunks(const QString &fileName, const QList<int> &hunkIndexes) const
 {
     if (fileName.isEmpty() || hunkIndexes.isEmpty() || m_currentHunks.isEmpty()) {
@@ -946,27 +1294,33 @@ void DiffEditor::contextMenuEvent(QContextMenuEvent *event)
 
 void DiffEditor::onStageSelectedClicked()
 {
-    QList<int> selectedHunks = getSelectedHunkIndexes();
-    if (selectedHunks.isEmpty()) {
-        // No selected hunks, do nothing
+    int startSynced, endSynced;
+    if (!getSelectionSyncedRange(startSynced, endSynced)) {
+        qDebug() << "StageSelected: no text selection";
         return;
     }
 
-    QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+    qDebug() << "StageSelected: synced range" << startSynced << endSynced
+             << "m_syncedLines.size()" << m_syncedLines.size()
+             << "m_fileIsNew" << m_fileIsNew
+             << "m_fileName" << m_fileName;
+
+    QString patch = buildPatchForSelectedHunks(m_fileName, startSynced, endSynced);
+    qDebug() << "StageSelected: patch length" << patch.length();
     if (!patch.isEmpty()) {
+        qDebug() << "StageSelected: patch:\n" << patch;
         emit stageSelectedPatch(m_fileName, patch);
     }
 }
 
 void DiffEditor::onRevertSelectedClicked()
 {
-    QList<int> selectedHunks = getSelectedHunkIndexes();
-    if (selectedHunks.isEmpty()) {
-        // No selected hunks, do nothing
+    int startSynced, endSynced;
+    if (!getSelectionSyncedRange(startSynced, endSynced)) {
         return;
     }
 
-    QString patch = buildPatchForHunks(m_fileName, selectedHunks);
+    QString patch = buildPatchForSelectedHunks(m_fileName, startSynced, endSynced);
     if (!patch.isEmpty()) {
         emit revertSelectedPatch(m_fileName, patch);
     }

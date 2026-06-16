@@ -135,6 +135,12 @@ private:
     QStringList getSelectedLines() const;
     QString buildPatchForHunks(const QString &fileName, const QList<int> &hunkIndexes) const;
     QList<int> getSelectedHunkIndexes() const;
+    /// Получить диапазон synced-строк, соответствующий выделению текста в панелях
+    bool getSelectionSyncedRange(int &startLine, int &endLine) const;
+    /// Построить патч только из выбранных synced-строк (строчный partial stage)
+    QString buildPatchForSelection(const QString &fileName, int startSynced, int endSynced) const;
+    /// Построить отфильтрованный патч из hunks, оставляя только выделенные synced-строки
+    QString buildPatchForSelectedHunks(const QString &fileName, int startSynced, int endSynced) const;
     QList<Hunk> m_currentHunks;
     QVector<SyncedLine> m_syncedLines;
 
