@@ -177,6 +177,9 @@ private:
     // Флаг для предотвращения рекурсии при синхронизации скролла
     bool m_syncingScroll;
 
+    // Сохранённая позиция скролла для восстановления после обновления diff
+    int m_savedScrollPos = -1;
+
     // Полное содержимое файлов (для side-by-side diff)
     QString m_leftFullContent;
     QString m_rightFullContent;

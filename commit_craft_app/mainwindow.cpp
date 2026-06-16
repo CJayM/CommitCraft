@@ -21,6 +21,7 @@
 #include <QUrl>
 #include <QFileIconProvider>
 #include <QFileInfo>
+#include <QProcess>
 #include <QPixmap>
 #include <QTemporaryFile>
 #include "./ui_mainwindow.h"
@@ -649,11 +650,6 @@ void MainWindow::onGitStatusFinished(const QString &output)
 
     // Включаем watcher обратно после обновления
     m_fsWatcher->blockSignals(false);
-
-    // Обновляем diff с актуальными данными моделей
-    if (!m_lastSelectedFileName.isEmpty()) {
-        updateDiffPanel(m_lastSelectedFileName);
-    }
 
     git->getCommitHistory();
 }
@@ -1937,7 +1933,43 @@ void MainWindow::onStageSelectedPatch(const QString &fileName, const QString &pa
         return;
     }
 
+    // После успешного стейджа обновляем diff синхронно, чтобы m_currentHunks
+    // в DiffEditor содержал актуальные данные для последующих операций.
     refreshGitStatus();
+    if (!m_lastSelectedFileName.isEmpty()) {
+        // Синхронно получаем diff (рабочая директория vs индекс)
+        QString diffOutput;
+        {
+            QProcess diffProcess;
+            diffProcess.setProgram(git->getGitExecutable());
+            diffProcess.setArguments({QStringLiteral("diff"), QStringLiteral("--"), m_lastSelectedFileName});
+            diffProcess.setWorkingDirectory(repositoryPath);
+            diffProcess.start();
+            if (diffProcess.waitForFinished(30000) && diffProcess.exitCode() == 0) {
+                diffOutput = QString::fromUtf8(diffProcess.readAllStandardOutput());
+            } else {
+                qDebug() << "Sync diff failed, exit code:" << diffProcess.exitCode()
+                         << "stderr:" << diffProcess.readAllStandardError();
+            }
+        }
+
+        qDebug() << "Sync diff output length:" << diffOutput.length();
+
+        // Обновляем содержимое и diff в DiffEditor
+        QString leftContent = getFileContent(m_lastSelectedFileName, true);  // staged
+        QString rightContent = getFileContent(m_lastSelectedFileName, false); // current
+        diffEditor->setDiffMode(HunkActionPanel::UnstagedDiff);
+        diffEditor->setFileIsNew(false);
+        diffEditor->setContents(leftContent, rightContent, m_lastSelectedFileName, repositoryPath);
+
+        if (!diffOutput.isEmpty()) {
+            GitParser parser;
+            QList<Hunk> hunks = parser.parseDiffOutput(diffOutput);
+            qDebug() << "Sync diff parsed hunks:" << hunks.size()
+                     << "leftStart:" << (hunks.isEmpty() ? -1 : hunks[0].leftStart);
+            diffEditor->applyDiffData(hunks);
+        }
+    }
 }
 
 void MainWindow::onRevertSelectedPatch(const QString &fileName, const QString &patch)

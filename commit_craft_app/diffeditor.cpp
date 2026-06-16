@@ -86,6 +86,9 @@ void DiffEditor::setContentsRaw(const QByteArray &leftData,
                                  const QString &repositoryPath,
                                  const QString &encoding)
 {
+    // Сохраняем позицию скролла перед очисткой
+    m_savedScrollPos = ui->leftPanel->verticalScrollBar()->value();
+
     // Убираем лишние кавычки если есть
     QString cleanFileName = fileName.trimmed();
     if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
@@ -197,6 +200,9 @@ void DiffEditor::setContents(const QString &leftContent,
                               const QString &fileName,
                               const QString &repositoryPath)
 {
+    // Сохраняем позицию скролла перед очисткой
+    m_savedScrollPos = ui->leftPanel->verticalScrollBar()->value();
+
     // Убираем лишние кавычки если есть
     QString cleanFileName = fileName.trimmed();
     if (cleanFileName.startsWith('"') && cleanFileName.endsWith('"')) {
@@ -436,6 +442,12 @@ void DiffEditor::applyDiffData(const QList<Hunk> &hunks)
     ui->rightPanel->setPlaceholderLines(rightPlaceholders);
 
     updateButtonsVisibility();
+
+    // Восстанавливаем позицию скролла, если была сохранена
+    if (m_savedScrollPos >= 0) {
+        ui->leftPanel->verticalScrollBar()->setValue(m_savedScrollPos);
+        m_savedScrollPos = -1;
+    }
 }
 
 void DiffEditor::applyFontSettings(const QString &fontFamily, int fontSize)

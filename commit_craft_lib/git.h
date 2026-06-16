@@ -216,9 +216,12 @@ private:
 
     // Git parser
     GitParser m_gitParser;
-    
+
+public:
     // Helper methods
     QString getGitExecutable() const;
+
+private:
     void setupProcess(QProcess *process, const QStringList &arguments);
 };
 
