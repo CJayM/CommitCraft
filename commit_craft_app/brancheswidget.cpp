@@ -281,9 +281,8 @@ void BranchesWidget::populateLocalBranches(const QList<QString> &branches, const
             item->setText(0, branch);
         }
 
-        QFont font = item->font(0);
-        font.setBold(branch == currentBranch);
-        font.setWeight(branch == currentBranch ? QFont::Bold : QFont::Normal);
+        QFont font = m_treeWidget->font();
+        font.setWeight(branch == currentBranch ? QFont::DemiBold : QFont::Normal);
         item->setFont(0, font);
     }
 }
