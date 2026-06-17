@@ -9,13 +9,13 @@ TEMPLATE = app
 # --- Version Updater ---
 VERSION_UPDATER_SCRIPT = version_updater
 version_update.target = version_update
-version_update.commands = %VERSION_UPDATER_SCRIPT% --make_pri $$PWD
+version_update.commands = $$VERSION_UPDATER_SCRIPT --make_pri $$PWD
 version_update.depends = FORCE
 QMAKE_EXTRA_TARGETS += version_update
 PRE_TARGETDEPS += version_update
+include(./_version.pri)
 # --------------------
 
-include(./_version.pri)
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
