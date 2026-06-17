@@ -15,6 +15,7 @@ venv/
 .venv/
 node_modules/
 __pycache__/
+memory/
 .mypy_cache/
 .pytest_cache/
 dist/
