@@ -198,6 +198,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_dirTreeView->selectionModel(), &QItemSelectionModel::currentChanged,
             this, &MainWindow::onDirTreeSelectionChanged);
 
+    // Context menu for directory tree
+    m_dirTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_dirTreeView, &QTreeView::customContextMenuRequested,
+            this, &MainWindow::showDirTreeContextMenu);
+
     // Сохраняем имя ветки при попытке checkout
     connect(ui->branchesWidget, &BranchesWidget::checkoutAttempted, this, [this](const QString &branch) {
         m_lastCheckoutBranch = branch;
@@ -1821,6 +1826,32 @@ void MainWindow::applyDirectoryFilter()
 
     unstagedFilesModel->setFiles(filteredUnstaged);
     stagedFilesModel->setFiles(filteredStaged);
+}
+
+void MainWindow::showDirTreeContextMenu(const QPoint &pos)
+{
+    QModelIndex index = m_dirTreeView->indexAt(pos);
+    if (!index.isValid()) return;
+
+    QString dirPath = index.data(Qt::UserRole).toString();
+    if (dirPath.isEmpty()) {
+        // Корневой элемент — открываем корень репозитория
+        dirPath = repositoryPath;
+    } else {
+        dirPath = QDir(repositoryPath).absoluteFilePath(dirPath);
+    }
+
+    QMenu contextMenu(this);
+    QAction *openDirAction = contextMenu.addAction(tr("Открыть директорию"));
+    connect(openDirAction, &QAction::triggered, this, [this, dirPath]() {
+        if (QDir(dirPath).exists()) {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));
+        } else {
+            QMessageBox::warning(this, tr("Ошибка"), tr("Директория не существует: %1").arg(dirPath));
+        }
+    });
+
+    contextMenu.exec(m_dirTreeView->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::showAboutDialog()

@@ -118,6 +118,7 @@ private slots:
 
     // Фильтрация по директории
     void onDirTreeSelectionChanged(const QModelIndex &current, const QModelIndex &previous);
+    void showDirTreeContextMenu(const QPoint &pos);
 
 private:
     void saveSplitterState();
