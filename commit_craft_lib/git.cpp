@@ -28,6 +28,7 @@ Git::Git(QObject *parent)
     , m_stashProcess(new QProcess(this))
     , m_createStashProcess(new QProcess(this))
     , m_submoduleProcess(new QProcess(this))
+    , m_cloneProcess(new QProcess(this))
     , m_gitParser(this)
 {
     // Connect process signals
@@ -119,6 +120,11 @@ Git::Git(QObject *parent)
     connect(m_submoduleProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Git::onSubmodulesFinished); // По умолчанию getSubmodules
     connect(m_submoduleProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
+
+    // Clone operation
+    connect(m_cloneProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &Git::onCloneFinished);
+    connect(m_cloneProcess, &QProcess::errorOccurred, this, &Git::onProcessError);
 }
 
 // ... (rest of the implementation remains the same)
@@ -1333,6 +1339,46 @@ void Git::onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void Git::onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     onApplyStashFinished(exitCode, exitStatus);
+}
+
+// Clone operation implementation
+void Git::cloneRepository(const QString &url, const QString &destination)
+{
+    if (url.isEmpty()) {
+        emit cloneReady(false, "URL is empty");
+        return;
+    }
+
+    if (destination.isEmpty()) {
+        emit cloneReady(false, "Destination path is empty");
+        return;
+    }
+
+    if (QDir(destination).exists()) {
+        emit cloneReady(false, "Destination directory already exists");
+        return;
+    }
+
+    QStringList args;
+    args << "clone" << url << destination;
+
+    m_cloneProcess->setProgram(getGitExecutable());
+    m_cloneProcess->setArguments(args);
+    m_cloneProcess->start();
+}
+
+void Git::onCloneFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitCode != 0) {
+        QString error = m_cloneProcess->readAllStandardError();
+        if (error.isEmpty()) {
+            error = m_cloneProcess->errorString();
+        }
+        emit cloneReady(false, error.trimmed());
+        return;
+    }
+
+    emit cloneReady(true, "Repository cloned successfully");
 }
 
 // Submodule operations implementation

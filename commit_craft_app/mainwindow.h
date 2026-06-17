@@ -55,6 +55,8 @@ private slots:
     void openSettingsDialog();
     void editGitignore();
     void openRepository();
+    void onCloneRepository();
+    void onCloneFinished(bool success, const QString &message);
     void refreshGitStatus();
     void onGitStatusFinished(const QString &output);
     void onGitDiffReady(const QString &output);
@@ -162,6 +164,9 @@ private:
     
     // Для повторного checkout с stash
     QString m_lastCheckoutBranch;
+
+    // Для клонирования
+    QString m_lastCloneDestination;
     
     // Дополнительные действия контекстного меню
     void copyFilePath(const QString &fileName);

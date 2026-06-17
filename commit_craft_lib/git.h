@@ -75,6 +75,9 @@ public:
     void dropStash(const QString &stashRef);
     void showStash(const QString &stashRef);
     
+    // Clone operation
+    void cloneRepository(const QString &url, const QString &destination);
+
     // Submodule operations
     void getSubmodules();
     void initSubmodule(const QString &path);
@@ -121,6 +124,9 @@ signals:
     void stashDropped(bool success, const QString &message);
     void stashShown(const QString &diff);
     
+    // Clone signal
+    void cloneReady(bool success, const QString &message);
+
     // Submodule signals
     void submodulesReady(const QList<QStringList> &submodules); // name, path, url, branch, commit, head, dirty, uninitialized, missing
     void submoduleInitReady(bool success, const QString &message);
@@ -172,6 +178,9 @@ private slots:
     void onDropStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onShowStashFinished(int exitCode, QProcess::ExitStatus exitStatus);
     
+    // Clone slot
+    void onCloneFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
     // Submodule slots
     void onSubmodulesFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onSubmoduleInitFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -209,6 +218,7 @@ private:
     QProcess *m_stashProcess;        // Для stash операций (apply/drop/show)
     QProcess *m_createStashProcess;  // Для создания stash
     QProcess *m_submoduleProcess;    // Для submodule операций
+    QProcess *m_cloneProcess;        // Для clone операции
 
     // Temporary storage for async operations
     QList<QString> m_currentBranchesList;

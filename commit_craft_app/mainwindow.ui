@@ -713,6 +713,7 @@
      <string>Файл</string>
     </property>
     <addaction name="actionOpenRepository"/>
+    <addaction name="actionCloneRepository"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -804,6 +805,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionCloneRepository">
+   <property name="text">
+    <string>Клонировать...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+K</string>
    </property>
   </action>
   <action name="actionSettings">

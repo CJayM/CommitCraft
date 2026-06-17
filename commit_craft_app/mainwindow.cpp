@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "clonedialog.h"
 #include <QCloseEvent>
 #include <QDebug>
 #include <QDir>
@@ -290,6 +291,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect the menu actions to their slots
     connect(ui->actionOpenRepository, &QAction::triggered, this, &MainWindow::openRepository);
+    connect(ui->actionCloneRepository, &QAction::triggered, this, &MainWindow::onCloneRepository);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::openSettingsDialog);
     connect(ui->actionEditGitignore, &QAction::triggered, this, &MainWindow::editGitignore);
     connect(ui->actionCommit, &QAction::triggered, this, &MainWindow::commitChanges);
@@ -433,6 +435,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(git, &Git::removeRemoteReady, this, &MainWindow::onRemoveRemoteReady);
     connect(git, &Git::renameRemoteReady, this, &MainWindow::onRenameRemoteReady);
     connect(git, &Git::remotesReady, this, &MainWindow::onRemotesReady);
+    connect(git, &Git::cloneReady, this, &MainWindow::onCloneFinished);
     
     // Connect submodule signals
     connect(git, &Git::submodulesReady, this, &MainWindow::onSubmodulesReady);
@@ -700,6 +703,33 @@ void MainWindow::openRepository()
 
     if (!dir.isEmpty()) {
         openRepositoryPath(dir);
+    }
+}
+
+void MainWindow::onCloneRepository()
+{
+    CloneDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        QString url = dialog.getRepositoryUrl();
+        QString dest = dialog.getDestinationPath();
+
+        if (!url.isEmpty() && !dest.isEmpty()) {
+            m_lastCloneDestination = dest;
+            git->cloneRepository(url, dest);
+        }
+    }
+}
+
+void MainWindow::onCloneFinished(bool success, const QString &message)
+{
+    if (success) {
+        QMessageBox::information(this, tr("Клонирование"),
+                                 tr("Репозиторий успешно склонирован!"));
+        openRepositoryPath(m_lastCloneDestination);
+        m_lastCloneDestination.clear();
+    } else {
+        QMessageBox::warning(this, tr("Ошибка клонирования"), message);
+        m_lastCloneDestination.clear();
     }
 }
 

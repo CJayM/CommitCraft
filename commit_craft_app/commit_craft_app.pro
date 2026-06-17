@@ -35,6 +35,7 @@ PRE_TARGETDEPS += version_update
 
 SOURCES += \
     brancheswidget.cpp \
+    clonedialog.cpp \
     codeeditor.cpp \
     diffeditor.cpp \
     diffhighlighter.cpp \
@@ -50,6 +51,7 @@ SOURCES += \
 HEADERS += \
     appstyle.h \
     brancheswidget.h \
+    clonedialog.h \
     codeeditor.h \
     diffeditor.h \
     diffhighlighter.h \
@@ -65,7 +67,8 @@ HEADERS += \
 FORMS += \
     mainwindow.ui \
     settingsdialog.ui \
-    diffeditor.ui
+    diffeditor.ui \
+    clonedialog.ui
 
 RESOURCES += \
     icons.qrc
