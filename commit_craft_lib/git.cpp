@@ -591,7 +591,8 @@ void Git::onLocalBranchesFinished(int exitCode, QProcess::ExitStatus exitStatus)
         }
 
         // Get current branch in parallel
-        m_currentBranchProcess->start(getGitExecutable(), {"rev-parse", "--abbrev-ref", "HEAD"});
+        setupProcess(m_currentBranchProcess, {"rev-parse", "--abbrev-ref", "HEAD"});
+        m_currentBranchProcess->start();
 
         // Store branches temporarily until we get current branch
         m_currentBranchesList = branches;
