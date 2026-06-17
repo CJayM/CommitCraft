@@ -3,35 +3,21 @@ QT += gui
 CONFIG += c++17
 
 
-DEFINES += APP_VERSION=\\\"$$VERSION\\\"
-
-# --- Чтение версии из .version ---
-exists($$PWD/.version) {
-    version_lines = $$cat($$PWD/.version, lines)
-    VERSION = $$member(version_lines, 1)
-} else {
-    VERSION = "0.0.0"
-}
-
-VERSION = $$replace(VERSION, "\\n", "")
-VERSION = $$replace(VERSION, "\\r", "")
-# --- END Чтение версии из .version ---
-
 TARGET = commit_craft
 TEMPLATE = app
 
 # --- Version Updater ---
-VERSION_UPDATER_SCRIPT = version_updater.bat
-
+VERSION_UPDATER_SCRIPT = version_updater
 version_update.target = version_update
-version_update.commands = $$VERSION_UPDATER_SCRIPT $$PWD
+version_update.commands = %VERSION_UPDATER_SCRIPT% --make_pri $$PWD
 version_update.depends = FORCE
 QMAKE_EXTRA_TARGETS += version_update
-
-# Выполнять перед каждой сборкой
 PRE_TARGETDEPS += version_update
 # --------------------
 
+include(./_version.pri)
+
+DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 SOURCES += \
     brancheswidget.cpp \
